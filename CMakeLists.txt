@@ -4,8 +4,12 @@ project(kproxy)
 # export compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+
 set(kproxy_server kproxys)
 set(kproxy_client kproxy)
+
+include_directories("${CMAKE_CURRENT_LIST_DIR}/include")
 
 # openssl #{
 if (WIN32)
