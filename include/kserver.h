@@ -122,16 +122,18 @@ class ServerToNetConnection //{
         size_t used_buffer_size;
         ConnectionId id;
 
+        static void tcp_read_callback   (uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
+        static void tcp_connect_callback(uv_connect_t* req, int status);
+        static void tcp_alloc_callback  (uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
+
     public:
         ServerToNetConnection(const sockaddr* addr, ConnectionId id, ClientConnectionProxy* p, uv_read_cb cb);
 
         ServerToNetConnection(const ServerToNetConnection&) = delete;
-        inline ServerToNetConnection(ServerToNetConnection&& a) {
-            *this = static_cast<ServerToNetConnection&&>(a);
-        }
+        ServerToNetConnection(ServerToNetConnection&& a) = delete;
 
-        ServerToNetConnection& operator=(ServerToNetConnection&) = delete;
-        ServerToNetConnection& operator=(ServerToNetConnection&&);
+        ServerToNetConnection& operator=(const ServerToNetConnection&) = delete;
+        ServerToNetConnection& operator=(ServerToNetConnection&&) = delete;
 
         /* wrapper of uv_write() */
         int write(uv_buf_t bufs[], unsigned int nbufs, uv_write_cb cb);

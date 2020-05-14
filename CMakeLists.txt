@@ -9,6 +9,16 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 set(kproxy_server kproxys)
 set(kproxy_client kproxy)
 
+set(kproxy_lib kpx)
+set(kproxy_lib_src 
+    lib/kpacket.cpp
+    lib/kclient.cpp
+    lib/kserver.cpp
+    lib/logger.cpp
+    lib/readonly_buf.cpp
+    lib/utils.cpp
+    )
+
 include_directories("${CMAKE_CURRENT_LIST_DIR}/include")
 
 # openssl #{
@@ -27,11 +37,52 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 
 add_subdirectory(./third_party/libuv)
 
+# library #{
+add_library(${kproxy_lib} STATIC ${kproxy_lib_src})
+
+add_dependencies(${kproxy_lib} uv_a)
+target_link_libraries(${kproxy_lib} uv_a)
+target_link_libraries(${kproxy_lib} ${OPENSSL_CRYPTO_LIBRARY})
+target_link_libraries(${kproxy_lib} ${OPENSSL_SSL_LIBRARY})
+#}
+
+# server #{
 add_executable(${kproxy_server} ./src/main.cpp)
 
 add_dependencies(${kproxy_server} uv_a)
 target_link_libraries(${kproxy_server} uv_a)
 
+target_link_libraries(${kproxy_server} ${kproxy_lib})
 target_link_libraries(${kproxy_server} ${OPENSSL_CRYPTO_LIBRARY})
 target_link_libraries(${kproxy_server} ${OPENSSL_SSL_LIBRARY})
+#}
+
+# client #{
+add_executable(${kproxy_client} ./app/main.cpp)
+
+add_dependencies(${kproxy_client} uv_a)
+target_link_libraries(${kproxy_client} uv_a)
+
+target_link_libraries(${kproxy_client} ${kproxy_lib})
+target_link_libraries(${kproxy_client} ${OPENSSL_CRYPTO_LIBRARY})
+target_link_libraries(${kproxy_client} ${OPENSSL_SSL_LIBRARY})
+#}
+
+# test #{
+file(GLOB TEST_FILES_CPP "${CMAKE_CURRENT_LIST_DIR}/tests/test-*.cpp")
+file(GLOB TEST_FILES_CX  "${CMAKE_CURRENT_LIST_DIR}/tests/test-*.cx")
+file(GLOB TEST_FILES     "${CMAKE_CURRENT_LIST_DIR}/tests/test-*.c")
+list(APPEND TEST_FILES ${TEST_FILES_CPP} ${TEST_FILES_CX})
+foreach (test_file IN LISTS TEST_FILES)
+    get_filename_component(fname ${test_file} NAME_WE)
+    string(LENGTH ${fname} fname_len)
+    math(EXPR name_len "${fname_len} - 5")
+    string(SUBSTRING ${fname} 5 ${name_len} execname)
+    message(STATUS "test=${execname}")
+    add_executable(${execname} ${test_file})
+    add_dependencies(${execname} ${kproxy_lib})
+    target_link_libraries(${execname} ${kproxy_lib})
+    set_target_properties(${execname} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
+endforeach()
+#}
 
