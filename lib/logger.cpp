@@ -3,9 +3,12 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <stdio.h>
+#include <stdarg.h>
 
 #include <vector>
 #include <tuple>
+
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
@@ -132,9 +135,11 @@ void Logger::new_line() //{
     *this->outputStream << std::endl << std::string(paddingSpace, ' ').c_str();
 } //}
 
-void Logger::__logger(const std::string& level, const char* msg) //{
+void Logger::__logger(const std::string& level, const char* xmsg, va_list list) //{
 {
     char buf[4096];
+    char msg[4096];
+    vsnprintf(msg, 4096, xmsg, list);
     this->begin_log(level);
     int len = strlen(msg);
     if(len == 0) {
@@ -165,25 +170,54 @@ void Logger::__logger(const std::string& level, const char* msg) //{
     }
 } //}
 
-void Logger::debug(const char* msg) //{
+void Logger::vdebug(const char* msg, va_list arg_list) //{
 {
     if(this->Level > LOGGER_DEBUG) return;
-    this->__logger("debug", msg);
+    this->__logger("debug", msg, arg_list);
 } //}
-void Logger::info (const char* msg) //{
+void Logger::vinfo (const char* msg, va_list arg_list) //{
 {
     if(this->Level > LOGGER_DEBUG) return;
-    this->__logger("info", msg);
+    this->__logger("info", msg, arg_list);
 } //}
-void Logger::warn(const char* msg) //{
+void Logger::vwarn(const char* msg, va_list arg_list) //{
 {
     if(this->Level > LOGGER_DEBUG) return;
-    this->__logger("warn", msg);
+    this->__logger("warn", msg, arg_list);
 } //}
-void Logger::error(const char* msg) //{
+void Logger::verror(const char* msg, va_list arg_list) //{
 {
     if(this->Level > LOGGER_DEBUG) return;
-    this->__logger("error", msg);
+    this->__logger("error", msg, arg_list);
+} //}
+
+void Logger::debug(const char* msg, ...) //{
+{
+    va_list arg_list;
+    va_start(arg_list, msg);
+    this->vdebug(msg, arg_list);
+    va_end(arg_list);
+} //}
+void Logger::info (const char* msg, ...) //{
+{
+    va_list arg_list;
+    va_start(arg_list, msg);
+    this->vinfo(msg, arg_list);
+    va_end(arg_list);
+} //}
+void Logger::warn (const char* msg, ...) //{
+{
+    va_list arg_list;
+    va_start(arg_list, msg);
+    this->vwarn(msg, arg_list);
+    va_end(arg_list);
+} //}
+void Logger::error(const char* msg, ...) //{
+{
+    va_list arg_list;
+    va_start(arg_list, msg);
+    this->verror(msg, arg_list);
+    va_end(arg_list);
 } //}
 
 Logger* logger = nullptr;
@@ -204,5 +238,10 @@ void logger_init_stdout() //{
     register_logger_cleaner = true;
     atexit(free_logger); // ease valgrind
 } //}
+
+void debug(const char* msg, ...) {va_list list; va_start(list, msg); logger->vdebug(msg, list); va_end(list);}
+void info (const char* msg, ...) {va_list list; va_start(list, msg); logger->vinfo (msg, list); va_end(list);}
+void warn (const char* msg, ...) {va_list list; va_start(list, msg); logger->vwarn (msg, list); va_end(list);}
+void error(const char* msg, ...) {va_list list; va_start(list, msg); logger->verror(msg, list); va_end(list);}
 
 }

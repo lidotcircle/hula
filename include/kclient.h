@@ -14,8 +14,7 @@ class ConnectionProxy;
 class ClientProxy;
 
 /**
- * @class Server a socks5 proxy server
- */
+ * @class Server a socks5 proxy server */
 class Server //{
 {
     private:
@@ -44,8 +43,7 @@ class Server //{
 }; //}
 
 /**
- * @class represent a socks5 connection
- */
+ * @class represent a socks5 connection */
 class ClientConnection //{
 {
     private:
@@ -68,10 +66,8 @@ class ClientConnection //{
     int write(uv_buf_t buf, uv_write_cb cb);
 }; //}
 
-
 /**
- * @class ConnectionProxy Multiplexing a single ssl/tls connection to multiple tcp connection
- */
+ * @class ConnectionProxy Multiplexing a single ssl/tls connection to multiple tcp connection */
 class ConnectionProxy //{
 {
     private:

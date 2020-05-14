@@ -8,8 +8,10 @@
 #include <tuple>
 #include <map>
 
+#include "../include/events.h"
 #include "../include/utils.h"
 #include "../include/kpacket.h"
+#include "dlinkedlist.hpp"
 
 /**                           DESIGN OVERVIEW                                     //{
  *
@@ -80,9 +82,8 @@ class ServerToNetConnection;
 /**
  * @class Server provides methods to listen at specific tcp address and 
  *        to handle incoming connection. Each object of this class own a tcp
- *        socket of uv(sole owner), and belong to an uv event loop.
- */
-class Server //{
+ *        socket of uv(sole owner), and belong to an uv event loop. */
+class Server: public EventEmitter //{
 {
     private:
         uint32_t bind_addr;
@@ -92,28 +93,24 @@ class Server //{
         uv_loop_t* mp_uv_loop;
         uv_tcp_t*  mp_uv_tcp;
 
-        void init_this(uv_loop_t* p_loop, uv_tcp_t* p_tcp, uint32_t a, uint16_t p);
+        DLinkedList<ClientConnectionProxy*>* tsl_list;
 
     public:
+        Server(uv_loop_t* loop, uint32_t bind_addr, uint16_t bind_port);
+
         Server(const Server&) = delete;
-        inline Server(const Server&& s) {
-            *this = static_cast<const Server&&>(s);
-        }
-
-        Server(uint32_t bind_addr, uint16_t bind_port);
-        Server(const std::string& bind_addr, const std::string& bind_port);
-
+        Server(Server&& s) = delete;
         Server& operator=(const Server&) = delete;
-        Server& operator=(const Server&&);
+        Server& operator=(Server&&) = delete;
 
         int listen();
+        int close();
 }; //}
 
 
 /**
- * @class ServerToNetConnection Proxy a single tcp connection. When new packet arrives, relay the packet to client
- */
-class ServerToNetConnection //{
+ * @class ServerToNetConnection Proxy a single tcp connection. When new packet arrives, relay the packet to client */
+class ServerToNetConnection: public EventEmitter //{
 {
     private:
         uv_tcp_t* mp_tcp;
@@ -148,9 +145,8 @@ class ServerToNetConnection //{
 
 
 /**
- * @class ClientConnectionProxy Multiplexing a single ssl/tls connection to multiple tcp connection
- */
-class ClientConnectionProxy //{
+ * @class ClientConnectionProxy Multiplexing a single ssl/tls connection to multiple tcp connection */
+class ClientConnectionProxy: public EventEmitter //{
 {
     private:
         std::map<uint8_t, ServerToNetConnection*> m_map;
@@ -178,6 +174,8 @@ class ClientConnectionProxy //{
 
         void server_handshake();
         void user_authenticate();
+
+        int close();
 
         inline size_t getConnectionNumbers() {return this->m_map.size();}
 }; //}

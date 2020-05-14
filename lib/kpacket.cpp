@@ -1,5 +1,6 @@
 #include "../include/kpacket.h"
 #include "../include/utils.h"
+#include "../include/robuf.h"
 
 #include <stdlib.h>
 #include <string.h>

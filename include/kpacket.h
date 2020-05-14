@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "utils.h"
+#include "robuf.h"
 
 /**               Packet Format                                   //{
  *       -------------------------------------------------------------------------

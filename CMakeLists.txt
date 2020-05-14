@@ -17,6 +17,7 @@ set(kproxy_lib_src
     lib/logger.cpp
     lib/readonly_buf.cpp
     lib/utils.cpp
+    lib/events.cpp
     )
 
 include_directories("${CMAKE_CURRENT_LIST_DIR}/include")

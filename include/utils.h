@@ -5,44 +5,22 @@
 
 #include <assert.h>
 
+#define xassert(expr) assert(expr)
+
 #include "logger.h"
 
 extern Logger::Logger logger;
 
-#define xassert(expr) assert(expr)
 
 X509* mem2cert(void* m, size_t len);
 RSA*  mem2rsa (void* m, size_t len);;
 
 
-struct ROBuf_shared {
-        void* base;
-        size_t ref;
-        void (*free)(ROBuf_shared*);
-};
+uint32_t k_htonl(uint32_t);
+uint32_t k_ntohl(uint32_t);
+uint16_t k_htons(uint16_t);
+uint16_t k_ntohs(uint16_t);
 
-
-class ROBuf //{
-{
-    private:
-        size_t len;
-        size_t offset;
-        ROBuf_shared* shared;
-
-    public:
-        ROBuf(size_t size);
-        ROBuf(const ROBuf& origin, size_t len, int offset = 0);
-        ROBuf(void* b, size_t size, size_t offset = 0, void (*free)(ROBuf_shared* b) = nullptr);
-        ROBuf(const ROBuf& a, const ROBuf& b);
-        
-        void ref();
-        void unref();
-
-        ROBuf operator+(const ROBuf& a);
-
-        void*  base() const;
-        size_t size() const;
-
-        ~ROBuf();
-}; //}
+char* ip4_to_str(uint32_t ip4);
+bool str_to_ip4(const char*, uint32_t* out);
 

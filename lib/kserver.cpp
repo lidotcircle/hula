@@ -1,5 +1,6 @@
 #include "../include/kserver.h"
 #include "../include/logger.h"
+#include "../include/utils.h"
 
 #include <uv.h>
 
@@ -10,6 +11,51 @@
 
 namespace KProxyServer {
 
+/**                     class Server                  *///{
+
+Server::Server(uv_loop_t* loop, uint32_t bind_addr, uint16_t bind_port): //{
+    bind_addr(bind_addr),
+    bind_port(bind_port),
+    mp_uv_loop(loop)
+{
+    this->mp_uv_tcp = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
+    uv_tcp_init(this->mp_uv_loop, this->mp_uv_tcp);
+
+    this->tsl_list = nullptr;
+} //}
+
+int Server::listen() //{ 
+{
+    std::cout << "????????????" << std::endl;
+    logger.debug("call Server::listen()");
+    sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_addr = {.s_addr = this->bind_addr};
+    addr.sin_port = this->bind_port;
+    int s = uv_tcp_bind(this->mp_uv_tcp, (sockaddr*)&addr, 0);
+    if(s != 0) {
+        logger.error("bind error");
+        return s;
+    }
+    s = uv_listen((uv_stream_t*)this->mp_uv_tcp, 100, nullptr);
+    if(s != 0) {
+        logger.error("listen error");
+    }
+    logger.debug("listen at %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
+    return s;
+} //}
+
+int Server::close() //{
+{
+    return 0;
+} //}
+
+//}
+
+/**                     class ClientConnectionProxy                  *///{
+//}
+
+/**             class ServerToNetConnection            */ //{
 void ServerToNetConnection::tcp_read_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
     if(nread < 0) {
@@ -88,11 +134,17 @@ int ServerToNetConnection::write(uv_buf_t bufs[], unsigned int nbufs, uv_write_c
             });
 } //}
 
+int ServerToNetConnection::realy_back(uv_buf_t buf) //{
+{
+    return 0;
+} //}
+
 ServerToNetConnection::~ServerToNetConnection() //{
 {
     Logger::debug("ServerToNetConnection:deconstructor() called");
     delete this->mp_tcp;
     this->mp_tcp = nullptr;
 } //}
+//}
 
 }

@@ -15,6 +15,8 @@
 #include <linux/limits.h>
 #endif // _WIN32 || _WIN64
 
+#include <stdarg.h>
+
 extern const char * __ALPHA;
 
 std::string random_string(size_t s = 8);
@@ -56,7 +58,7 @@ private:
 
     void begin_log(const std::string&);
     void new_line();
-    void __logger(const std::string& level, const char* msg);
+    void __logger(const std::string& level, const char* msg, va_list list);
 
 public:
     inline std::ostream& ostream() { return *this->outputStream; }
@@ -73,19 +75,25 @@ public:
 
 	~Logger();
 
-    void debug(const char*);
-    void info (const char*);
-    void warn (const char*);
-    void error(const char*);
+    void vdebug(const char*, va_list);
+    void vinfo (const char*, va_list);
+    void vwarn (const char*, va_list);
+    void verror(const char*, va_list);
+
+    void debug(const char*, ...);
+    void info (const char*, ...);
+    void warn (const char*, ...);
+    void error(const char*, ...);
 }; //}
 
 extern Logger* logger;
 
 void logger_init_stdout();
-inline void debug(const char* msg) {logger->debug(msg);}
-inline void info (const char* msg) {logger->info (msg);}
-inline void warn (const char* msg) {logger->warn (msg);}
-inline void error(const char* msg) {logger->error(msg);}
+
+void debug(const char* msg, ...);
+void info (const char* msg, ...);
+void warn (const char* msg, ...);
+void error(const char* msg, ...);
 
 }
 #endif // _LOGGER_H

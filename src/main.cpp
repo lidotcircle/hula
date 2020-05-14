@@ -3,6 +3,9 @@
 
 #include <openssl/crypto.h>
 
+#include <utils.h>
+#include <kserver.h>
+
 #include <iostream>
 #include <iomanip>
 
@@ -58,12 +61,15 @@ int main() //{
     uv_loop_t loop;
     uv_loop_init(&loop);
 
-    query_dns(&loop, "baidu.com");
-
-    if(start_server(&loop, "0.0.0.0", "8888") != 0) {
-        std::cout << "start server fail" << std::endl;
-        return 1;
+    uint32_t ipv4_addr;
+    if(str_to_ip4("0.0.0.0", &ipv4_addr) == false) {
+        logger.error("fatal error");
+        abort();
     }
+
+    KProxyServer::Server server(&loop, ipv4_addr, 8888);
+    std::cout << "????" << std::endl;
+    server.listen();
 
     uv_run(&loop, UV_RUN_DEFAULT);
 
