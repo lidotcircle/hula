@@ -9,7 +9,7 @@
 
 #include "logger.h"
 
-extern Logger::Logger logger;
+extern Logger::Logger* logger;
 
 
 X509* mem2cert(void* m, size_t len);

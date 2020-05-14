@@ -95,13 +95,16 @@ void CBList_insert_to_tail(CBList** cbl, EventCallback cb, CBFlags flags) //{
         old_tail->next = new_entry;
 } //}
 
-void EventEmitter::on(const std::string& event, EventCallback cb, CBFlags flags) //{
+void* EventEmitter::on(const std::string& event, EventCallback cb, CBFlags flags) //{
 {
     if(this->m_listeners.find(event) == this->m_listeners.end())
         this->m_listeners[event] = nullptr;
     CBList_insert_to_tail(&this->m_listeners[event], cb, flags);
+    auto x = this->m_listeners[event];
+    CBList_tail(&x);
+    return x;
 } //}
-void EventEmitter::emit(const std::string& event, void* argv) //{
+void  EventEmitter::emit(const std::string& event, void* argv) //{
 {
     if(this->m_listeners.find(event) == this->m_listeners.end()) return;
     CBList_head(&this->m_listeners[event]);
@@ -118,5 +121,14 @@ void EventEmitter::emit(const std::string& event, void* argv) //{
             h = h->next;
         }
     }
+} //}
+void  EventEmitter::remove(void* l) //{
+{
+    assert(l != nullptr);
+    CBList_delete((CBList**)&l);
+} //}
+void  EventEmitter::removeall() //{
+{
+    this->m_listeners.clear();
 } //}
 

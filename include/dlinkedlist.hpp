@@ -10,13 +10,13 @@ struct DLinkedList {
 };
 
 template<typename T>
-void DLinkedList_insert(DLinkedList<T>** cbl, T value) //{
+DLinkedList<T>* DLinkedList_insert(DLinkedList<T>** cbl, T value) //{
 {
     DLinkedList<T>* new_entry = new DLinkedList<T>(value);
 
     if(*cbl == nullptr) {
         *cbl = new_entry;
-        return;
+        return new_entry;
     }
 
     DLinkedList<T>* cbl_next = (*cbl)->next;
@@ -28,7 +28,7 @@ void DLinkedList_insert(DLinkedList<T>** cbl, T value) //{
         cbl_next->prev = new_entry;
         new_entry->next = cbl_next;
     }
-    return;
+    return new_entry;
 } //}
 template<typename T>
 void DLinkedList_delete(DLinkedList<T>** cbl) //{
@@ -71,7 +71,7 @@ void DLinkedList_tail(DLinkedList<T>** cbl) //{
     *cbl = c;
 } //}
 template<typename T>
-void DLinkedList_insert_to_head(DLinkedList<T>** cbl, T value) //{
+DLinkedList<T>* DLinkedList_insert_to_head(DLinkedList<T>** cbl, T value) //{
 {
     DLinkedList_head(cbl);
     DLinkedList<T>* new_entry = new DLinkedList<T>(value);
@@ -81,9 +81,10 @@ void DLinkedList_insert_to_head(DLinkedList<T>** cbl, T value) //{
     new_entry->next = old_head;
     if(old_head != nullptr)
         old_head->prev = new_entry;
+    return new_entry;
 } //}
 template<typename T>
-void DLinkedList_insert_to_tail(DLinkedList<T>** cbl, T value) //{
+DLinkedList<T>* DLinkedList_insert_to_tail(DLinkedList<T>** cbl, T value) //{
 {
     DLinkedList_tail(cbl);
     DLinkedList<T>* new_entry = new DLinkedList<T>();
@@ -93,5 +94,6 @@ void DLinkedList_insert_to_tail(DLinkedList<T>** cbl, T value) //{
     new_entry->prev = old_tail;
     if(old_tail != nullptr)
         old_tail->next = new_entry;
+    return new_entry;
 } //}
 

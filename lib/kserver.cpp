@@ -1,6 +1,7 @@
 #include "../include/kserver.h"
 #include "../include/logger.h"
 #include "../include/utils.h"
+#include "../include/dlinkedlist.hpp"
 
 #include <uv.h>
 
@@ -10,6 +11,7 @@
 
 
 namespace KProxyServer {
+using Logger::logger;
 
 /**                     class Server                  *///{
 
@@ -21,28 +23,28 @@ Server::Server(uv_loop_t* loop, uint32_t bind_addr, uint16_t bind_port): //{
     this->mp_uv_tcp = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
     uv_tcp_init(this->mp_uv_loop, this->mp_uv_tcp);
 
+    uv_handle_set_data((uv_handle_t*)this->mp_uv_tcp, this);
+
     this->tsl_list = nullptr;
 } //}
 
 int Server::listen() //{ 
 {
-    logger.debug("call Server::listen()");
+    logger->debug("call Server::listen()");
     sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_addr = {.s_addr = this->bind_addr};
-    addr.sin_port = this->bind_port;
+    uv_ip4_addr(ip4_to_str(this->bind_addr), this->bind_port, &addr);
     int s = uv_tcp_bind(this->mp_uv_tcp, (sockaddr*)&addr, 0);
     if(s != 0) {
-        logger.error("bind error %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
+        logger->error("bind error %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
         return s;
     }
-    s = uv_listen((uv_stream_t*)this->mp_uv_tcp, 100, nullptr);
+    s = uv_listen((uv_stream_t*)this->mp_uv_tcp, DEFAULT_BACKLOG, Server::on_connection);
     if(s != 0) {
-        logger.error("listen error %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
+        logger->error("listen error %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
         return s;
     }
-    logger.debug("listen at %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
-    return s;
+    logger->debug("listen at %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
+    return 0;
 } //}
 
 int Server::close() //{
@@ -50,12 +52,64 @@ int Server::close() //{
     return 0;
 } //}
 
+/** connection callback function */
+void Server::on_connection(uv_stream_t* stream, int status) //{
+{
+    logger->debug("connection callback called");
+    if(status < 0) {
+        logger->warn("new connection error");
+        return;
+    }
+
+    Server* _this = (Server*)uv_handle_get_data((uv_handle_t*)stream);
+    uv_tcp_t* client = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
+    uv_tcp_init(_this->mp_uv_loop, client);
+
+    if(uv_accept(stream, (uv_stream_t*)client) < 0) {
+        logger->warn("accept new connection error");
+        return;
+    }
+
+    connectionType* cb_arg = new connectionType(client);
+    _this->emit("connection", cb_arg);
+    delete cb_arg;
+
+    _this->dispatch_new_connection(client);
+    return;
+} //}
+
+/** dispatch connection to wrapper object */
+void Server::dispatch_new_connection(uv_tcp_t* connection) //{
+{
+    DLinkedList<ClientConnectionProxy*>* new_entry
+        = DLinkedList_insert<ClientConnectionProxy*>(&this->tsl_list, nullptr);
+    ClientConnectionProxy* newProxy = new ClientConnectionProxy(this, connection, new_entry);
+    new_entry->value = newProxy;
+} //}
 //}
 
 /**                     class ClientConnectionProxy                  *///{
+
+/** constructor */
+ClientConnectionProxy::ClientConnectionProxy(Server* server, uv_tcp_t* connection, 
+                                             DLinkedList<ClientConnectionProxy*>* list_entry) //{
+{
+    this->m_server = server;
+    this->m_connection = connection;
+    this->m_entry = list_entry;
+
+    uv_handle_set_data((uv_handle_t*)this->m_connection, this);
+
+    this->server_handshake();
+} //}
+
+void ClientConnectionProxy::server_handshake() //{
+{
+} //}
+
 //}
 
-/**             class ServerToNetConnection            */ //{
+/**                     class ServerToNetConnection            */ //{
 void ServerToNetConnection::tcp_read_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
     if(nread < 0) {

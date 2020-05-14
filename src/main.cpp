@@ -56,18 +56,32 @@ int start_server(uv_loop_t *p_loop, const char* bind_addr, const char* bind_port
     return uv_listen((uv_stream_t*)p_tcp_socket, 100, nullptr);
 } //}
 
+void connectEcho(EventEmitter* target, const std::string& ename, void* args) //{
+{
+    uv_tcp_t* client;
+    std::tie(client) = *(KProxyServer::Server::connectionType*)args;
+    sockaddr_in addr;
+    int len;
+    uv_tcp_getpeername(client, (sockaddr*)&addr, &len);
+    Logger::logger->info("new connection from %s:%d", ip4_to_str(k_ntohl(addr.sin_addr.s_addr)), addr.sin_port);
+} //}
+
 int main() //{
 {
+    Logger::logger_init_stdout();
     uv_loop_t loop;
     uv_loop_init(&loop);
 
     uint32_t ipv4_addr;
-    if(str_to_ip4("127.0.0.1", &ipv4_addr) == false) {
-        logger.error("fatal error");
+    if(str_to_ip4("0.0.0.0", &ipv4_addr) == false) {
+        logger->error("fatal error");
         abort();
     }
 
+    std::cout << std::setbase(16) << ipv4_addr;
+
     KProxyServer::Server server(&loop, ipv4_addr, 8888);
+    server.on("connection", connectEcho, CB_NONE);
     server.listen();
 
     uv_run(&loop, UV_RUN_DEFAULT);

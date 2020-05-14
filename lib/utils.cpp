@@ -8,7 +8,7 @@
 #include "../include/utils.h"
 
 /** global logger */
-Logger::Logger logger("kproxy", "./kproxy.log");
+Logger::Logger* logger = new Logger::Logger("kproxy", "./kproxy.log");
 
 
 X509* mem2cert(void* m, size_t len) //{
@@ -71,10 +71,10 @@ bool str_to_ip4(const char* str, uint32_t* out) //{
     dot_p[2]++;
 
     _ipv4_addr addr;
-    addr.a = atoi(copyx);
-    addr.b = atoi((char*)&dot_p[0]);
-    addr.c = atoi((char*)&dot_p[1]);
-    addr.d = atoi((char*)&dot_p[2]);
+    addr.a = atoi(copyx + 0);
+    addr.b = atoi(copyx + dot_p[0]);
+    addr.c = atoi(copyx + dot_p[1]);
+    addr.d = atoi(copyx + dot_p[2]);
 
     *out = k_ntohl(*(uint32_t*)&addr);
     return true;

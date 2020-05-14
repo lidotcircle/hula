@@ -8,10 +8,12 @@
 #include <tuple>
 #include <map>
 
-#include "../include/events.h"
-#include "../include/utils.h"
-#include "../include/kpacket.h"
+#include "events.h"
+#include "utils.h"
+#include "kpacket.h"
 #include "dlinkedlist.hpp"
+
+#define DEFAULT_BACKLOG 100
 
 /**                           DESIGN OVERVIEW                                     //{
  *
@@ -82,9 +84,16 @@ class ServerToNetConnection;
 /**
  * @class Server provides methods to listen at specific tcp address and 
  *        to handle incoming connection. Each object of this class own a tcp
- *        socket of uv(sole owner), and belong to an uv event loop. */
+ *        socket of uv(sole owner), and belong to an uv event loop. 
+ *
+ * @event connection @fires when new conection is accepted
+ *        (uv_tcp_t* accept_stream, Server* this_server)
+ */
 class Server: public EventEmitter //{
 {
+    public:
+        using connectionType = std::tuple<uv_tcp_t*>;
+
     private:
         uint32_t bind_addr;
         uint16_t bind_port;
@@ -94,6 +103,10 @@ class Server: public EventEmitter //{
         uv_tcp_t*  mp_uv_tcp;
 
         DLinkedList<ClientConnectionProxy*>* tsl_list;
+
+        static void on_connection(uv_stream_t* stream, int status);
+
+        void dispatch_new_connection(uv_tcp_t* stream);
 
     public:
         Server(uv_loop_t* loop, uint32_t bind_addr, uint16_t bind_port);
@@ -152,16 +165,14 @@ class ClientConnectionProxy: public EventEmitter //{
         std::map<uint8_t, ServerToNetConnection*> m_map;
         Server* m_server;
         uv_tcp_t* m_connection;
+        DLinkedList<ClientConnectionProxy*>* m_entry;
 
     public:
-        ClientConnectionProxy(Server* server);
+        ClientConnectionProxy(Server* server, uv_tcp_t* connection, DLinkedList<ClientConnectionProxy*>* list_entry);
 
         ClientConnectionProxy(const ClientConnectionProxy&) = delete;
-        inline ClientConnectionProxy(ClientConnectionProxy&& a) {
-            *this = static_cast<ClientConnectionProxy&&>(a);
-        };
-
-        ClientConnectionProxy& operator=(ClientConnectionProxy&&);
+        ClientConnectionProxy(ClientConnectionProxy&& a) = delete;
+        ClientConnectionProxy& operator=(ClientConnectionProxy&&) = delete;
         ClientConnectionProxy& operator=(const ClientConnectionProxy&) = delete;
 
         /**
@@ -174,6 +185,7 @@ class ClientConnectionProxy: public EventEmitter //{
 
         void server_handshake();
         void user_authenticate();
+
 
         int close();
 

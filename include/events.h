@@ -26,7 +26,9 @@ class EventEmitter {
         std::map<std::string, CBList*> m_listeners;
 
     public:
-        void on(const std::string&, EventCallback cb, CBFlags flags = CB_NONE);
-        void emit(const std::string&, void* argv);
+        void* on(const std::string&, EventCallback cb, CBFlags flags = CB_NONE);
+        void  emit(const std::string&, void* argv);
+        void  remove(void*);
+        void  removeall();
 };
 
