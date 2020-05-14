@@ -64,23 +64,25 @@ ServerToNetConnection::ServerToNetConnection(const sockaddr* addr, ConnectionId 
 int ServerToNetConnection::write(uv_buf_t bufs[], unsigned int nbufs, uv_write_cb cb) //{
 {
     Logger::debug("ServerToNetConnection::write() called");
-    using data_type = std::tuple<decltype(this), decltype(cb)>;
+    using data_type = std::tuple<decltype(this), decltype(cb), size_t>;
+
+    size_t size = 0;
+    for(int i=0;i<nbufs;i++)
+        size += bufs[i].len;
+    this->used_buffer_size += size;
 
     uv_write_t* p_req = new uv_write_t();
-    uv_req_set_data((uv_req_t*)p_req, new data_type(this, cb));
-
-    for(int i=0;i<nbufs;i++)
-        this->used_buffer_size += bufs[i].len;
+    uv_req_set_data((uv_req_t*)p_req, new data_type(this, cb, size));
 
     return uv_write(p_req, (uv_stream_t*)this->mp_tcp, bufs, nbufs, 
             [](uv_write_t* req, int status) -> void {
                 data_type* x = static_cast<data_type*>(uv_req_get_data((uv_req_t*)req));
                 ServerToNetConnection* _this = std::get<0>(*x);
                 uv_write_cb cb = std::get<1>(*x);
+                size_t size = std::get<2>(*x);
                 delete x;
                 
-                for(int i=0;i<req->nbufs;i++)
-                    _this->used_buffer_size -= req->bufs[i].len;
+                _this->used_buffer_size -= size;
 
                 cb(req, status);
             });
