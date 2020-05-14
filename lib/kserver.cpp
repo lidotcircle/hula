@@ -64,7 +64,7 @@ ServerToNetConnection::ServerToNetConnection(const sockaddr* addr, ConnectionId 
 int ServerToNetConnection::write(uv_buf_t bufs[], unsigned int nbufs, uv_write_cb cb) //{
 {
     Logger::debug("ServerToNetConnection::write() called");
-    using data_type = std::tuple<typeof(this), typeof(cb)>;
+    using data_type = std::tuple<decltype(this), decltype(cb)>;
 
     uv_write_t* p_req = new uv_write_t();
     uv_req_set_data((uv_req_t*)p_req, new data_type(this, cb));
