@@ -26,7 +26,6 @@ Server::Server(uv_loop_t* loop, uint32_t bind_addr, uint16_t bind_port): //{
 
 int Server::listen() //{ 
 {
-    std::cout << "????????????" << std::endl;
     logger.debug("call Server::listen()");
     sockaddr_in addr;
     addr.sin_family = AF_INET;
@@ -34,12 +33,13 @@ int Server::listen() //{
     addr.sin_port = this->bind_port;
     int s = uv_tcp_bind(this->mp_uv_tcp, (sockaddr*)&addr, 0);
     if(s != 0) {
-        logger.error("bind error");
+        logger.error("bind error %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
         return s;
     }
     s = uv_listen((uv_stream_t*)this->mp_uv_tcp, 100, nullptr);
     if(s != 0) {
-        logger.error("listen error");
+        logger.error("listen error %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
+        return s;
     }
     logger.debug("listen at %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
     return s;
