@@ -35,7 +35,7 @@ void Logger::initializeOutputFile() //{
 {
     char default_log_file[_PATH_MAX * 2];
 #if defined(_WIN32) || defined(_WIN64)
-    GetEnvironmentVariable(L"USERPROFILE", (wchar_t*)default_log_file, _PATH_MAX);
+    GetEnvironmentVariable((LPCSTR)"USERPROFILE", (LPSTR)default_log_file, _PATH_MAX);
 #else
     const char* home_path = ::getenv("HOME"); // TODO
     strcpy(default_log_file, home_path);
@@ -50,7 +50,7 @@ void Logger::initializeOutputStream() //{
 {
     this->outputStream = new std::fstream(this->fileName, std::ios_base::out | std::ios_base::app);
     if(errno != 0) {
-        std::cout << "FATAL Open file '" << this->fileName << "' fail!" << std::endl;
+        std::cout << "FATAL Open file '" << this->fileName.c_str() << "' fail!" << std::endl;
         abort();
     } else {
         this->helloLogger();
@@ -124,12 +124,12 @@ void Logger::begin_log(const std::string& level) //{
 		<< std::setfill('0') << std::setw(2) << std::right << _time_.tm_hour << ":" 
 		<< std::setfill('0') << std::setw(2) << std::right << _time_.tm_min << ":" 
         << std::setfill('0') << std::setw(2) << std::right << _time_.tm_sec << " "
-        << std::setfill(' ') << std::setw(5) << level << "]  ";
+        << std::setfill(' ') << std::setw(5) << level.c_str() << "]  ";
 } //}
 void Logger::new_line() //{
 {
     size_t paddingSpace = 25 + ::strlen((char*)this->title.c_str());
-    *this->outputStream << std::endl << std::string(paddingSpace, ' ');
+    *this->outputStream << std::endl << std::string(paddingSpace, ' ').c_str();
 } //}
 
 void Logger::__logger(const std::string& level, const char* msg) //{

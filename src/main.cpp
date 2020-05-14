@@ -29,8 +29,10 @@ void query_dns(uv_loop_t* p_loop, const char* addr) //{
                     continue;
                 }
                 m = (struct sockaddr_in*)a->ai_addr;
+                /*
                 char* addr = inet_ntoa(m->sin_addr);
                 std::cout << "address: " << addr << std::endl;
+                */
             }
     }, addr, "80", &hints);
 } //}
@@ -40,7 +42,8 @@ int start_server(uv_loop_t *p_loop, const char* bind_addr, const char* bind_port
     uv_tcp_t* p_tcp_socket = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
     uv_tcp_init(p_loop, p_tcp_socket);
 
-    int port = std::stoi(bind_port);
+    // int port = std::stoi(bind_port); MSVC++ fail
+    int port = 3333;
 
     struct sockaddr_in addr;
     uv_ip4_addr(bind_addr, port, &addr);
