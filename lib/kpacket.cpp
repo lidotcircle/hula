@@ -12,14 +12,14 @@
 
 
 /**
- * @param {ROBuf*} remain unfinished buffer
- * @param {ROBuf*} income latest recieved buffer
+ * @param {ROBuf} remain unfinished buffer
+ * @param {ROBuf} income latest recieved buffer
  * @return if get<0>(return) is nullptr, frame doesn't complete
  * @exception if income equals nullptr then raise error
  */
-std::tuple<ROBuf*, ROBuf*, PacketOp, ConnectionId> decode_packet(ROBuf* remain, ROBuf* income) //{
+std::tuple<bool, ROBuf, ROBuf, PacketOp, ConnectionId> decode_packet(const ROBuf remain, const ROBuf income) //{
 {
-    xassert(income != nullptr);
+    xassert(!income.empty());
 
     PacketHeader header;
     memset(&header, 0, sizeof(PacketHeader));
@@ -27,27 +27,27 @@ std::tuple<ROBuf*, ROBuf*, PacketOp, ConnectionId> decode_packet(ROBuf* remain, 
     uint32_t len = 0;
     size_t i = 0;
 
-    if(remain != nullptr)
-        i = remain->size();
+    if(!remain.empty())
+        i = remain.size();
     if(i > sizeof(PacketHeader))
         i = sizeof(PacketHeader);
     if(i > 0)
-        memcpy(&header, remain->base(), i);
+        memcpy(&header, remain.base(), i);
     if(i < sizeof(PacketHeader))
-        memcpy((char*)&header + i, income->base(), __MIN(sizeof(PacketHeader) - i, income->size()));
+        memcpy((char*)&header + i, income.base(), __MIN(sizeof(PacketHeader) - i, income.size()));
 
     size_t header_size = 0;
     switch(header.length) {
         case 0xFE:
-            header_size = offsetof(PacketHeader, extend_length.e32);
+            header_size = 4;
             len = ntohs(header.extend_length.e16);
             break;
         case 0xFF:
-            header_size = sizeof(PacketHeader);
+            header_size = 6;
             len = ntohl(header.extend_length.e32);
             break;
         default:
-            header_size = offsetof(PacketHeader, extend_length.e16);
+            header_size = 2;
             len = header.length;
             break;
     }
@@ -57,27 +57,24 @@ std::tuple<ROBuf*, ROBuf*, PacketOp, ConnectionId> decode_packet(ROBuf* remain, 
 
     xassert(len != 0); // TODO
 
-    if(len + header_size > (remain == nullptr ? 0 : remain->size()) + income->size()) {
-        if(remain != nullptr) {
-            return std::make_tuple(new ROBuf(*remain + *income), nullptr, op, id);
+    if(len + header_size > remain.size() + income.size()) {
+        if(!remain.empty()) {
+            return std::make_tuple(true, ROBuf(), ROBuf(remain + income), op, id);
         } else {
-            income->ref();
-            return std::make_tuple(new ROBuf(*income), nullptr, op, id);
+            return std::make_tuple(true, ROBuf(), income, op, id);
         }
     } else {
-        ROBuf* merge;
-        if(remain != nullptr) {
-            merge = new ROBuf(*remain + *income);
+        ROBuf merge;
+        if(!remain.empty()) {
+            merge = remain + income;
         } else {
-            merge = new ROBuf(*income);
-            merge->ref();
+            merge = income;
         }
-        ROBuf* frame = new ROBuf(merge, len, header_size);
-        merge->unref();
-        if(merge->size() == len + header_size)
-            return std::make_tuple(nullptr, frame, op, id);
-        ROBuf* remain = new ROBuf(merge, merge->size() - len - header_size, len + header_size);
-        return std::make_tuple(frame, remain, op, id);
+        ROBuf frame = ROBuf(merge, len, header_size);
+        if(merge.size() == len + header_size)
+            return std::make_tuple(true, frame, ROBuf(), op, id);
+        ROBuf remain = ROBuf(merge, merge.size() - len - header_size, len + header_size);
+        return std::make_tuple(true, frame, remain, op, id);
     }
 } //}
 
@@ -85,35 +82,35 @@ std::tuple<ROBuf*, ROBuf*, PacketOp, ConnectionId> decode_packet(ROBuf* remain, 
 /**
  * @see decode_packet()
  */
-std::tuple<std::vector<std::tuple<ROBuf*, PacketOp, uint8_t>>, ROBuf*> decode_all_packet(ROBuf* remain, ROBuf* income) //{
+std::tuple<bool, std::vector<std::tuple<ROBuf, PacketOp, uint8_t>>, ROBuf> decode_all_packet(const ROBuf remain, const ROBuf income) //{
 {
-    xassert(income != nullptr);
-    ROBuf *x_remain = nullptr, *x_income = new ROBuf(*income);
-    x_income->ref();
-    if(remain != nullptr) {
-        x_remain = new ROBuf(*remain);
-        x_remain->ref();
-    }
+    xassert(!income.empty());
 
-    std::vector<std::tuple<ROBuf*, PacketOp, uint8_t>> ret;
+    ROBuf x_remain;
+    ROBuf x_income(income);
+    if(!remain.empty())
+        x_remain = remain;
+
+    std::vector<std::tuple<ROBuf, PacketOp, uint8_t>> ret;
 
     while(true) {
-        ROBuf *a, *b;
+        bool error;
+        ROBuf a, b;
         PacketOp op;
         uint8_t id;
-        std::tie(a, b, op, id) = decode_packet(x_remain, x_income);
-        delete x_income;
-        delete x_remain;
-        if(a != nullptr) ret.push_back(std::make_tuple(a, op, id));
+        std::tie(error, a, b, op, id) = decode_packet(x_remain, x_income);
+        if(error == false)
+            return std::make_tuple(false, ret, b);
+        if(!a.empty()) ret.push_back(std::make_tuple(a, op, id));
         x_income = b;
-        x_remain = nullptr;
-        if(a == nullptr) {
+        x_remain = ROBuf();
+        if(a.empty()) {
             x_remain = b;
             break;
         }
     }
 
-    return std::make_tuple(ret, x_remain);
+    return std::make_tuple(true, ret, x_remain);
 } //}
 
 
@@ -143,7 +140,7 @@ ROBuf encode_packet_header(PacketOp op, ConnectionId id, size_t len) //{
     }
 
     ROBuf ret(header_size);
-    memcpy(ret.base(), &header, header_size);
+    memcpy(ret.__base(), &header, header_size);
     return ret;
 } //}
 
@@ -154,8 +151,6 @@ ROBuf encode_packet(PacketOp op, ConnectionId id, size_t len, void* buf) //{
     ROBuf header = encode_packet_header(op, id, len);
     ROBuf payload = ROBuf(buf, len);
     ROBuf ret = header + payload;
-    header.unref();
-    payload.unref();
     return ret;
 } //}
 

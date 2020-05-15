@@ -4,7 +4,8 @@ project(kproxy)
 # export compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+set(CMAKE_CXX_FLAGS "-g ${CMAKE_CXX_FLAGS}")
+set(CMAKE_C_FLAGS   "-g ${CMAKE_C_FLAGS}")
 
 set(kproxy_server kproxys)
 set(kproxy_client kproxy)

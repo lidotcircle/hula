@@ -39,8 +39,9 @@ struct PacketHeader {
     } extend_length;
 };
 
-std::tuple<ROBuf*, ROBuf*, PacketOp, ConnectionId> decode_packet(ROBuf* remain, ROBuf* income);
-std::tuple<std::vector<std::tuple<ROBuf*, PacketOp, uint8_t>>, ROBuf*> decode_all_packet(ROBuf* remain, ROBuf* income);
+/** @return <frame, remain, opcode, id> */
+std::tuple<bool, ROBuf, ROBuf, PacketOp, ConnectionId> decode_packet(ROBuf remain, ROBuf income);
+std::tuple<bool, std::vector<std::tuple<ROBuf, PacketOp, uint8_t>>, ROBuf> decode_all_packet(ROBuf remain, ROBuf income);
 
 ROBuf encode_packet_header(PacketOp op, ConnectionId id, size_t len);
 ROBuf encode_packet(PacketOp op, ConnectionId id, size_t len, void* buf);

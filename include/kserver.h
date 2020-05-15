@@ -126,7 +126,7 @@ class Server: public EventEmitter //{
 class ServerToNetConnection: public EventEmitter //{
 {
     public:
-        using data_callback = void (*)(ServerToNetConnection* con, uint8_t id, const uv_buf_t* buf);
+        using data_callback = void (*)(ServerToNetConnection* con, uint8_t id, ROBuf buf);
 
     private:
         uv_loop_t* mp_loop;
@@ -135,10 +135,15 @@ class ServerToNetConnection: public EventEmitter //{
         size_t used_buffer_size;
         ConnectionId id;
 
+        using write_callback = void (*)(void*);
+
         static void tcp_read_callback   (uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
         static void tcp_connect_callback(uv_connect_t* req, int status);
         static void tcp_alloc_callback  (uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
         static void tcp_write_callback  (uv_write_t* req, int status);
+
+        /** wrapper of uv_write() */
+        int _write(uv_buf_t bufs[], unsigned int nbufs, write_callback cb, void* arg);
 
     public:
         ServerToNetConnection(uv_loop_t* loop, const sockaddr* addr, ConnectionId id, ClientConnectionProxy* p);
@@ -149,10 +154,8 @@ class ServerToNetConnection: public EventEmitter //{
         ServerToNetConnection& operator=(ServerToNetConnection&&) = delete;
 
         /* 
-         * wrapper of uv_write() 
          * @return indicate congestion state, #return < 0 means connection is congested. */
-        int write(uv_buf_t  bufs[], unsigned int nbufs, uv_write_cb cb);
-        int write(uv_buf_t* buf);
+        int write(ROBuf buf);
 
         int realy_back(uv_buf_t buf);
 
@@ -179,7 +182,7 @@ class ClientConnectionProxy: public EventEmitter //{
         uv_tcp_t* m_connection;
         DLinkedList<ClientConnectionProxy*>* m_entry;
 
-        ROBuf* remains = nullptr;
+        ROBuf remains = ROBuf();
 
         static void malloc_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* out);
         static void read_cb  (uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
@@ -189,12 +192,12 @@ class ClientConnectionProxy: public EventEmitter //{
 
         void query_dns_connection(char* addr, uint16_t port, uint8_t id);
 
-        void dispatch_new_encrypted_data  (ssize_t nread, const uv_buf_t* buf);
-        void dispatch_new_unencrypted_data(ssize_t nread, const uv_buf_t* buf);
+        void dispatch_new_encrypted_data  (ssize_t nread, ROBuf buf);
+        void dispatch_new_unencrypted_data(ssize_t nread, ROBuf buf);
 
-        void dispatch_reg  (uint8_t id, ROBuf* buf);  // OPCODE PACKET_OP_REG
-        void dispatch_new  (uint8_t id, ROBuf* buf);  // OPCODE PACKET_OP_NEW
-        void dispatch_close(uint8_t id, ROBuf* buf);  // OPCODE PACKET_OP_CLOSE
+        void dispatch_reg  (uint8_t id, ROBuf buf);  // OPCODE PACKET_OP_REG
+        void dispatch_new  (uint8_t id, ROBuf buf);  // OPCODE PACKET_OP_NEW
+        void dispatch_close(uint8_t id, ROBuf buf);  // OPCODE PACKET_OP_CLOSE
 
         void to_internet_ipv4_connection(const sockaddr_in* addr, uint8_t id);
 

@@ -1,64 +1,115 @@
 #include "../include/robuf.h"
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
-void robuf_free(ROBuf_shared* b)
-{
-    free(b->base);
-    return;
+struct ROBuf_shared {
+        const char* base;
+        size_t ref;
+        free_func free;
 };
 
-ROBuf::ROBuf(size_t size): len(size), offset(0) 
+ROBuf::ROBuf(size_t size): len(size), offset(0) //{
 {
-    this->shared = (ROBuf_shared*)malloc(sizeof(ROBuf_shared));
+    if(this->len == 0) {
+        this->shared = nullptr;
+        return;
+    }
+    this->shared = new ROBuf_shared();
     this->shared->base = (char*)malloc(this->len);
-    this->shared->free = robuf_free;
-    this->shared->ref = 0;
-    this->ref();
-}
-
-ROBuf::ROBuf(const ROBuf& origin, size_t len, int offset) 
+    this->shared->free = free;
+    this->shared->ref = 1;
+} //}
+ROBuf::ROBuf(const ROBuf& origin, size_t len, int offset) //{
 {
     this->offset = offset + origin.offset;
+    assert(this->offset > 0);
     this->len = len;
     this->shared = origin.shared;
     this->ref();
-}
-
-ROBuf::ROBuf(void* b, size_t size, size_t offset, void (*free)(ROBuf_shared* b)): len(size), offset(offset)
+} //}
+ROBuf::ROBuf(void* b, size_t size, size_t offset, free_func free): len(size), offset(offset) //{
 {
-    this->shared = (ROBuf_shared*)malloc(sizeof(ROBuf_shared));
+    assert(size > 0 && size > offset);
+    this->shared = new ROBuf_shared();
     this->shared->base = (char*)b;
     this->shared->free = free;
-    this->shared->ref = 0;
-    this->ref();
-}
+    this->shared->ref = 1;
+} //}
 
-ROBuf::ROBuf(const ROBuf& a, const ROBuf& b): len(a.size() + b.size()), offset(0)
+ROBuf::ROBuf(): len(0), offset(0), shared(nullptr) {}
+ROBuf::ROBuf(const ROBuf& buf) //{
 {
-    this->shared = (ROBuf_shared*)malloc(sizeof(ROBuf_shared));
-    this->shared->free = robuf_free;
-    this->shared->ref = 0;
-    this->ref();
-
-    memcpy(this->base(), a.base(), a.size());
-    memcpy((char*)this->base() + a.size(), b.base(), b.size());
-}
-
-void ROBuf::ref()   {++this->shared->ref;}
-void ROBuf::unref() 
+    this->shared = nullptr;
+    (*this) = buf;
+    return;
+} //}
+ROBuf::ROBuf(ROBuf&& buf) //{
 {
+    this->shared = nullptr;
+    (*this) = static_cast<ROBuf&&>(buf);
+} //}
+
+ROBuf& ROBuf::operator=(const ROBuf& buf) //{
+{
+    this->unref();
+    this->len = buf.len;
+    this->offset = buf.offset;
+    this->shared = buf.shared;
+    this->ref();
+    return *this;
+} //}
+ROBuf& ROBuf::operator=(ROBuf&& buf) //{
+{
+    this->unref();
+    this->len = buf.len;
+    this->offset = buf.offset;
+    this->shared = buf.shared;
+    buf.shared = nullptr;
+    buf.len = 0;
+    buf.offset = 0;
+    return *this;
+} //}
+
+void ROBuf::ref() //{
+{
+    if(this->shared == nullptr) return;
+    ++this->shared->ref;
+} //}
+void ROBuf::unref() //{
+{
+    if(this->shared == nullptr) return;
     if(--this->shared->ref != 0) return;
-    if(this->shared->free == nullptr)
-        free(this->shared->base);
-    else
-        this->shared->free(this->shared);
-}
+    if(this->shared->free != nullptr)
+        this->shared->free((char*)this->shared->base);
+    delete this->shared;
+} //}
 
-ROBuf ROBuf::operator+(const ROBuf& a) {return ROBuf(*this, a);}
+ROBuf ROBuf::operator+(const ROBuf& a) const //{
+{
+    ROBuf buf(this->size() + a.size());
+    memcpy(buf.__base(), this->base(), this->size());
+    memcpy(buf.__base() + this->size(), a.base(), a.size());
+    return buf;
+} //}
 
-char*  ROBuf::base() const {return (char*)this->shared->base + this->offset;}
+const char*  ROBuf::base() const //{
+{
+    if(this->shared == nullptr) return nullptr;
+    return this->shared->base + this->offset;
+} //}
 size_t ROBuf::size() const {return this->len;}
 
-ROBuf::~ROBuf() {}
+void ROBuf::clear_free() //{
+{
+    if(this->shared == nullptr) return;
+    this->shared->free = nullptr;
+} //}
+std::tuple<free_func, char*> ROBuf::get_free() const //{
+{
+    if(this->shared == nullptr) return std::make_tuple(nullptr, nullptr);
+    return std::make_tuple(this->shared->free, (char*)this->shared->base);
+} //}
+
+ROBuf::~ROBuf() {this->unref();}
 

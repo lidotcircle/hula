@@ -1,12 +1,12 @@
 #pragma once
 
+#include <tuple>
+
 #include <stdlib.h>
 
-struct ROBuf_shared {
-        char* base;
-        size_t ref;
-        void (*free)(ROBuf_shared*);
-};
+typedef void (*free_func)(void*);
+
+struct ROBuf_shared;
 
 class ROBuf //{
 {
@@ -15,19 +15,30 @@ class ROBuf //{
         size_t offset;
         ROBuf_shared* shared;
 
-    public:
-        ROBuf(size_t size);
-        ROBuf(const ROBuf& origin, size_t len, int offset = 0);
-        ROBuf(void* b, size_t size, size_t offset = 0, void (*free)(ROBuf_shared* b) = nullptr);
-        ROBuf(const ROBuf& a, const ROBuf& b);
-        
         void ref();
         void unref();
 
-        ROBuf operator+(const ROBuf& a);
+    public:
+        ROBuf();
+        ROBuf(const ROBuf&);
+        ROBuf(ROBuf&&);
 
-        char*  base() const;
+        ROBuf& operator=(const ROBuf&);
+        ROBuf& operator=(ROBuf&&);
+
+        ROBuf(size_t size);
+        ROBuf(const ROBuf& origin, size_t len, int offset = 0);
+        ROBuf(void* b, size_t size, size_t offset = 0, free_func free = nullptr);
+
+        ROBuf operator+(const ROBuf& a) const;
+
+        const char* base() const;
+        inline char* __base() const {return const_cast<char*>(this->base());};
         size_t size() const;
+
+        inline bool empty() const {return this->shared == nullptr;}
+        void clear_free();
+        std::tuple<free_func, char*> get_free() const;
 
         ~ROBuf();
 }; //}

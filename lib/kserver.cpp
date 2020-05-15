@@ -131,30 +131,33 @@ void ClientConnectionProxy::read_cb  (uv_stream_t* stream, ssize_t nread, const 
     ClientConnectionProxy* proxy = 
         (ClientConnectionProxy*)uv_handle_get_data((uv_handle_t*)stream);
     assert(proxy != nullptr);
-    proxy->dispatch_new_encrypted_data(nread,buf);
+    ROBuf xbuf(buf->base, buf->len, 0, free);
+    proxy->dispatch_new_encrypted_data(nread, xbuf);
 } //}
 
-void ClientConnectionProxy::dispatch_new_encrypted_data(ssize_t nread, const uv_buf_t* buf) //{
+void ClientConnectionProxy::dispatch_new_encrypted_data(ssize_t nread, ROBuf buf) //{
 {
     // pass
     this->dispatch_new_unencrypted_data(nread, buf);
 } //}
 
-void ClientConnectionProxy::dispatch_new_unencrypted_data(ssize_t nread, const uv_buf_t* buf) //{
+void ClientConnectionProxy::dispatch_new_unencrypted_data(ssize_t nread, ROBuf buf) //{
 {
-    ROBuf v(buf->base, buf->len);
-    auto result = decode_all_packet(this->remains, &v);
-    std::vector<std::tuple<ROBuf*, PacketOp, uint8_t>> x;
-    ROBuf* y;
-    std::tie(x, y) = result;
+    auto result = decode_all_packet(this->remains, buf);
+    bool error;
+    std::vector<std::tuple<ROBuf, PacketOp, uint8_t>> x;
+    ROBuf y;
+    std::tie(error, x, y) = result;
 
-    this->remains->unref();
-    delete this->remains;
-    v.unref();
+    if(error) {
+        // packet error, give up TODO
+        return;
+    }
+
     this->remains = y;
 
     for(auto& z: x) {
-        ROBuf* a;
+        ROBuf a;
         PacketOp b;
         uint8_t id;
         std::tie(a, b, id) = z;
@@ -211,7 +214,7 @@ void ClientConnectionProxy::to_internet_ipv4_connection(const sockaddr_in* addr,
 /*
  * the request has format like | addr_len |    address:port   | 
  *                             |  16bit   |   addr_len bytes  |*/
-void ClientConnectionProxy::dispatch_new(uint8_t id, ROBuf* buf) //{
+void ClientConnectionProxy::dispatch_new(uint8_t id, ROBuf buf) //{
 {
     assert(id < 1 << 6);
     if(this->m_map.find(id) != this->m_map.end()) {
@@ -221,15 +224,15 @@ void ClientConnectionProxy::dispatch_new(uint8_t id, ROBuf* buf) //{
     }
 
     uint16_t len = 0;
-    len = k_ntohs(*(u_int16_t*)buf->base());
-    if(len + sizeof(len) != buf->size()) {
+    len = k_ntohs(*(u_int16_t*)buf.base());
+    if(len + sizeof(len) != buf.size()) {
         logger->warn("invalid packet with length %d", len);
         // TODO send a close packet to id
         return;
     }
 
     char* addr_pair = (char*)malloc(len + 1);
-    memcpy(addr_pair, buf->base(), len);
+    memcpy(addr_pair, buf.base(), len);
     addr_pair[len] = '0';
     int semicolon = find_semicolon(addr_pair);
     if(semicolon < 0) {
@@ -257,24 +260,21 @@ void ClientConnectionProxy::dispatch_new(uint8_t id, ROBuf* buf) //{
     return;
 } //}
 
-void ClientConnectionProxy::dispatch_reg(uint8_t id, ROBuf* buf) //{
+void ClientConnectionProxy::dispatch_reg(uint8_t id, ROBuf buf) //{
 {
     assert(this->m_map.find(id) != this->m_map.end());
     ServerToNetConnection* s = this->m_map[id];
-    uv_buf_t bufx;
-    bufx.base = (char*)buf->base();
-    bufx.len = buf->size();
-    s->write(&bufx);
+    s->write(buf);
 } //}
 
-void ClientConnectionProxy::dispatch_close(uint8_t id, ROBuf* buf) //{
+void ClientConnectionProxy::dispatch_close(uint8_t id, ROBuf buf) //{
 {
     assert(this->m_map.find(id) != this->m_map.end());
     ServerToNetConnection* s = this->m_map[id];
-    if( buf->size() > 0) {
-        char* reason = (char*)malloc(buf->size() + 1);
-        memcpy(reason, buf->base(), buf->size());
-        reason[buf->size()] = '\0';
+    if( buf.size() > 0) {
+        char* reason = (char*)malloc(buf.size() + 1);
+        memcpy(reason, buf.base(), buf.size());
+        reason[buf.size()] = '\0';
         logger->info("close connection because %s", reason);
         free(reason);
     }
@@ -409,12 +409,17 @@ ServerToNetConnection::ServerToNetConnection(uv_loop_t* loop, const sockaddr* ad
 // static
 void ServerToNetConnection::tcp_write_callback(uv_write_t* req, int status) //{
 {
-    std::tuple<ServerToNetConnection*, uv_write_cb, size_t>* x 
-        = static_cast<std::tuple<ServerToNetConnection*, uv_write_cb, size_t>*>(uv_req_get_data((uv_req_t*)req));
-    ServerToNetConnection* _this = std::get<0>(*x);
-    uv_write_cb cb = std::get<1>(*x);
-    size_t size = std::get<2>(*x);
+    std::tuple<ServerToNetConnection*, write_callback, size_t, void*>* x 
+        = static_cast<std::tuple<ServerToNetConnection*, write_callback, size_t, void*>*>(uv_req_get_data((uv_req_t*)req));
+    ServerToNetConnection* _this;
+    write_callback cb;
+    size_t size;
+    void *arg;
+    std::tie(_this, cb, size, arg) = *x;
     delete x;
+
+    if(cb != nullptr)
+        cb(arg);
 
     _this->used_buffer_size -= size;
 
@@ -422,15 +427,12 @@ void ServerToNetConnection::tcp_write_callback(uv_write_t* req, int status) //{
         // TODO close
         return;
     }
-
-    if(cb != nullptr)
-        cb(req, status);
 } //}
 
-int ServerToNetConnection::write(uv_buf_t bufs[], unsigned int nbufs, uv_write_cb cb) //{
+int ServerToNetConnection::_write(uv_buf_t bufs[], unsigned int nbufs, write_callback cb, void* arg) //{
 {
     Logger::debug("ServerToNetConnection::write() called");
-    using data_type = std::tuple<decltype(this), decltype(cb), size_t>;
+    using data_type = std::tuple<decltype(this), decltype(cb), size_t, void*>;
 
     size_t size = 0;
     for(int i=0;i<nbufs;i++)
@@ -438,7 +440,7 @@ int ServerToNetConnection::write(uv_buf_t bufs[], unsigned int nbufs, uv_write_c
     this->used_buffer_size += size;
 
     uv_write_t* p_req = new uv_write_t();
-    uv_req_set_data((uv_req_t*)p_req, new data_type(this, cb, size));
+    uv_req_set_data((uv_req_t*)p_req, new data_type(this, cb, size, arg));
 
     uv_write(p_req, 
              (uv_stream_t*)this->mp_tcp, 
@@ -448,9 +450,17 @@ int ServerToNetConnection::write(uv_buf_t bufs[], unsigned int nbufs, uv_write_c
 
     return this->used_buffer_size > CONNECTION_MAX_BUFFER_SIZE ? -1 : 0;
 } //}
-int ServerToNetConnection::write(uv_buf_t* buf) //{
+static void delete_buf(void* arg) {delete (ROBuf*)arg;}
+int ServerToNetConnection::write(ROBuf buf) //{
 {
-    return this->write(buf, 1, nullptr);
+    assert(!buf.empty());
+    ROBuf* memo_holder = new ROBuf(buf);
+    uv_buf_t* bufx = new uv_buf_t();
+    bufx->base = memo_holder->__base();
+    bufx->len = memo_holder->size();
+    int ret = this->_write(bufx, 1, delete_buf, memo_holder);
+    delete bufx;
+    return ret;
 } //}
 
 int ServerToNetConnection::realy_back(uv_buf_t buf) //{
@@ -472,3 +482,4 @@ ServerToNetConnection::~ServerToNetConnection() //{
 //}
 
 }
+
