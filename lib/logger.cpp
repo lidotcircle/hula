@@ -121,7 +121,7 @@ void Logger::begin_log(const std::string& level) //{
     LOCAL_TIME(_time_, t);
 
 	*this->outputStream << "[" << this->title.c_str() << " ";
-	*this->outputStream
+	*this->outputStream << std::setbase(10)
 		<< std::setw(2) << std::right << _time_.tm_mon + 1 << "-" 
 		<< std::setfill('0') << std::setw(2) << std::right << _time_.tm_mday  << " "
 		<< std::setfill('0') << std::setw(2) << std::right << _time_.tm_hour << ":" 

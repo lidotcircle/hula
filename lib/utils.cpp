@@ -26,8 +26,8 @@ RSA* mem2rsa(void* m, size_t len) //{
     return rsa;
 } //}
 
-static uint16_t bytes_endian_test = 0xFFEE;
-static bool little_endian() {return (uint8_t)bytes_endian_test == 0xEE;}
+static union {uint16_t u16; uint8_t u8;} bytes_endian_test = {.u16 = 0xFFEE};
+static bool little_endian() {return bytes_endian_test.u8 == 0xEE;}
 struct _ipv4_addr {uint8_t a, b, c, d;};
 struct __int_16 {uint8_t a, b;};
 static char ipv4str[20];

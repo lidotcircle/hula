@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 struct ROBuf_shared {
-        void* base;
+        char* base;
         size_t ref;
         void (*free)(ROBuf_shared*);
 };
@@ -26,7 +26,7 @@ class ROBuf //{
 
         ROBuf operator+(const ROBuf& a);
 
-        void*  base() const;
+        char*  base() const;
         size_t size() const;
 
         ~ROBuf();
