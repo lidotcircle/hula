@@ -7,15 +7,26 @@
 #include <tuple>
 #include <map>
 
+#include "../include/robuf.h"
+#include "../include/utils.h"
+#include "../include/events.h"
+
 namespace KProxyClient {
 
 class Server;
 class ConnectionProxy;
 class ClientProxy;
 
+enum ConnectionState {
+    CONNECTION_INIT = 0,
+    CONNECTION_OPEN,
+    CONNECTION_CLOSING,
+    CONNECTION_CLOSED
+};
+
 /**
  * @class Server a socks5 proxy server */
-class Server //{
+class Server: EventEmitter //{
 {
     private:
         uint32_t bind_addr;
@@ -26,6 +37,8 @@ class Server //{
         uv_tcp_t*  mp_uv_tcp;
 
         void init_this(uv_loop_t* p_loop, uv_tcp_t* p_tcp, uint32_t a, uint16_t p);
+
+        ConnectionState m_state;
 
     public:
         Server(const Server&) = delete;
@@ -40,62 +53,59 @@ class Server //{
         Server& operator=(const Server&&);
 
         int listen();
+        void close();
 }; //}
 
 /**
  * @class represent a socks5 connection */
-class ClientConnection //{
+class ClientConnection: EventEmitter //{
 {
     private:
         uv_tcp_t* mp_tcp;
-        ConnectionProxy* m_connectionWrapper;
-        uv_read_cb m_read_callback;
+        Server* mp_server;
+        ConnectionProxy* mp_proxy;
+        uint8_t m_id;
 
+        ConnectionState m_state;
+
+        void socks5_authenticate();
 
     public:
-        ClientConnection(const sockaddr* addr, ConnectionProxy* p, uv_read_cb cb);
+        ClientConnection(const sockaddr* addr, Server* p);
 
         ClientConnection(const ClientConnection&) = delete;
-        inline ClientConnection(ClientConnection&& a) {
-            *this = static_cast<ClientConnection&&>(a);
-        }
-
+        ClientConnection(ClientConnection&& a) = delete; 
         ClientConnection& operator=(ClientConnection&) = delete;
-        ClientConnection& operator=(ClientConnection&&);
+        ClientConnection& operator=(ClientConnection&&) = delete;
 
-    int write(uv_buf_t buf, uv_write_cb cb);
+        int write(ROBuf buf);
+        void close();
 }; //}
 
 /**
  * @class ConnectionProxy Multiplexing a single ssl/tls connection to multiple tcp connection */
-class ConnectionProxy //{
+class ConnectionProxy: EventEmitter //{
 {
     private:
         std::map<uint8_t, ClientProxy*> m_map;
         Server* m_server;
         uv_tcp_t* m_connection;
 
+        ConnectionState m_state;
+
+        void tsl_handshake();
+        void client_autheticate();
+
     public:
         ConnectionProxy(Server* server);
 
         ConnectionProxy(const ConnectionProxy&) = delete;
-        inline ConnectionProxy(ConnectionProxy&& a) {
-            *this = static_cast<ConnectionProxy&&>(a);
-        };
-
+        ConnectionProxy(ConnectionProxy&& a) = delete;
         ConnectionProxy& operator=(ConnectionProxy&&);
         ConnectionProxy& operator=(const ConnectionProxy&) = delete;
 
-        /**
-         * @param addr network address
-         * @return return 0 means everything is ok, otherwise error occurs
-         */
-        int new_connection(sockaddr* addr);
-
-        int release_connection(uint8_t);
-
-        void server_handshake();
-        void user_authenticate();
+        int write(uint8_t id,ROBuf buf);
+        void close();
 
         inline size_t getConnectionNumbers() {return this->m_map.size();}
 }; //}

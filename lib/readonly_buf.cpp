@@ -88,8 +88,8 @@ void ROBuf::unref() //{
 ROBuf ROBuf::operator+(const ROBuf& a) const //{
 {
     ROBuf buf(this->size() + a.size());
-    memcpy(buf.__base(), this->base(), this->size());
-    memcpy(buf.__base() + this->size(), a.base(), a.size());
+    if(this->size() > 0) memcpy(buf.__base(), this->base(), this->size());
+    if(a.size() > 0)     memcpy(buf.__base() + this->size(), a.base(), a.size());
     return buf;
 } //}
 
@@ -112,4 +112,22 @@ std::tuple<free_func, char*> ROBuf::get_free() const //{
 } //}
 
 ROBuf::~ROBuf() {this->unref();}
+
+
+static char __hex_code[17] = "0123456789ABCDEF";
+std::ostream& operator<<(std::ostream& o, const ROBuf& b) //{
+{
+    size_t i;
+    uint8_t m, n;
+    const char* base = b.base();
+    o << '\'';
+    for(i=0; i<b.size(); i++) {
+        m = (base[i] & 0xF0);
+        n = (base[i] & 0x0F) >> 4;
+        o << __hex_code[m] << __hex_code[n];
+    }
+    o << '\'';
+    return o;
+} //}
+
 

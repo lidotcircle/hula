@@ -43,3 +43,5 @@ class ROBuf //{
         ~ROBuf();
 }; //}
 
+std::ostream& operator<<(std::ostream& o, const ROBuf& b);
+

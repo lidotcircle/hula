@@ -19,6 +19,7 @@ set(kproxy_lib_src
     lib/readonly_buf.cpp
     lib/utils.cpp
     lib/events.cpp
+    lib/config_file.cpp
     )
 
 include_directories("${CMAKE_CURRENT_LIST_DIR}/include")
@@ -39,11 +40,16 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 
 add_subdirectory(./third_party/libuv)
 
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+add_subdirectory(./third_party/json)
+
 # library #{
 add_library(${kproxy_lib} STATIC ${kproxy_lib_src})
 
 add_dependencies(${kproxy_lib} uv_a)
+add_dependencies(${kproxy_lib} nlohmann_json)
 target_link_libraries(${kproxy_lib} uv_a)
+target_link_libraries(${kproxy_lib} nlohmann_json)
 target_link_libraries(${kproxy_lib} ${OPENSSL_CRYPTO_LIBRARY})
 target_link_libraries(${kproxy_lib} ${OPENSSL_SSL_LIBRARY})
 #}

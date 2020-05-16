@@ -25,26 +25,24 @@ std::tuple<bool, ROBuf, ROBuf, PacketOp, ConnectionId> decode_packet(const ROBuf
     memset(&header, 0, sizeof(PacketHeader));
 
     uint32_t len = 0;
-    size_t i = 0;
+    size_t i = remain.size();
 
-    if(!remain.empty())
-        i = remain.size();
     if(i > sizeof(PacketHeader))
         i = sizeof(PacketHeader);
     if(i > 0)
         memcpy(&header, remain.base(), i);
-    if(i < sizeof(PacketHeader))
+    if(i < sizeof(PacketHeader) || income.size() > 0)
         memcpy((char*)&header + i, income.base(), __MIN(sizeof(PacketHeader) - i, income.size()));
 
     size_t header_size = 0;
     switch(header.length) {
         case 0xFE:
             header_size = 4;
-            len = ntohs(header.extend_length.e16);
+            len = k_ntohs(header.extend_length.e16);
             break;
         case 0xFF:
             header_size = 6;
-            len = ntohl(header.extend_length.e32);
+            len = k_ntohl(header.extend_length.e32);
             break;
         default:
             header_size = 2;
@@ -52,14 +50,19 @@ std::tuple<bool, ROBuf, ROBuf, PacketOp, ConnectionId> decode_packet(const ROBuf
             break;
     }
 
+    Logger::logger->debug("len: %d, header_size: %d", len, header_size);
+
     PacketOp op     = (PacketOp)header.opcode;
     ConnectionId id = header.id;
+
+    if(remain.size() + income.size() < header_size)
+        return std::make_tuple(true, ROBuf(), remain + income, op, id);
 
     xassert(len != 0); // TODO
 
     if(len + header_size > remain.size() + income.size()) {
         if(!remain.empty()) {
-            return std::make_tuple(true, ROBuf(), ROBuf(remain + income), op, id);
+            return std::make_tuple(true, ROBuf(), remain + income, op, id);
         } else {
             return std::make_tuple(true, ROBuf(), income, op, id);
         }

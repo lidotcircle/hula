@@ -8,7 +8,7 @@
 #include "../include/utils.h"
 
 /** global logger */
-Logger::Logger* logger = new Logger::Logger("kproxy", "./kproxy.log");
+Logger::Logger* logger = new Logger::Logger("kproxy", "./kproxy.log", true);
 
 
 X509* mem2cert(void* m, size_t len) //{
@@ -26,7 +26,7 @@ RSA* mem2rsa(void* m, size_t len) //{
     return rsa;
 } //}
 
-static union {uint16_t u16; uint8_t u8;} bytes_endian_test = {.u16 = 0xFFEE};
+static union {uint16_t u16; struct {uint8_t u8; uint8_t xx;};} bytes_endian_test = {.u16 = 0xFFEE};
 static bool little_endian() {return bytes_endian_test.u8 == 0xEE;}
 struct _ipv4_addr {uint8_t a, b, c, d;};
 struct __int_16 {uint8_t a, b;};
@@ -114,7 +114,7 @@ uint16_t k_htons(uint16_t v) //{
         __int_16 vx;
         *(uint16_t*)&vx = v;
         uint8_t t = vx.a;
-        vx.a = vx.b; vx.a = t;
+        vx.a = vx.b; vx.b = t;
         return *(uint16_t*)&vx;
     } else {
         return v;
@@ -126,7 +126,7 @@ uint16_t k_ntohs(uint16_t v) //{
         __int_16 vx;
         *(uint16_t*)&vx = v;
         uint8_t t = vx.a;
-        vx.a = vx.b; vx.a = t;
+        vx.a = vx.b; vx.b = t;
         return *(uint16_t*)&vx;
     } else {
         return v;

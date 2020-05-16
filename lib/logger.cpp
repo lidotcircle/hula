@@ -12,6 +12,9 @@
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
+std::vector<Logger::Logger*> cleaned_logger;
+bool register_logger_cleaner = false;
+
 const char * __ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 std::string random_string(size_t s) //{
 {
@@ -27,6 +30,25 @@ std::string random_string(size_t s) //{
 } //}
 
 namespace Logger {
+
+Logger* logger = nullptr;
+void free_logger() //{
+{
+    while(cleaned_logger.size() != 0) {
+        delete cleaned_logger.back();
+        cleaned_logger.pop_back();
+    }
+} //}
+void logger_init_stdout() //{
+{
+    if(logger != nullptr) return;
+    logger = new Logger(random_string(), std::cout);
+    cleaned_logger.push_back(logger);
+    if(register_logger_cleaner) return;
+    register_logger_cleaner = true;
+    atexit(free_logger); // ease valgrind
+} //}
+
 
 void Logger::helloLogger() //{
 {
@@ -75,6 +97,14 @@ Logger::Logger()//{
     this->initializeOutputFile();
     this->initializeTitle(this->title.c_str());
     this->initializeOutputStream();
+} //}
+Logger::Logger(const std::string& title, const char* filename, bool clean): //{
+    fileName(filename)
+{
+    assert(clean && "clean logger at exit");
+    this->initializeTitle(title.c_str());
+    this->initializeOutputStream();
+    cleaned_logger.push_back(this);
 } //}
 Logger::Logger(const std::string& title, const char* filename): //{
     fileName(filename)
@@ -218,25 +248,6 @@ void Logger::error(const char* msg, ...) //{
     va_start(arg_list, msg);
     this->verror(msg, arg_list);
     va_end(arg_list);
-} //}
-
-Logger* logger = nullptr;
-bool register_logger_cleaner = false;
-
-void free_logger() //{
-{
-    if(logger != nullptr) {
-        delete logger;
-        logger = nullptr;
-    }
-} //}
-void logger_init_stdout() //{
-{
-    if(logger != nullptr) return;
-    logger = new Logger(random_string(), std::cout);
-    if(register_logger_cleaner) return;
-    register_logger_cleaner = true;
-    atexit(free_logger); // ease valgrind
 } //}
 
 void debug(const char* msg, ...) {va_list list; va_start(list, msg); logger->vdebug(msg, list); va_end(list);}

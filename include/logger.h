@@ -67,6 +67,7 @@ public:
     LoggerLevel Level = LOGGER_DEBUG;
 
     // constructor
+	Logger(const std::string& title, const char* filename, bool clean);
 	Logger(const std::string& title, const char* filename);
 	Logger(const std::string& title, const std::string& filename);
     Logger(const std::string& title, std::ostream& outstream);
