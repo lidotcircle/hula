@@ -80,21 +80,45 @@ enum ProxyRule {
 class SingleServerInfo //{
 {
     private:
-        uint32_t m_addr;
         uint16_t m_port;
+        std::string   m_addr;
         username_type m_user;
         password_type m_pass;
         certificate_type m_cert;
         cipher_type m_cipher;
 
-        size_t m_current_connection;
+        std::string   m_server_name;
+
+        size_t m_current_connection = 0;
 
     public:
-        SingleServerInfo(uint32_t addr, uint16_t port, 
-                const char* name,
-                const char* pass,
-                const char* cert,
-                const char* cipher);
+        SingleServerInfo(const std::string& addr, uint16_t port, 
+                const std::string& server_name,
+                const std::string& name,
+                const std::string& pass,
+                const std::string& cert,
+                const std::string& cipher);
+
+        inline void increase() {this->m_current_connection++;}
+        inline void decrease() {this->m_current_connection--;}
+
+        inline void new_port(uint16_t port){this->m_port = port;}
+        inline void new_addr(const std::string& addr){this->m_addr = addr;}
+        inline void new_user(const std::string& user){this->m_user = user;}
+        inline void new_pass(const std::string& pass){this->m_pass = pass;}
+        inline void new_cert(const std::string& cert){this->m_cert = cert;}
+        inline void new_cipher(const std::string& cipher){this->m_cipher = cipher;}
+        inline void new_name(const std::string& name){this->m_server_name = name;}
+
+        inline uint16_t Port(){return this->m_port;}
+        inline const std::string& new_addr(){return this->m_addr;}
+        inline const std::string& new_user(){return this->m_user;}
+        inline const std::string& new_pass(){return this->m_pass;}
+        inline const std::string& new_cert(){return this->m_cert;}
+        inline const std::string& new_cipher(){return this->m_cipher;}
+        inline const std::string& new_name(){return this->m_server_name;}
+
+        json to_json();
 }; //}
 struct ClientPolicy //{
 {
@@ -107,8 +131,9 @@ struct ClientPolicy //{
 class ClientConfig //{
 {
     public:
-        using LoadCallback  = void (*)(int status, void*);
-        using WriteCallback = void (*)(int status, void*);
+        /** status greater than 0 mean error, errno */
+        using LoadCallback  = void (*)(int error, void*);
+        using WriteCallback = void (*)(int error, void*);
 
     private:
         ConfigState                                  m_state;
@@ -117,9 +142,26 @@ class ClientConfig //{
         std::unordered_map<std::string, std::string> m_accounts;
         std::string                                  m_filename;
 
+        std::string m_error;
+
         uv_loop_t* mp_loop;
 
         static void open_file_callback(uv_fs_t* req);
+        static void stat_file_callback(uv_fs_t* req);
+        static void read_file_callback(uv_fs_t* req);
+        static void close_file_callback(uv_fs_t* req);
+
+        static void open_file_callback2(uv_fs_t* req);
+        static void write_file_callback(uv_fs_t* req);
+
+        int from_json(const json&, LoadCallback cb, void* data);
+        int set_policy(const json&);
+        int set_servers(const json&);
+        int set_users(const json&);
+
+        json to_json();
+        json servers_to_json();
+        json users_to_json();
 
     public:
         bool validateUser(const std::string& username, const std::string& password);
@@ -127,13 +169,22 @@ class ClientConfig //{
         int  loadFromFile(LoadCallback, void*);
         int  writeToFile (WriteCallback, void*);
 
-        ClientConfig(const char* filename);
+        ClientConfig(uv_loop_t* loop, const char* filename);
 
         ClientConfig() = delete;
         ClientConfig(const ClientConfig&) = delete;
         ClientConfig(ClientConfig&&) = delete;
         ClientConfig& operator=(const ClientConfig&) = delete;
         ClientConfig& operator=(ClientConfig&&) = delete;
+
+        inline json toJson() {return this->to_json();}
+
+        inline std::string getError() {return this->m_error;}
+
+        inline std::vector<SingleServerInfo>& Servers() {return this->m_servers;}
+        inline std::unordered_map<std::string, std::string>& Users() {return this->m_accounts;}
+
+        inline void new_file(const std::string& filename) {this->m_filename = filename;}
 }; //}
 
 class ServerConfig //{

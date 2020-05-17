@@ -1,0 +1,25 @@
+{
+    "mode": "global",
+    "rule": "all",
+    "bind_address": "0.0.0.0",
+    "bind_port":    1080,
+
+    "servers": [
+        {
+            "server_name": "beybey",
+            "address": "www.example.com",
+            "port": 8800,
+            "certificate": "fake certificate",
+            "cipher": "chacha20",
+            "username": "admin",
+            "password": "king"
+        }
+    ],
+
+    "local_users": [
+        {
+            "username": "username",
+            "password": "password"
+        }
+    ]
+}

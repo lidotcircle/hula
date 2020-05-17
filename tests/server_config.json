@@ -1,0 +1,10 @@
+{
+    "rsa_private_key": "dummy key",
+    "cipher": "chacha",
+    "users": [
+        {
+            "username": "admin",
+            "password": "password"
+        }
+    ]
+}
