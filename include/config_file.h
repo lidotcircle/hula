@@ -154,7 +154,7 @@ class ClientConfig //{
         static void open_file_callback2(uv_fs_t* req);
         static void write_file_callback(uv_fs_t* req);
 
-        int from_json(const json&, LoadCallback cb, void* data);
+        int from_json(const json&);
         int set_policy(const json&);
         int set_servers(const json&);
         int set_users(const json&);
@@ -191,7 +191,6 @@ class ServerConfig //{
 {
     public:
         using LoadCallback  = void (*)(int status, void*);
-        using WriteCallback = void (*)(int status, void*);
 
     private:
         std::string m_rsa_private_key;
@@ -199,8 +198,19 @@ class ServerConfig //{
 
         std::unordered_map<std::string, std::string> m_users;
 
+        uv_loop_t*  mp_loop;
+        std::string m_filename;
+        std::string m_error;
+        ConfigState m_state;
+
+        int from_json(const json&);
+
+        static void read_file_callback(uv_fs_t* req);
+
     public:
-        ServerConfig(const char* private_key, const char* cipher, std::unordered_map<std::string, std::string> users);
+        ServerConfig(uv_loop_t* loop, const std::string& filename);
+
+        bool validateUser(const std::string& username, const std::string& password);
 
         ServerConfig() = delete;
         ServerConfig(const ServerConfig&) = delete;
@@ -208,7 +218,9 @@ class ServerConfig //{
         ServerConfig& operator=(const ServerConfig&) = delete;
         ServerConfig& operator=(ServerConfig&&) = delete;
 
-        int loadFromFile(LoadCallback);
-        int writeToFile (WriteCallback);
+        int loadFromFile(LoadCallback, void*);
+
+        std::string RSA();
+        std::string Cipher();
 }; //}
 

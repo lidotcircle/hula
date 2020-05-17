@@ -12,6 +12,7 @@
 #include "utils.h"
 #include "kpacket.h"
 #include "dlinkedlist.hpp"
+#include "config_file.h"
 
 #define DEFAULT_BACKLOG 100
 
@@ -101,6 +102,8 @@ class Server: public EventEmitter //{
         // uv data structures
         uv_loop_t* mp_uv_loop;
         uv_tcp_t*  mp_uv_tcp;
+
+        ServerConfig* config;
 
         DLinkedList<ClientConnectionProxy*>* tsl_list;
 

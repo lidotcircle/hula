@@ -1,6 +1,6 @@
 {
     "rsa_private_key": "dummy key",
-    "cipher": "chacha",
+    "cipher": "chacha20",
     "users": [
         {
             "username": "admin",
