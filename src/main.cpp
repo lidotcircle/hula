@@ -80,7 +80,7 @@ int main() //{
 
     std::cout << std::setbase(16) << ipv4_addr;
 
-    KProxyServer::Server server(&loop, ipv4_addr, 8888);
+    KProxyServer::Server server(&loop, "../tests/server_config.json");
     server.on("connection", connectEcho, CB_NONE);
     server.listen();
 

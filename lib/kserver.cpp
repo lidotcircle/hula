@@ -20,35 +20,57 @@ using Logger::logger;
 
 /**                     class Server                  *///{
 
-Server::Server(uv_loop_t* loop, uint32_t bind_addr, uint16_t bind_port): //{
-    bind_addr(bind_addr),
-    bind_port(bind_port),
+Server::Server(uv_loop_t* loop, const std::string& config_file): //{
+    bind_addr(0),
+    bind_port(1080),
     mp_uv_loop(loop)
 {
     this->mp_uv_tcp = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
     uv_tcp_init(this->mp_uv_loop, this->mp_uv_tcp);
+
+    this->config = new ServerConfig(this->mp_uv_loop, config_file);
 
     uv_handle_set_data((uv_handle_t*)this->mp_uv_tcp, this);
 
     this->tsl_list = nullptr;
 } //}
 
-int Server::listen() //{ 
+void Server::on_config_load(int error, void* data) //{
 {
-    logger->debug("call Server::listen()");
+    Server* _this = (Server*) data;
+    if(error > 0) {
+        logger->error("load config file fail");
+        exit(1);
+    }
+    _this->bind_addr = _this->config->BindAddr();
+    _this->bind_port = _this->config->BindPort();
+    _this->__listen();
+} //}
+int Server::__listen() //{ 
+{
     sockaddr_in addr;
-    uv_ip4_addr(ip4_to_str(this->bind_addr), this->bind_port, &addr);
+
+    uint32_t network_order_addr = k_htonl(this->bind_addr);
+
+    uv_ip4_addr(ip4_to_str(network_order_addr), this->bind_port, &addr);
     int s = uv_tcp_bind(this->mp_uv_tcp, (sockaddr*)&addr, 0);
     if(s != 0) {
-        logger->error("bind error %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
+        logger->error("bind error %s:%d", ip4_to_str(network_order_addr), this->bind_port);
         return s;
     }
     s = uv_listen((uv_stream_t*)this->mp_uv_tcp, DEFAULT_BACKLOG, Server::on_connection);
     if(s != 0) {
-        logger->error("listen error %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
+        logger->error("listen error %s:%d", ip4_to_str(network_order_addr), this->bind_port);
         return s;
     }
-    logger->debug("listen at %s:%d", ip4_to_str(this->bind_addr), this->bind_port);
+    logger->debug("listen at %s:%d", ip4_to_str(network_order_addr), this->bind_port);
+    return 0;
+} //}
+
+int Server::listen() //{ 
+{
+    logger->debug("call Server::listen()");
+    this->config->loadFromFile(Server::on_config_load, this);
     return 0;
 } //}
 
@@ -67,11 +89,12 @@ void Server::on_connection(uv_stream_t* stream, int status) //{
     }
 
     Server* _this = (Server*)uv_handle_get_data((uv_handle_t*)stream);
-    uv_tcp_t* client = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
+    uv_tcp_t* client = new uv_tcp_t();
     uv_tcp_init(_this->mp_uv_loop, client);
 
     if(uv_accept(stream, (uv_stream_t*)client) < 0) {
         logger->warn("accept new connection error");
+        delete client;
         return;
     }
 
@@ -282,7 +305,7 @@ void ClientConnectionProxy::dispatch_close(uint8_t id, ROBuf buf) //{
 } //}
 
 // static 
-void ClientConnectionProxy::query_dns_cb(uv_loop_t* loop, uv_getaddrinfo_t* req, int status, struct addrinfo* res) //{
+void ClientConnectionProxy::query_dns_cb(uv_getaddrinfo_t* req, int status, struct addrinfo* res) //{
 {
     struct addrinfo *a;
     struct sockaddr_in* m;
@@ -299,6 +322,7 @@ void ClientConnectionProxy::query_dns_cb(uv_loop_t* loop, uv_getaddrinfo_t* req,
     if(status == UV_ECANCELED || status < 0) {
         logger->warn("dns query be cancelled");
         // TODO send a close packet
+        uv_freeaddrinfo(res);
         return;
     }
     for(a = res; a != nullptr; a = a->ai_next) {
@@ -315,12 +339,14 @@ void ClientConnectionProxy::query_dns_cb(uv_loop_t* loop, uv_getaddrinfo_t* req,
     if(a == nullptr) {
         logger->warn("query dns doesn't get an ipv4 address");
         // TODO send a close packet
+        uv_freeaddrinfo(res);
         return;
     }
     m = (struct sockaddr_in*)a->ai_addr;
     logger->info("used ipv4 address: %s", ip4_to_str(m->sin_addr.s_addr));
     m->sin_port = port;
     _this->to_internet_ipv4_connection(m, id);
+    uv_freeaddrinfo(res);
 } //}
 
 void ClientConnectionProxy::query_dns_connection(char* addr, uint16_t port, uint8_t id) //{
@@ -334,9 +360,7 @@ void ClientConnectionProxy::query_dns_connection(char* addr, uint16_t port, uint
     uv_getaddrinfo_t* p_req = (uv_getaddrinfo_t*)malloc(sizeof(uv_getaddrinfo_t));
     uv_req_set_data((uv_req_t*)p_req, new std::tuple<ClientConnectionProxy*, uint16_t, uint8_t>(this, port, id));
 
-    uv_getaddrinfo(this->mp_loop, p_req, [](uv_getaddrinfo_t* req, int status, struct addrinfo* res) {
-    }, addr, "80", &hints);
-
+    uv_getaddrinfo(this->mp_loop, p_req, ClientConnectionProxy::query_dns_cb, addr, "80", &hints);
 } //}
 
 void ClientConnectionProxy::server_tsl_handshake() //{

@@ -31,6 +31,7 @@ class ROBuf //{
         ROBuf(void* b, size_t size, size_t offset = 0, free_func free = nullptr);
 
         ROBuf operator+(const ROBuf& a) const;
+        ROBuf operator+(int offset) const;
 
         const char* base() const;
         inline char* __base() const {return const_cast<char*>(this->base());};

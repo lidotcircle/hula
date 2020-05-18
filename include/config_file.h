@@ -185,6 +185,9 @@ class ClientConfig //{
         inline std::unordered_map<std::string, std::string>& Users() {return this->m_accounts;}
 
         inline void new_file(const std::string& filename) {this->m_filename = filename;}
+
+        inline uint32_t BindAddr() {return this->m_policy.m_addr;}
+        inline uint32_t BindPort() {return this->m_policy.m_port;}
 }; //}
 
 class ServerConfig //{
@@ -202,6 +205,9 @@ class ServerConfig //{
         std::string m_filename;
         std::string m_error;
         ConfigState m_state;
+
+        uint32_t m_bind_addr;
+        uint16_t m_bind_port;
 
         int from_json(const json&);
 
@@ -222,5 +228,8 @@ class ServerConfig //{
 
         std::string RSA();
         std::string Cipher();
+
+        inline uint32_t BindAddr() {return this->m_bind_addr;}
+        inline uint32_t BindPort() {return this->m_bind_port;}
 }; //}
 

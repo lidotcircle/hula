@@ -111,8 +111,11 @@ class Server: public EventEmitter //{
 
         void dispatch_new_connection(uv_tcp_t* stream);
 
+        static void on_config_load(int error, void* data);
+        int __listen();
+
     public:
-        Server(uv_loop_t* loop, uint32_t bind_addr, uint16_t bind_port);
+        Server(uv_loop_t* loop, const std::string& config_file);
 
         Server(const Server&) = delete;
         Server(Server&& s) = delete;
@@ -191,7 +194,7 @@ class ClientConnectionProxy: public EventEmitter //{
         static void read_cb  (uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
         static void write_cb (uv_write_t*  write,  int status);
 
-        static void query_dns_cb(uv_loop_t* loop, uv_getaddrinfo_t* req, int status, struct addrinfo* res);
+        static void query_dns_cb(uv_getaddrinfo_t* req, int status, struct addrinfo* res);
 
         void query_dns_connection(char* addr, uint16_t port, uint8_t id);
 

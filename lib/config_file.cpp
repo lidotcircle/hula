@@ -477,6 +477,8 @@ void ClientConfig::write_file_callback(uv_fs_t* req) //{
 //                   class ServerConfig                  //{
 ServerConfig::ServerConfig(uv_loop_t* loop, const std::string& filename) //{
 {
+    this->m_bind_addr = 0;
+    this->m_bind_port = 1122;
     this->mp_loop = loop;
     this->m_filename = filename;
     this->m_state = CONFIG_UNINIT;
@@ -598,6 +600,25 @@ int ServerConfig::from_json(const json& jsonx) //{
     if(jsonx.find("cipher") == jsonx.end()) return -1;
     if(!jsonx["cipher"].is_string()) return -1;
     this->m_cipher = jsonx["cipher"].get<std::string>();
+
+    if(jsonx.find("bind_address") == jsonx.end()) return -1;
+    if(!jsonx["bind_address"].is_string()) return -1;
+
+    uint32_t addr;
+    if(str_to_ip4(jsonx["bind_address"].get<std::string>().c_str(), &addr) == false) {
+        logger->error("bad ipv4 address '%s'", jsonx["bind_address"].get<std::string>().c_str());
+        return -1;
+    }
+    this->m_bind_addr = k_ntohl(addr);
+    
+    if(jsonx.find("bind_port") == jsonx.end()) return -1;
+    if(!jsonx["bind_port"].is_string() && !jsonx["bind_port"].is_number()) return -1;
+    uint16_t port;
+    if(get_valid_port(jsonx["bind_port"], &port) == false) {
+        logger->error("bad port");
+        return -1;
+    }
+    this->m_bind_port = port;
 
     if(jsonx.find("users") == jsonx.end()) {
         logger->warn("server without any user maybe useless");

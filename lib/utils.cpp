@@ -33,8 +33,7 @@ struct __int_16 {uint8_t a, b;};
 static char ipv4str[20];
 char* ip4_to_str(uint32_t addr) //{
 {
-    uint32_t t = k_htonl(addr);
-    _ipv4_addr* x = (_ipv4_addr*)&t;
+    _ipv4_addr* x = (_ipv4_addr*)&addr;
     sprintf(ipv4str, "%d.%d.%d.%d", x->a, x->b, x->c, x->d);
     return ipv4str;
 } //}
@@ -54,11 +53,11 @@ bool str_to_ip4(const char* str, uint32_t* out) //{
         l++;
     }
     if(dot != 3) return false;
-    if(dot_p[0] == 0 || dot_p[2] + 1 == strlen(str)) return false;
 
     if(dot_p[0] - 0        > 3 || 
-       dot_p[1] - dot_p[0] > 3 || 
-       dot_p[2] - dot_p[1] > 3)
+       dot_p[1] - dot_p[0] > 4 || 
+       dot_p[2] - dot_p[1] > 4 ||
+       strlen(str) - dot_p[2] > 4)
         return false;
 
     char copyx[20];
@@ -76,7 +75,7 @@ bool str_to_ip4(const char* str, uint32_t* out) //{
     addr.c = atoi(copyx + dot_p[1]);
     addr.d = atoi(copyx + dot_p[2]);
 
-    *out = k_ntohl(*(uint32_t*)&addr);
+    *out = *(uint32_t*)&addr;
     return true;
 } //}
 

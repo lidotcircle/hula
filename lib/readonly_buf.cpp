@@ -3,6 +3,8 @@
 #include <string.h>
 #include <assert.h>
 
+#include <exception>
+
 struct ROBuf_shared {
         const char* base;
         size_t ref;
@@ -40,8 +42,10 @@ ROBuf::ROBuf(void* b, size_t size, size_t offset, free_func free): len(size), of
 ROBuf::ROBuf(): len(0), offset(0), shared(nullptr) {}
 ROBuf::ROBuf(const ROBuf& buf) //{
 {
-    this->shared = nullptr;
-    (*this) = buf;
+    this->shared = buf.shared;
+    this->len = buf.len;
+    this->offset = buf.offset;
+    this->ref();
     return;
 } //}
 ROBuf::ROBuf(ROBuf&& buf) //{
@@ -87,9 +91,21 @@ void ROBuf::unref() //{
 
 ROBuf ROBuf::operator+(const ROBuf& a) const //{
 {
+    if(this->size() == 0) return a;
+    if(a.size() == 0) return *this;
     ROBuf buf(this->size() + a.size());
     if(this->size() > 0) memcpy(buf.__base(), this->base(), this->size());
     if(a.size() > 0)     memcpy(buf.__base() + this->size(), a.base(), a.size());
+    return buf;
+} //}
+ROBuf ROBuf::operator+(int a) const //{
+{
+    ROBuf buf(*this);
+    buf.offset += a;
+    buf.len -= a;
+    if(buf.offset < 0) throw std::exception(); // FIXME
+    if(buf.len < 0)    throw std::exception();
+    if(buf.len == 0) return ROBuf();
     return buf;
 } //}
 
