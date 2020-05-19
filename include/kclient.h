@@ -90,7 +90,7 @@ class Server: EventEmitter //{
         ClientConfig* m_config;
 
         std::unordered_set<Socks5Auth*> m_auths;
-        std::unordered_map<RelayConnection*, bool> m_relay;
+        std::unordered_set<RelayConnection*> m_relay;
 
         ConnectionState m_state;
 

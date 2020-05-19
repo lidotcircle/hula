@@ -323,6 +323,7 @@ void Server::on_connection(uv_stream_t* stream, int status) //{
     }
 
     Server* _this = (Server*)uv_handle_get_data((uv_handle_t*)stream);
+    __logger->debug("connections: %d", _this->m_auths.size() + _this->m_relay.size());
     uv_tcp_t* client = new uv_tcp_t();
     uv_tcp_init(_this->mp_uv_loop, client);
 
@@ -341,6 +342,7 @@ void Server::on_authentication(int status, Socks5Auth* self_ref,
 {
     __logger->debug("recieve socks5 session with status: %d", status);
     Server* _this = (Server*)data;
+    __logger->debug("connections: %d", _this->m_auths.size() + _this->m_relay.size());
     assert(_this->m_auths.find(self_ref) != _this->m_auths.end());
     _this->m_auths.erase(_this->m_auths.find(self_ref));
     if(status < 0) {
@@ -362,12 +364,13 @@ void Server::dispath_base_on_addr(const std::string& addr, uint16_t port, uv_tcp
 void Server::dispath_bypass(const std::string& addr, uint16_t port, uv_tcp_t* con) //{
 {
     RelayConnection* relay = new RelayConnection(this, this->mp_uv_loop, con, addr, port);
-    this->m_relay[relay] = true;
+    this->m_relay.insert(relay);
     relay->run();
 } //}
 
 void Server::close_relay(RelayConnection* relay) //{
 {
+    __logger->debug("connections: %d", this->m_auths.size() + this->m_relay.size());
     assert(this->m_relay.find(relay) != this->m_relay.end());
     this->m_relay.erase(this->m_relay.find(relay));
     delete relay;
@@ -443,6 +446,7 @@ void RelayConnection::close() //{
         uv_read_stop((uv_stream_t*)this->mp_tcp_client);
         this->m_client_start_read = false;
     }
+    __logger->debug("0x%lx -- buf1: %d, buf2: %d", (long)this, this->m_in_buffer, this->m_out_buffer);
     if(this->m_in_buffer == 0 && this->m_out_buffer == 0) {
         if(this->mp_tcp_server != nullptr) {
             uv_close((uv_handle_t*)this->mp_tcp_server, delete_closed_handle);
@@ -625,7 +629,7 @@ void RelayConnection::client_write_cb(uv_write_t* req, int status) //{
     std::tie(_this, buf) = *x;
     delete x;
 
-    _this->m_out_buffer -= buf->len;
+    _this->m_in_buffer -= buf->len;
     free(buf->base);
     delete buf;
 
