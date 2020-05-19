@@ -231,16 +231,27 @@ static bool get_valid_port(const json& x, uint16_t* out) //{
 } //}
 int ClientConfig::set_policy(const json& jsonx) //{
 {
+    if(jsonx.find("mode") == jsonx.end() || 
+       jsonx.find("rule") == jsonx.end() || 
+       jsonx.find("bind_address") == jsonx.end() || 
+       jsonx.find("bind_port") == jsonx.end() || 
+       jsonx.find("socks5_auth") == jsonx.end()) return -1;
+
     auto mode = jsonx["mode"];
     auto rule = jsonx["rule"];
     auto bind_address = jsonx["bind_address"];
     auto bind_port = jsonx["bind_port"];
+    auto method = jsonx["socks5_auth"];
     if(!mode.is_string()) {
         this->m_error = "invalid proxy mode";
         return -1;
     }
     if(!rule.is_string()) {
         this->m_error = "invalid proxy rule";
+        return -1;
+    }
+    if(!method.is_string()) {
+        this->m_error = "invalid method";
         return -1;
     }
     if(!bind_address.is_string()) return -1;
@@ -251,6 +262,7 @@ int ClientConfig::set_policy(const json& jsonx) //{
     } else if(mode.get<std::string>() == "port") {
         this->m_policy.m_mode = PROXY_MODE_PORT;
     } else {
+        this->m_error = "incorrect proxy mode";
         return -1;
     }
 
@@ -261,6 +273,16 @@ int ClientConfig::set_policy(const json& jsonx) //{
     } else if(rule.get<std::string>() == "nomatch") {
         this->m_policy.m_rule = PROXY_RULE_NOT_MATCH;
     } else {
+        this->m_error = "incorrect proxy rule";
+        return -1;
+    }
+
+    if(method.get<std::string>() == "allowed") {
+        this->m_policy.m_method = SOCKS5_NO_REQUIRED;
+    } else if(rule.get<std::string>() == "password") {
+        this->m_policy.m_method = SOCKS5_PASSWORD;
+    } else {
+        this->m_error = "incorrect authentication method";
         return -1;
     }
 

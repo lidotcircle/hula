@@ -28,6 +28,7 @@ using json = nlohmann::json;
  * {
  *     "mode": "global" | "port",
  *     "rule": "all" | "match" | "nomatch",
+ *     "socks5_auth": "allowed" | "password",
  *     "bind_address": <valid_ipv4>,
  *     "bind_port":    <port>,
  *
@@ -77,6 +78,11 @@ enum ProxyRule {
     PROXY_RULE_NOT_MATCH
 };
 
+enum Socks5AuthMethod {
+    SOCKS5_NO_REQUIRED,
+    SOCKS5_PASSWORD
+};
+
 class SingleServerInfo //{
 {
     private:
@@ -124,6 +130,7 @@ struct ClientPolicy //{
 {
     ProxyMode m_mode;
     ProxyRule m_rule;
+    Socks5AuthMethod m_method;
     uint16_t  m_port;
     uint32_t  m_addr;
 }; //}
@@ -188,6 +195,8 @@ class ClientConfig //{
 
         inline uint32_t BindAddr() {return this->m_policy.m_addr;}
         inline uint32_t BindPort() {return this->m_policy.m_port;}
+
+        inline ClientPolicy Policy() {return this->m_policy;}
 }; //}
 
 class ServerConfig //{

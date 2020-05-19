@@ -30,6 +30,7 @@ Socks5Auth::Socks5Auth(uv_tcp_t* client, ClientConfig* config, finish_cb cb, voi
     this->m_port = 80;
 
     this->m_cb = cb;
+    this->m_client_read_start = true;
     
     uv_handle_set_data((uv_handle_t*)this->mp_client, this);
     uv_read_start((uv_stream_t*)this->mp_client, malloc_cb, Socks5Auth::read_callback);
@@ -38,7 +39,11 @@ Socks5Auth::Socks5Auth(uv_tcp_t* client, ClientConfig* config, finish_cb cb, voi
 void Socks5Auth::return_to_server() //{ 
 {
     int status = -1;
-    if(this->m_state == SOCKS5_ID) status = 0;
+    if(this->m_state == SOCKS5_FINISH) status = 0;
+    if(!m_client_read_start) {
+        uv_read_stop((uv_stream_t*)this->mp_client);
+        this->m_client_read_start = false;
+    }
     this->m_cb(status, this, this->m_servername, this->m_port, this->mp_client, this->m_data);
 } //}
 
@@ -56,13 +61,183 @@ void Socks5Auth::read_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_
 
 void Socks5Auth::dispatch_data(ROBuf buf) //{
 {
-    // TODO TODO TODO
     switch (this->m_state) {
-        case SOCKS5_INIT:
-        case SOCKS5_METHOD:
-        case SOCKS5_ID:
+        case SOCKS5_INIT: {
+            auto x = parse_client_hello(this->m_remain, buf);
+            bool finished;
+            __client_selection_msg msg;
+            ROBuf remain;
+            std::tie(finished, msg, remain) = x;
+            this->m_remain = remain;
+            if(finished) {
+                if(msg.m_version != 0x5) { // inform client TODO
+                    return this->return_to_server();
+                }
+                socks5_authentication_method method = SOCKS5_AUTH_NO_ACCEPTABLE;
+                for(auto& i: msg.m_methods) {
+                    if(method == SOCKS5_AUTH_NO_ACCEPTABLE && i == SOCKS5_AUTH_NO_REQUIRED && 
+                       this->mp_config->Policy().m_method == SOCKS5_NO_REQUIRED)
+                        method = (socks5_authentication_method)i;
+                    if(i == SOCKS5_AUTH_USERNAME_PASSWORD) 
+                        method = (socks5_authentication_method)i;
+                }
+                this->m_state = SOCKS5_ID;
+                if(method == SOCKS5_AUTH_NO_REQUIRED) this->m_state = SOCKS5_METHOD;
+                this->__send_selection_method(method);
+            }
+            break;}
+        case SOCKS5_ID: {
+            auto x = parse_username_authentication(this->m_remain, buf);
+            bool finished;
+            __socks5_username_password msg;
+            ROBuf buf;
+            std::tie(finished, msg, buf) = x;
+            this->m_remain = buf;
+            if(finished) {
+                if(msg.m_version != 0x5) {
+                    // TODO inform error
+                    this->return_to_server();
+                    break;
+                }
+                uint8_t status = -1;
+                if(this->mp_config->validateUser(msg.m_username, msg.m_password)) {
+                    status = 0;
+                    this->m_state = SOCKS5_METHOD;
+                }
+                this->__send_auth_status(status);
+            }
+            break;
+        }
+        case SOCKS5_METHOD: {
+            auto x = parse_client_request(this->m_remain, buf);
+            bool finished, error;
+            __client_request_msg msg;
+            ROBuf remain;
+            std::tie(finished, msg, remain, error) = x;
+            this->m_remain = remain;
+            if(error) {
+                // TODO inform error
+                this->return_to_server();
+                break;
+            }
+            if(finished) {
+                if(msg.m_version  != 0x5 ||
+                   msg.m_command != SOCKS5_CMD_CONNECT ||
+                   (msg.m_addr_type != SOCKS5_ADDR_IPV4 && msg.m_addr_type != SOCKS5_ADDR_DOMAIN)) {
+                    // TODO inform error
+                    this->return_to_server();
+                    break;
+                }
+                this->m_servername = msg.m_addr;
+                this->m_port = msg.m_port;
+                this->m_state = SOCKS5_FINISH;
+                this->__send_reply(0x00); // TODO
+            }
+        }
+        case SOCKS5_FINISH:
+            assert(false && "bug");
             break;
     }
+} //}
+
+void Socks5Auth::__send_selection_method(socks5_authentication_method method) //{
+{
+    __server_selection_msg* msg = new __server_selection_msg();
+    msg->m_version = 0x5;
+    msg->m_method = method;
+    uv_buf_t* buf = new uv_buf_t();
+    buf->base = (char*)msg;
+    buf->len = sizeof(__server_selection_msg);
+
+    uv_write_t* req = new uv_write_t();
+    uv_req_set_data((uv_req_t*)req, new std::tuple<Socks5Auth*, uv_buf_t*>(this, buf));
+    uv_write(req, (uv_stream_t*)this->mp_client, buf, 1, Socks5Auth::write_callback_hello);
+} //}
+void Socks5Auth::__send_auth_status(uint8_t status) //{
+{
+    __socks5_user_authentication_reply* msg = new __socks5_user_authentication_reply();
+    msg->m_version = 0x5;
+    msg->m_status = status;
+    uv_buf_t* buf = new uv_buf_t();
+    buf->base = (char*)msg;
+    buf->len = sizeof(__socks5_user_authentication_reply);
+
+    uv_write_t* req = new uv_write_t();
+    uv_req_set_data((uv_req_t*)req, new std::tuple<Socks5Auth*, uv_buf_t*>(this, buf));
+    uv_write(req, (uv_stream_t*)this->mp_client, buf, 1, Socks5Auth::write_callback_id);
+} //}
+void Socks5Auth::__send_reply(uint8_t status) //{
+{
+    this->m_client_read_start = false;
+    uv_read_stop((uv_stream_t*)this->mp_client);
+    __server_reply_msg msg;
+    msg.m_version = 0x5;
+    msg.m_reply = (socks5_reply_type)status;
+    msg.m_reserved = 0;
+    msg.m_addr_type = SOCKS5_ADDR_IPV4;
+    uint32_t ipv4addr;
+    char* bufx = nullptr;
+    size_t size = 0;
+    if(str_to_ip4(this->m_servername.c_str(), &ipv4addr)) {
+        size = 10;
+        bufx = (char*)malloc(size);
+        memcpy(bufx, &msg, 4);
+        *(uint32_t*)(bufx + 4) = ipv4addr;
+        *(uint16_t*)(bufx + 8) = this->m_port; // FIXME
+    } else {
+        size = this->m_servername.length() + 6;
+        bufx = (char*)malloc(size);
+        msg.m_addr_type = SOCKS5_ADDR_DOMAIN;
+        memcpy(bufx, &msg, 4);
+        memcpy(bufx + 4, this->m_servername.c_str(), this->m_servername.size());
+        *(uint16_t*)(bufx + (size - 2)) = this->m_port; // FIXME
+    }
+    uv_buf_t* buf = new uv_buf_t();
+    buf->base = (char*)bufx;
+    buf->len = size;
+
+    uv_write_t* req = new uv_write_t();
+    uv_req_set_data((uv_req_t*)req, new std::tuple<Socks5Auth*, uv_buf_t*>(this, buf));
+    uv_write(req, (uv_stream_t*)this->mp_client, buf, 1, Socks5Auth::write_callback_id);
+} //}
+
+void Socks5Auth::write_callback_hello(uv_write_t* req, int status) //{
+{
+    std::tuple<Socks5Auth*, uv_buf_t*>* x = 
+        static_cast<decltype(x)>(uv_req_get_data((uv_req_t*)req));
+    Socks5Auth* _this;
+    uv_buf_t* buf;
+    std::tie(_this, buf) = *x;
+    delete x;
+    delete (__server_selection_msg*)buf->base;
+    delete buf;
+    if(status != 0) _this->return_to_server();
+} //}
+void Socks5Auth::write_callback_id(uv_write_t* req, int status) //{
+{
+    std::tuple<Socks5Auth*, uv_buf_t*>* x = 
+        static_cast<decltype(x)>(uv_req_get_data((uv_req_t*)req));
+    Socks5Auth* _this;
+    uv_buf_t* buf;
+    std::tie(_this, buf) = *x;
+    delete x;
+    delete (__socks5_user_authentication_reply*)buf->base;
+    delete buf;
+    if(status != 0) _this->return_to_server();
+} //}
+void Socks5Auth::write_callback_reply(uv_write_t* req, int status) //{
+{
+    std::tuple<Socks5Auth*, uv_buf_t*>* x = 
+        static_cast<decltype(x)>(uv_req_get_data((uv_req_t*)req));
+    Socks5Auth* _this;
+    uv_buf_t* buf;
+    std::tie(_this, buf) = *x;
+    delete x;
+    free(buf->base);
+    delete buf;
+    if(status != 0)
+        _this->m_state = SOCKS5_INIT;
+    _this->return_to_server();
 } //}
 //}
 

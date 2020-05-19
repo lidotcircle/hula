@@ -1,3 +1,5 @@
+#pragma once
+
 #include "kpacket.h"
 #include "robuf.h"
 
@@ -76,8 +78,9 @@ struct __socks5_username_password {
 /**  @return {packet_finish, msg} */
 std::tuple<bool, struct __socks5_username_password, ROBuf> parse_username_authentication(ROBuf remain, ROBuf income);
 
+PACK(
 struct __socks5_user_authentication_reply {
     uint8_t m_version;
     uint8_t m_status;
-};
+});
 

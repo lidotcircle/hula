@@ -12,6 +12,7 @@
 #include "../include/events.h"
 #include "../include/config_file.h"
 #include "../include/dlinkedlist.hpp"
+#include "../include/socks5.h"
 
 namespace KProxyClient {
 
@@ -35,12 +36,14 @@ class Socks5Auth //{
         using finish_cb = void (*)(int status, Socks5Auth* self_ref, const std::string& addr, uint16_t port, uv_tcp_t* tcp, void* data);
         enum SOCKS5_STAGE {
             SOCKS5_INIT = 0,
+            SOCKS5_ID,
             SOCKS5_METHOD,
-            SOCKS5_ID
+            SOCKS5_FINISH
         };
 
     private:
         finish_cb m_cb;
+        bool m_client_read_start;
 
         SOCKS5_STAGE  m_state;
         uv_loop_t*    mp_loop;
@@ -56,7 +59,15 @@ class Socks5Auth //{
 
         static void read_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
 
+        static void write_callback_hello(uv_write_t* req, int status);
+        static void write_callback_id(uv_write_t* req, int status);
+        static void write_callback_reply(uv_write_t* req, int status);
+
         void return_to_server();
+
+        void __send_selection_method(socks5_authentication_method method);
+        void __send_auth_status(uint8_t status);
+        void __send_reply(uint8_t reply);
 
     public:
         Socks5Auth(uv_tcp_t* client, ClientConfig* config, finish_cb cb, void* data);
