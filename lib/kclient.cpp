@@ -198,11 +198,12 @@ void Socks5Auth::__send_reply(uint8_t status) //{
         *(uint32_t*)(bufx + 4) = ipv4addr;
         *(uint16_t*)(bufx + 8) = this->m_port; // FIXME
     } else {
-        size = this->m_servername.length() + 6;
+        size = this->m_servername.length() + 7;
         bufx = (char*)malloc(size);
         msg.m_addr_type = SOCKS5_ADDR_DOMAIN;
         memcpy(bufx, &msg, 4);
-        memcpy(bufx + 4, this->m_servername.c_str(), this->m_servername.size());
+        *(bufx + 4) = this->m_servername.size();
+        memcpy(bufx + 5, this->m_servername.c_str(), this->m_servername.size());
         *(uint16_t*)(bufx + (size - 2)) = this->m_port; // FIXME
     }
     uv_buf_t* buf = new uv_buf_t();
@@ -432,6 +433,7 @@ void RelayConnection::run() //{
 
 void RelayConnection::close() //{
 {
+    __logger->debug("call RelayConnection::close(this=0x%lx)", (long)this);
     this->m_error = true;
     if(this->m_server_start_read) {
         uv_read_stop((uv_stream_t*)this->mp_tcp_server);
@@ -442,10 +444,11 @@ void RelayConnection::close() //{
         this->m_client_start_read = false;
     }
     if(this->m_in_buffer == 0 && this->m_out_buffer == 0) {
-        // TODO inform superior object
-        uv_close((uv_handle_t*)this->mp_tcp_server, delete_closed_handle);
-        this->mp_tcp_server = nullptr;
-        uv_close((uv_handle_t*)this->mp_tcp_client, delete_closed_handle); // FIXME
+        if(this->mp_tcp_server != nullptr) {
+            uv_close((uv_handle_t*)this->mp_tcp_server, delete_closed_handle);
+            this->mp_tcp_server = nullptr;
+        }
+        uv_close((uv_handle_t*)this->mp_tcp_client, delete_closed_handle);
         this->mp_tcp_client = nullptr;
         return this->m_kserver->close_relay(this);
     }
@@ -460,7 +463,7 @@ void RelayConnection::__connect_to(const sockaddr* addr) //{
     uv_tcp_init(this->mp_loop, tcp);
     this->mp_tcp_server = tcp;
     uv_handle_set_data((uv_handle_t*)this->mp_tcp_server, this);
-    __logger->debug("call uv_tcp_connect()");
+    // TODO set a timeout
     uv_tcp_connect(req, tcp, addr, RelayConnection::connect_server_cb);
 } //}
 
@@ -509,7 +512,7 @@ void RelayConnection::connect_server_cb(uv_connect_t* req, int status) //{
     RelayConnection* _this = (RelayConnection*)uv_req_get_data((uv_req_t*)req);
     delete req;
     if(status != 0) {
-        // TODO close connection
+        __logger->debug("RelayConnection::conenct_sesrver_cb() fail");
         uv_close((uv_handle_t*) _this->mp_tcp_server, delete_closed_handle);
         _this->mp_tcp_server = nullptr;
         _this->close();
@@ -527,6 +530,7 @@ void RelayConnection::__start_relay() //{
 
 void RelayConnection::__relay_client_to_server() //{
 {
+    __logger->debug("call RelayConnection::__relay_client_to_server()");
     assert(this->m_client_start_read == false);
     uv_read_start((uv_stream_t*)this->mp_tcp_client, 
             malloc_cb, 
@@ -535,6 +539,7 @@ void RelayConnection::__relay_client_to_server() //{
 } //}
 void RelayConnection::__relay_server_to_client() //{
 {
+    __logger->debug("call RelayConnection::__relay_server_to_client()");
     assert(this->m_server_start_read == false);
     uv_read_start((uv_stream_t*)this->mp_tcp_server, 
             malloc_cb, 
@@ -545,7 +550,6 @@ void RelayConnection::__relay_server_to_client() //{
 void RelayConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
     __logger->debug("call RelayConnection::client_read_cb() callback");
-    assert(nread == buf->len);
     if(nread == 0) return;
     RelayConnection* _this = (RelayConnection*)uv_handle_get_data((uv_handle_t*)stream);
     if(nread < 0) {
@@ -558,7 +562,7 @@ void RelayConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const u
     uv_write_t* req = new uv_write_t();
     uv_req_set_data((uv_req_t*)req, new std::tuple<RelayConnection*, const uv_buf_t*>(_this, bufx));
     _this->m_out_buffer += nread;
-    uv_write(req, (uv_stream_t*)_this->mp_tcp_server, buf, 1, RelayConnection::server_write_cb);
+    uv_write(req, (uv_stream_t*)_this->mp_tcp_server, bufx, 1, RelayConnection::server_write_cb);
 
     if(_this->m_out_buffer > RELAY_MAX_BUFFER_SIZE) {
         uv_read_stop(stream);
@@ -568,7 +572,6 @@ void RelayConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const u
 void RelayConnection::server_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
     __logger->debug("call RelayConnection::server_read_cb() callback");
-    assert(nread == buf->len);
     if(nread == 0) return;
     RelayConnection* _this = (RelayConnection*)uv_handle_get_data((uv_handle_t*)stream);
     if(nread < 0) {
@@ -581,7 +584,7 @@ void RelayConnection::server_read_cb(uv_stream_t* stream, ssize_t nread, const u
     uv_write_t* req = new uv_write_t();
     uv_req_set_data((uv_req_t*)req, new std::tuple<RelayConnection*, const uv_buf_t*>(_this, bufx));
     _this->m_in_buffer += nread;
-    uv_write(req, (uv_stream_t*)_this->mp_tcp_client, buf, 1, RelayConnection::client_write_cb);
+    uv_write(req, (uv_stream_t*)_this->mp_tcp_client, bufx, 1, RelayConnection::client_write_cb);
 
     if(_this->m_in_buffer > RELAY_MAX_BUFFER_SIZE) {
         uv_read_stop(stream);
@@ -591,6 +594,7 @@ void RelayConnection::server_read_cb(uv_stream_t* stream, ssize_t nread, const u
 
 void RelayConnection::server_write_cb(uv_write_t* req, int status) //{
 {
+    __logger->debug("call RelayConnection::server_write_cb() callback");
     std::tuple<RelayConnection*, const uv_buf_t*>* x = 
         static_cast<decltype(x)>(uv_req_get_data((uv_req_t*)req));
     RelayConnection* _this;
@@ -603,7 +607,6 @@ void RelayConnection::server_write_cb(uv_write_t* req, int status) //{
     delete buf;
 
     if(status != 0 || _this->m_error) {
-        // TODO
         _this->m_error = true;
         _this->close();
         return;
@@ -614,6 +617,7 @@ void RelayConnection::server_write_cb(uv_write_t* req, int status) //{
 } //}
 void RelayConnection::client_write_cb(uv_write_t* req, int status) //{
 {
+    __logger->debug("call RelayConnection::client_write_cb() callback");
     std::tuple<RelayConnection*, const uv_buf_t*>* x = 
         static_cast<decltype(x)>(uv_req_get_data((uv_req_t*)req));
     RelayConnection* _this;
@@ -626,11 +630,11 @@ void RelayConnection::client_write_cb(uv_write_t* req, int status) //{
     delete buf;
 
     if(status != 0 || _this->m_error) {
-        // TODO
         _this->m_error = true;
         _this->close();
         return;
     }
+
     if(!_this->m_server_start_read && _this->m_in_buffer < RELAY_MAX_BUFFER_SIZE)
         _this->__relay_server_to_client();
 } //}
