@@ -1,22 +1,28 @@
 #include "../include/socks5.h"
 #include "../include/utils.h"
+#include "../include/config.h"
 
 
 std::tuple<bool, struct __client_selection_msg, ROBuf> parse_client_hello(ROBuf remain, ROBuf income) //{
 {
+    __logger->debug("call parse_client_hello(remain.size=%d, income.size=%d)", remain.size(), income.size());
     assert(income.size() > 0); 
     ROBuf merge = remain + income;
     __client_selection_msg msg;
     msg.m_version = merge.base()[0];
     uint8_t i = merge.base()[1];
+    __logger->debug("         methods: %d", i);
     if(merge.size() < i + 2) return std::make_tuple(false, msg, ROBuf());
     for(int j = 2; i > 0; i--, j++)
         msg.m_methods.push_back(merge.base()[j]);
+    if(msg.m_methods.size() > 0) 
+        __logger->debug("         first method: %d", msg.m_methods[0]);
     return std::make_tuple(true, msg, merge + 2 + msg.m_methods.size());
 } //}
 
 std::tuple<bool, struct __client_request_msg, ROBuf, bool> parse_client_request(ROBuf remain, ROBuf income) //{
 {
+    __logger->debug("call parse_client_request(remain.size=%d, income.size=%d)", remain.size(), income.size());
     assert(income.size() > 0);
     bool result = true;
     bool packet_error = false;
@@ -68,11 +74,14 @@ std::tuple<bool, struct __client_request_msg, ROBuf, bool> parse_client_request(
         inc += 2;
     }
 __RETURN:
+    __logger->debug("parse_client_request() error=%d, return with (addr=%s, port=%d, addr_type=%d, cmd=%d)", 
+            packet_error, msg.m_addr.c_str(), k_ntohs(msg.m_port), msg.m_addr_type, msg.m_command);
     return std::make_tuple(result, msg, merge + inc, packet_error);
 } //}
 
 std::tuple<bool, struct __socks5_username_password, ROBuf> parse_username_authentication(ROBuf remain, ROBuf income) //{
 {
+    __logger->debug("call parse_username_authentication()");
     __socks5_username_password pair;
     bool result = true;
     ROBuf merge = remain + income;
@@ -108,6 +117,7 @@ std::tuple<bool, struct __socks5_username_password, ROBuf> parse_username_authen
     }
 
 __RETURN:
+    __logger->debug("parse_username_authentication()  username=%s, password=%s", pair.m_username.c_str(), pair.m_password.c_str());
     return std::make_tuple(result, pair, merge + inc);
 } //}
 

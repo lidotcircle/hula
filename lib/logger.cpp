@@ -8,6 +8,7 @@
 
 #include <vector>
 #include <tuple>
+#include <ostream>
 
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
@@ -27,6 +28,15 @@ std::string random_string(size_t s) //{
         ret.push_back(x);
     }
     return ret;
+} //}
+
+static std::streambuf const * coutbuf = std::cout.rdbuf();
+static std::streambuf const * cerrbuf = std::cerr.rdbuf();
+static bool ostream_is_tty(const std::ostream& os) //{
+{
+    std::streambuf const * os_buf = os.rdbuf();
+    if(os_buf == coutbuf || os_buf == cerrbuf) return true;
+    return false;
 } //}
 
 namespace Logger {

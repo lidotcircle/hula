@@ -6,6 +6,7 @@
 #include <vector>
 #include <tuple>
 #include <map>
+#include <unordered_set>
 
 #include "../include/robuf.h"
 #include "../include/utils.h"
@@ -35,7 +36,8 @@ class Socks5Auth //{
     public:
         using finish_cb = void (*)(int status, Socks5Auth* self_ref, const std::string& addr, uint16_t port, uv_tcp_t* tcp, void* data);
         enum SOCKS5_STAGE {
-            SOCKS5_INIT = 0,
+            SOCKS5_ERROR = 0,
+            SOCKS5_INIT,
             SOCKS5_ID,
             SOCKS5_METHOD,
             SOCKS5_FINISH
@@ -87,7 +89,7 @@ class Server: EventEmitter //{
 
         ClientConfig* m_config;
 
-        std::unordered_map<Socks5Auth*, bool> m_auths;
+        std::unordered_set<Socks5Auth*> m_auths;
         std::unordered_map<RelayConnection*, bool> m_relay;
 
         ConnectionState m_state;
@@ -195,8 +197,6 @@ class RelayConnection: EventEmitter //{
 
         static void getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct addrinfo* res);
         static void connect_server_cb(uv_connect_t* req, int status);
-
-        static void malloc_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
 
         static void client_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
         static void server_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);

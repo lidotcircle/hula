@@ -1,5 +1,6 @@
 #include "../include/config_file.h"
 #include "../include/utils.h"
+#include "../include/config.h"
 
 #include <assert.h>
 
@@ -184,6 +185,8 @@ void ClientConfig::read_file_callback(uv_fs_t* req) //{
     delete uv_buf;
 
     if(_this->from_json(jsonx) < 0) {
+        if(_this->m_error == "") _this->m_error = "bad json";
+        __logger->error("%s", _this->m_error.c_str());
         cb(1, data);
         return;
     }
@@ -199,6 +202,7 @@ void ClientConfig::close_file_callback(uv_fs_t* req) //{
 
 int ClientConfig::from_json(const json& jsonx) //{
 {
+    __logger->debug("call ClientConfig::from_json()");
     if(this->set_policy(jsonx) < 0) {
         this->m_state = CONFIG_ERROR;
         return -1;
@@ -235,13 +239,16 @@ int ClientConfig::set_policy(const json& jsonx) //{
        jsonx.find("rule") == jsonx.end() || 
        jsonx.find("bind_address") == jsonx.end() || 
        jsonx.find("bind_port") == jsonx.end() || 
-       jsonx.find("socks5_auth") == jsonx.end()) return -1;
+       jsonx.find("socks5_authentication") == jsonx.end()) {
+        this->m_error = "policy fields don't match required";
+        return -1;
+    }
 
     auto mode = jsonx["mode"];
     auto rule = jsonx["rule"];
     auto bind_address = jsonx["bind_address"];
     auto bind_port = jsonx["bind_port"];
-    auto method = jsonx["socks5_auth"];
+    auto method = jsonx["socks5_authentication"];
     if(!mode.is_string()) {
         this->m_error = "invalid proxy mode";
         return -1;
@@ -279,7 +286,7 @@ int ClientConfig::set_policy(const json& jsonx) //{
 
     if(method.get<std::string>() == "allowed") {
         this->m_policy.m_method = SOCKS5_NO_REQUIRED;
-    } else if(rule.get<std::string>() == "password") {
+    } else if(method.get<std::string>() == "password") {
         this->m_policy.m_method = SOCKS5_PASSWORD;
     } else {
         this->m_error = "incorrect authentication method";
@@ -603,7 +610,8 @@ void ServerConfig::read_file_callback(uv_fs_t* req) //{
     delete uv_buf;
 
     if(_this->from_json(jsonx) < 0) {
-        _this->m_error = "bad json";
+        if(_this->m_error == "") _this->m_error = "bad json";
+        __logger->error("%s", _this->m_error.c_str());
         cb(1, data);
         return;
     }

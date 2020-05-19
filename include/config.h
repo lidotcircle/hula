@@ -5,3 +5,5 @@
 
 #define MAX_LISTEN 500
 
+#define __logger Logger::logger
+

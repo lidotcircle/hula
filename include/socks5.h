@@ -20,7 +20,7 @@ enum socks5_authentication_method: uint8_t {
     SOCKS5_AUTH_NO_REQUIRED = 0,
     SOCKS5_AUTH_GSSAPI,
     SOCKS5_AUTH_USERNAME_PASSWORD,
-    SOCKS5_AUTH_NO_ACCEPTABLE = 0x77
+    SOCKS5_AUTH_NO_ACCEPTABLE = 0xFF
 };
 PACK(
 struct __server_selection_msg {

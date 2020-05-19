@@ -72,19 +72,12 @@ int main() //{
     uv_loop_t loop;
     uv_loop_init(&loop);
 
-    uint32_t ipv4_addr;
-    if(str_to_ip4("0.0.0.0", &ipv4_addr) == false) {
-        logger->error("fatal error");
-        abort();
-    }
-
-    std::cout << std::setbase(16) << ipv4_addr;
-
     KProxyServer::Server server(&loop, "../tests/server_config.json");
     server.on("connection", connectEcho, CB_NONE);
     server.listen();
 
     uv_run(&loop, UV_RUN_DEFAULT);
+    uv_loop_close(&loop);
 
     return 0;
 } //}

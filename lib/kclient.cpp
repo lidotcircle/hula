@@ -8,6 +8,7 @@
 
 namespace KProxyClient {
 
+using Logger::logger;
 
 static void malloc_cb(uv_handle_t*, size_t suggested_size, uv_buf_t* buf) //{
 {
@@ -19,6 +20,7 @@ static void delete_closed_handle(uv_handle_t* h) {delete h;}
 //                  class Socks5Auth                     //{
 Socks5Auth::Socks5Auth(uv_tcp_t* client, ClientConfig* config, finish_cb cb, void* data) //{
 {
+    __logger->debug("new socks5 authentication session");
     this->m_state = SOCKS5_INIT;
     this->mp_loop = uv_handle_get_loop((uv_handle_t*)client);
     this->mp_client = client;
@@ -38,6 +40,7 @@ Socks5Auth::Socks5Auth(uv_tcp_t* client, ClientConfig* config, finish_cb cb, voi
 
 void Socks5Auth::return_to_server() //{ 
 {
+    __logger->debug("return socks5 authentication sessioin to server with state: %d", this->m_state);
     int status = -1;
     if(this->m_state == SOCKS5_FINISH) status = 0;
     if(!m_client_read_start) {
@@ -49,18 +52,23 @@ void Socks5Auth::return_to_server() //{
 
 void Socks5Auth::read_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
+    __logger->debug("call Socks5Auth::read_callback(0x%lx, %d, 0x%lx)", (long)stream, (int)nread, (long)buf);
     Socks5Auth* _this = (Socks5Auth*)uv_handle_get_data((uv_handle_t*)stream);
     if(nread == 0) {
-        // TODO
         return;
     }
-    ROBuf bufx = ROBuf(buf->base, buf->len, 0, free);
-    delete buf;
+    if(nread < 0) {
+        _this->m_state = SOCKS5_ERROR;
+        _this->return_to_server();
+        return;
+    }
+    ROBuf bufx = ROBuf(buf->base, nread, 0, free);
     _this->dispatch_data(bufx);
 } //}
 
 void Socks5Auth::dispatch_data(ROBuf buf) //{
 {
+    __logger->debug("call Socks5Auth::dispatch_data(buf.size()=%d)", buf.size());
     switch (this->m_state) {
         case SOCKS5_INIT: {
             auto x = parse_client_hello(this->m_remain, buf);
@@ -86,7 +94,7 @@ void Socks5Auth::dispatch_data(ROBuf buf) //{
                 this->__send_selection_method(method);
             }
             break;}
-        case SOCKS5_ID: {
+        case SOCKS5_ID: { // without debug, because chrome socks5 client dones't support username and password
             auto x = parse_username_authentication(this->m_remain, buf);
             bool finished;
             __socks5_username_password msg;
@@ -133,8 +141,10 @@ void Socks5Auth::dispatch_data(ROBuf buf) //{
                 this->m_state = SOCKS5_FINISH;
                 this->__send_reply(0x00); // TODO
             }
+            break;
         }
         case SOCKS5_FINISH:
+        case SOCKS5_ERROR:
             assert(false && "bug");
             break;
     }
@@ -142,6 +152,7 @@ void Socks5Auth::dispatch_data(ROBuf buf) //{
 
 void Socks5Auth::__send_selection_method(socks5_authentication_method method) //{
 {
+    __logger->debug("send selection mothod: %d", (uint8_t)method);
     __server_selection_msg* msg = new __server_selection_msg();
     msg->m_version = 0x5;
     msg->m_method = method;
@@ -155,6 +166,7 @@ void Socks5Auth::__send_selection_method(socks5_authentication_method method) //
 } //}
 void Socks5Auth::__send_auth_status(uint8_t status) //{
 {
+    __logger->debug("send authenticate status: %d", status);
     __socks5_user_authentication_reply* msg = new __socks5_user_authentication_reply();
     msg->m_version = 0x5;
     msg->m_status = status;
@@ -168,6 +180,7 @@ void Socks5Auth::__send_auth_status(uint8_t status) //{
 } //}
 void Socks5Auth::__send_reply(uint8_t status) //{
 {
+    __logger->debug("send reply for client request, status: %d, remain_size: %d", status, this->m_remain.size());
     this->m_client_read_start = false;
     uv_read_stop((uv_stream_t*)this->mp_client);
     __server_reply_msg msg;
@@ -198,7 +211,7 @@ void Socks5Auth::__send_reply(uint8_t status) //{
 
     uv_write_t* req = new uv_write_t();
     uv_req_set_data((uv_req_t*)req, new std::tuple<Socks5Auth*, uv_buf_t*>(this, buf));
-    uv_write(req, (uv_stream_t*)this->mp_client, buf, 1, Socks5Auth::write_callback_id);
+    uv_write(req, (uv_stream_t*)this->mp_client, buf, 1, Socks5Auth::write_callback_reply);
 } //}
 
 void Socks5Auth::write_callback_hello(uv_write_t* req, int status) //{
@@ -235,7 +248,7 @@ void Socks5Auth::write_callback_reply(uv_write_t* req, int status) //{
     delete x;
     free(buf->base);
     delete buf;
-    if(status != 0)
+    if(status != 0 || _this->m_remain.size() != 0)
         _this->m_state = SOCKS5_INIT;
     _this->return_to_server();
 } //}
@@ -267,9 +280,10 @@ void Server::on_config_load(int error, void* data) //{
 } //}
 int Server::__listen() //{ 
 {
+    logger->debug("call __listen()");
     sockaddr_in addr;
 
-    uint32_t network_order_addr = k_htonl(this->bind_addr);
+    uint32_t network_order_addr = this->bind_addr;
 
     uv_ip4_addr(ip4_to_str(network_order_addr), this->bind_port, &addr);
     int s = uv_tcp_bind(this->mp_uv_tcp, (sockaddr*)&addr, 0);
@@ -301,9 +315,9 @@ void Server::close() //{
 /** connection callback function */
 void Server::on_connection(uv_stream_t* stream, int status) //{
 {
-    logger->debug("connection callback called");
+    __logger->debug("call Server::on_connection()");
     if(status < 0) {
-        logger->warn("new connection error");
+        __logger->warn("new connection error");
         return;
     }
 
@@ -312,28 +326,31 @@ void Server::on_connection(uv_stream_t* stream, int status) //{
     uv_tcp_init(_this->mp_uv_loop, client);
 
     if(uv_accept(stream, (uv_stream_t*)client) < 0) {
-        logger->warn("accept new connection error");
-        delete client;
+        __logger->warn("accept new connection error");
+        uv_close((uv_handle_t*)client, delete_closed_handle);
         return;
     }
     Socks5Auth* auth = new Socks5Auth(client, _this->m_config, Server::on_authentication, _this);
-    _this->m_auths[auth] = true;
+    _this->m_auths.insert(auth);
 } //}
 
 void Server::on_authentication(int status, Socks5Auth* self_ref, 
         const std::string& addr, uint16_t port,
         uv_tcp_t* con, void* data) //{
 {
+    __logger->debug("recieve socks5 session with status: %d", status);
     Server* _this = (Server*)data;
     assert(_this->m_auths.find(self_ref) != _this->m_auths.end());
     _this->m_auths.erase(_this->m_auths.find(self_ref));
-    delete self_ref;
-    if(status <= 0) {
+    if(status < 0) {
         uv_close((uv_handle_t*)con, delete_closed_handle);
+        delete self_ref;
         return;
     }
 
     _this->dispath_base_on_addr(addr, port ,con);
+    delete self_ref;
+    return;
 } //}
 
 void Server::dispath_base_on_addr(const std::string& addr, uint16_t port, uv_tcp_t* con) //{
@@ -360,6 +377,7 @@ void Server::close_relay(RelayConnection* relay) //{
 //                class RelayConnection                       //{
 RelayConnection::RelayConnection(Server* kserver, uv_loop_t* loop, uv_tcp_t* tcp_client, const std::string& server, uint16_t port) //{
 {
+    __logger->debug("RelayConnection() to %s:%d", server.c_str(), k_ntohs(port));
     this->m_kserver = kserver;
     this->mp_loop = loop;
     this->mp_tcp_client = tcp_client;
@@ -379,6 +397,7 @@ RelayConnection::RelayConnection(Server* kserver, uv_loop_t* loop, uv_tcp_t* tcp
 
 void RelayConnection::run() //{
 {
+    __logger->debug("call RelayConnection::run()");
     uint32_t addr_ipv4;
 
     if(str_to_ip4(this->m_server.c_str(), &addr_ipv4)) {
@@ -434,12 +453,14 @@ void RelayConnection::close() //{
 
 void RelayConnection::__connect_to(const sockaddr* addr) //{
 {
+    __logger->debug("call RelayConnection::__connect_to()");
     uv_connect_t* req = new uv_connect_t();
     uv_req_set_data((uv_req_t*)req, this);
     uv_tcp_t* tcp = new uv_tcp_t();
     uv_tcp_init(this->mp_loop, tcp);
     this->mp_tcp_server = tcp;
     uv_handle_set_data((uv_handle_t*)this->mp_tcp_server, this);
+    __logger->debug("call uv_tcp_connect()");
     uv_tcp_connect(req, tcp, addr, RelayConnection::connect_server_cb);
 } //}
 
@@ -457,22 +478,18 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
     if(clean) delete req;
     delete msg;
 
-    if(status == UV_ECANCELED || status < 0) {
-        logger->warn("dns query be cancelled");
+    if(status < 0) {
+        __logger->warn("dns query fail");
+        std::cout << status << std::endl;
         // TODO send a close packet
         if(clean) uv_freeaddrinfo(res);
         return;
     }
     for(a = res; a != nullptr; a = a->ai_next) {
         if(sizeof(struct sockaddr_in) != a->ai_addrlen) {
-            logger->info("query dns get an address that isn't ipv4 address");
-            std::cout << "problem" << std::endl;
+            __logger->debug("query dns get an address that isn't ipv4 address");
             continue;
         } else break;
-        /*
-           char* addr = inet_ntoa(m->sin_addr);
-           std::cout << "address: " << addr << std::endl;
-           */
     }
     if(a == nullptr) {
         logger->warn("query dns doesn't get an ipv4 address");
@@ -481,7 +498,6 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
         return;
     }
     m = (struct sockaddr_in*)a->ai_addr; // FIXME
-    logger->info("used ipv4 address: %s", ip4_to_str(m->sin_addr.s_addr));
     m->sin_port = _this->m_port;
     _this->__connect_to((sockaddr*)m);
     if(clean) uv_freeaddrinfo(res);
@@ -489,6 +505,7 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
 
 void RelayConnection::connect_server_cb(uv_connect_t* req, int status) //{
 {
+    __logger->debug("call RelayConnection::connect_server_cb() callback");
     RelayConnection* _this = (RelayConnection*)uv_req_get_data((uv_req_t*)req);
     delete req;
     if(status != 0) {
@@ -503,6 +520,7 @@ void RelayConnection::connect_server_cb(uv_connect_t* req, int status) //{
 
 void RelayConnection::__start_relay() //{
 {
+    __logger->debug("call RelayConnection::__start_relay()");
     this->__relay_client_to_server();
     this->__relay_server_to_client();
 } //}
@@ -526,15 +544,20 @@ void RelayConnection::__relay_server_to_client() //{
 
 void RelayConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
+    __logger->debug("call RelayConnection::client_read_cb() callback");
     assert(nread == buf->len);
-    if(nread == 0) {
-        // TODO
+    if(nread == 0) return;
+    RelayConnection* _this = (RelayConnection*)uv_handle_get_data((uv_handle_t*)stream);
+    if(nread < 0) {
+        _this->close();
         return;
     }
-    RelayConnection* _this = (RelayConnection*)uv_handle_get_data((uv_handle_t*)stream);
+    uv_buf_t* bufx = new uv_buf_t();
+    bufx->base = buf->base;
+    bufx->len  = nread;
     uv_write_t* req = new uv_write_t();
-    uv_req_set_data((uv_req_t*)req, new std::tuple<RelayConnection*, const uv_buf_t*>(_this, buf));
-    _this->m_out_buffer += buf->len;
+    uv_req_set_data((uv_req_t*)req, new std::tuple<RelayConnection*, const uv_buf_t*>(_this, bufx));
+    _this->m_out_buffer += nread;
     uv_write(req, (uv_stream_t*)_this->mp_tcp_server, buf, 1, RelayConnection::server_write_cb);
 
     if(_this->m_out_buffer > RELAY_MAX_BUFFER_SIZE) {
@@ -544,15 +567,20 @@ void RelayConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const u
 } //}
 void RelayConnection::server_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
+    __logger->debug("call RelayConnection::server_read_cb() callback");
     assert(nread == buf->len);
-    if(nread == 0) {
-        // TODO whether connection error
+    if(nread == 0) return;
+    RelayConnection* _this = (RelayConnection*)uv_handle_get_data((uv_handle_t*)stream);
+    if(nread < 0) {
+        _this->close();
         return;
     }
-    RelayConnection* _this = (RelayConnection*)uv_handle_get_data((uv_handle_t*)stream);
+    uv_buf_t* bufx = new uv_buf_t();
+    bufx->base = buf->base;
+    bufx->len  = nread;
     uv_write_t* req = new uv_write_t();
-    uv_req_set_data((uv_req_t*)req, new std::tuple<RelayConnection*, const uv_buf_t*>(_this, buf));
-    _this->m_in_buffer += buf->len;
+    uv_req_set_data((uv_req_t*)req, new std::tuple<RelayConnection*, const uv_buf_t*>(_this, bufx));
+    _this->m_in_buffer += nread;
     uv_write(req, (uv_stream_t*)_this->mp_tcp_client, buf, 1, RelayConnection::client_write_cb);
 
     if(_this->m_in_buffer > RELAY_MAX_BUFFER_SIZE) {
@@ -572,7 +600,7 @@ void RelayConnection::server_write_cb(uv_write_t* req, int status) //{
 
     _this->m_out_buffer -= buf->len;
     free(buf->base);
-    free((void*)buf);
+    delete buf;
 
     if(status != 0 || _this->m_error) {
         // TODO
@@ -595,7 +623,7 @@ void RelayConnection::client_write_cb(uv_write_t* req, int status) //{
 
     _this->m_out_buffer -= buf->len;
     free(buf->base);
-    free((void*)buf);
+    delete buf;
 
     if(status != 0 || _this->m_error) {
         // TODO
