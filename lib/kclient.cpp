@@ -40,14 +40,32 @@ Socks5Auth::Socks5Auth(uv_tcp_t* client, ClientConfig* config, finish_cb cb, voi
 
 void Socks5Auth::return_to_server() //{ 
 {
-    __logger->debug("return socks5 authentication sessioin to server with state: %d", this->m_state);
-    int status = -1;
-    if(this->m_state == SOCKS5_FINISH) status = 0;
+    __logger->debug("call Socks5Auth::return_to_server()");
     if(!m_client_read_start) {
         uv_read_stop((uv_stream_t*)this->mp_client);
         this->m_client_read_start = false;
     }
-    this->m_cb(status, this, this->m_servername, this->m_port, this->mp_client, this->m_data);
+    this->m_cb(0, this, this->m_servername, this->m_port, this->mp_client, this->m_data);
+} //}
+void Socks5Auth::try_to_build_connection() //{
+{
+    __logger->debug("Socks5Auth::try_to_build_connection() -> try to build a connection to server");
+    assert(this->m_state == SOCKS5_FINISH);
+    if(!m_client_read_start) {
+        uv_read_stop((uv_stream_t*)this->mp_client);
+        this->m_client_read_start = false;
+    }
+    this->m_cb(0, this, this->m_servername, this->m_port, nullptr, this->m_data);
+} //}
+void Socks5Auth::close_this_with_error() //{
+{
+    __logger->debug("Socks5Auth::close_this_with_error()");
+    this->m_state = SOCKS5_ERROR;
+    if(!m_client_read_start) {
+        uv_read_stop((uv_stream_t*)this->mp_client);
+        this->m_client_read_start = false;
+    }
+    this->m_cb(-1, this, this->m_servername, this->m_port, this->mp_client, this->m_data);
 } //}
 
 void Socks5Auth::read_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
@@ -79,7 +97,7 @@ void Socks5Auth::dispatch_data(ROBuf buf) //{
             this->m_remain = remain;
             if(finished) {
                 if(msg.m_version != 0x5) { // inform client TODO
-                    return this->return_to_server();
+                    return this->close_this_with_error();
                 }
                 socks5_authentication_method method = SOCKS5_AUTH_NO_ACCEPTABLE;
                 for(auto& i: msg.m_methods) {
@@ -104,7 +122,7 @@ void Socks5Auth::dispatch_data(ROBuf buf) //{
             if(finished) {
                 if(msg.m_version != 0x5) {
                     // TODO inform error
-                    this->return_to_server();
+                    this->close_this_with_error();
                     break;
                 }
                 uint8_t status = -1;
@@ -125,7 +143,7 @@ void Socks5Auth::dispatch_data(ROBuf buf) //{
             this->m_remain = remain;
             if(error) {
                 // TODO inform error
-                this->return_to_server();
+                this->close_this_with_error();
                 break;
             }
             if(finished) {
@@ -133,13 +151,13 @@ void Socks5Auth::dispatch_data(ROBuf buf) //{
                    msg.m_command != SOCKS5_CMD_CONNECT ||
                    (msg.m_addr_type != SOCKS5_ADDR_IPV4 && msg.m_addr_type != SOCKS5_ADDR_DOMAIN)) {
                     // TODO inform error
-                    this->return_to_server();
+                    this->close_this_with_error();
                     break;
                 }
                 this->m_servername = msg.m_addr;
                 this->m_port = msg.m_port;
                 this->m_state = SOCKS5_FINISH;
-                this->__send_reply(0x00); // TODO
+                this->try_to_build_connection(); // TODO
             }
             break;
         }
@@ -250,8 +268,9 @@ void Socks5Auth::write_callback_reply(uv_write_t* req, int status) //{
     free(buf->base);
     delete buf;
     if(status != 0 || _this->m_remain.size() != 0)
-        _this->m_state = SOCKS5_INIT;
-    _this->return_to_server();
+        _this->close_this_with_error();
+    else 
+        _this->return_to_server();
 } //}
 //}
 
@@ -332,38 +351,62 @@ void Server::on_connection(uv_stream_t* stream, int status) //{
         return;
     }
     Socks5Auth* auth = new Socks5Auth(client, _this->m_config, Server::on_authentication, _this);
-    _this->m_auths.insert(auth);
+    _this->m_auths[auth] = std::make_tuple(true, nullptr);
 } //}
 
 void Server::on_authentication(int status, Socks5Auth* self_ref, 
         const std::string& addr, uint16_t port,
         uv_tcp_t* con, void* data) //{
 {
-    __logger->debug("recieve socks5 session with status: %d", status);
+    __logger->debug("call [static] Server::on_authentication()");
     Server* _this = (Server*)data;
     assert(_this->m_auths.find(self_ref) != _this->m_auths.end());
-    _this->m_auths.erase(_this->m_auths.find(self_ref));
-    if(status < 0) {
-        uv_close((uv_handle_t*)con, delete_closed_handle);
-        delete self_ref;
-        return;
+    if(con == nullptr) {     // 1. connect
+        assert(status == 0);
+        _this->dispath_base_on_addr(addr, port, self_ref);
+    } else {
+        if(status < 0) { // 2. delete
+            uv_close((uv_handle_t*)con, delete_closed_handle);
+            delete self_ref;
+            auto mm = _this->m_auths[self_ref];
+            if(std::get<0>(mm)) { // bypass
+                if(std::get<1>(mm) != nullptr)
+                    delete (RelayConnection*)std::get<1>(mm);
+            } else {
+                assert(false && "bug...");
+            }
+            _this->m_auths.erase(_this->m_auths.find(self_ref));
+            return;
+        } else { // 3. transfer connection to relay
+            delete self_ref;
+            _this->redispatch(con, self_ref);
+            return;
+        }
     }
-
-    _this->dispath_base_on_addr(addr, port ,con);
-    delete self_ref;
-    return;
 } //}
 
-void Server::dispath_base_on_addr(const std::string& addr, uint16_t port, uv_tcp_t* con) //{
+void Server::dispath_base_on_addr(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
 {
-    this->dispath_bypass(addr, port, con);
+    this->dispath_bypass(addr, port, socks5);
 } //}
 
-void Server::dispath_bypass(const std::string& addr, uint16_t port, uv_tcp_t* con) //{
+void Server::dispath_bypass(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
 {
-    RelayConnection* relay = new RelayConnection(this, this->mp_uv_loop, con, addr, port);
-    this->m_relay[relay] = true;
-    relay->run();
+    RelayConnection* relay = new RelayConnection(this, this->mp_uv_loop, nullptr, addr, port);
+    this->m_auths[socks5] = std::make_tuple(true, relay);
+    relay->connect(socks5);
+} //}
+
+void Server::redispatch(uv_tcp_t* client_tcp, Socks5Auth* socks5) //{
+{
+    auto ff = this->m_auths.find(socks5);
+    assert(ff != this->m_auths.end());
+    if(std::get<0>(ff->second)) {
+        RelayConnection* rl = (decltype(rl))std::get<1>(ff->second);
+        rl->run(client_tcp);
+    } else {
+        assert(false && "bugggg");
+    }
 } //}
 
 void Server::close_relay(RelayConnection* relay) //{
@@ -396,9 +439,9 @@ RelayConnection::RelayConnection(Server* kserver, uv_loop_t* loop, uv_tcp_t* tcp
 }
 //}
 
-void RelayConnection::run() //{
+void RelayConnection::connect(Socks5Auth* socks5) //{
 {
-    __logger->debug("call RelayConnection::run()");
+    __logger->debug("call RelayConnection::connect()");
     uint32_t addr_ipv4;
 
     if(str_to_ip4(this->m_server.c_str(), &addr_ipv4)) {
@@ -415,7 +458,7 @@ void RelayConnection::run() //{
         info.ai_addr = (sockaddr*)&addr;
 
         uv_getaddrinfo_t req;
-        uv_req_set_data((uv_req_t*)&req, new std::tuple<bool, RelayConnection*>(false, this));
+        uv_req_set_data((uv_req_t*)&req, new std::tuple<bool, RelayConnection*, Socks5Auth*>(false, this, socks5));
         RelayConnection::getaddrinfo_cb(&req, 0, &info);
     } else {
         struct addrinfo hints;
@@ -425,10 +468,17 @@ void RelayConnection::run() //{
         hints.ai_flags = 0;
 
         uv_getaddrinfo_t* p_req = new uv_getaddrinfo_t();
-        uv_req_set_data((uv_req_t*)p_req, new std::tuple<bool, RelayConnection*>(true, this));
+        uv_req_set_data((uv_req_t*)p_req, new std::tuple<bool, RelayConnection*, Socks5Auth*>(true, this, socks5));
 
         uv_getaddrinfo(this->mp_loop, p_req, RelayConnection::getaddrinfo_cb, this->m_server.c_str(), "80", &hints);
     }
+} //}
+
+void RelayConnection::run(uv_tcp_t* client_tcp) //{
+{
+    __logger->debug("call RelayConnection::run()");
+    this->mp_tcp_client = client_tcp;
+    this->__start_relay();
 } //}
 
 void RelayConnection::close() //{
@@ -454,7 +504,7 @@ void RelayConnection::close() //{
     }
 } //}
 
-void RelayConnection::__connect_to(const sockaddr* addr) //{
+void RelayConnection::__connect_to(const sockaddr* addr, Socks5Auth* socks5) //{
 {
     __logger->debug("call RelayConnection::__connect_to()");
     uv_connect_t* req = new uv_connect_t();
@@ -462,7 +512,7 @@ void RelayConnection::__connect_to(const sockaddr* addr) //{
     uv_tcp_t* tcp = new uv_tcp_t();
     uv_tcp_init(this->mp_loop, tcp);
     this->mp_tcp_server = tcp;
-    uv_handle_set_data((uv_handle_t*)this->mp_tcp_server, this);
+    uv_handle_set_data((uv_handle_t*)this->mp_tcp_server, new std::tuple<RelayConnection*, Socks5Auth*>(this, socks5));
     // TODO set a timeout
     uv_tcp_connect(req, tcp, addr, RelayConnection::connect_server_cb);
 } //}
@@ -475,9 +525,10 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
 
     bool clean;
     RelayConnection* _this;
-    std::tuple<bool, RelayConnection*>* msg =
-        (std::tuple<bool, RelayConnection*>*)uv_req_get_data((uv_req_t*)req);
-    std::tie(clean, _this) = *msg;
+    Socks5Auth* socks5;
+    std::tuple<bool, RelayConnection*, Socks5Auth*>* msg =
+        (std::tuple<bool, RelayConnection*, Socks5Auth*>*)uv_req_get_data((uv_req_t*)req);
+    std::tie(clean, _this, socks5) = *msg;
     if(clean) delete req;
     delete msg;
 
@@ -486,7 +537,7 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
         std::cout << status << std::endl;
         // TODO send a close packet
         if(clean) uv_freeaddrinfo(res);
-        return;
+        return socks5->send_reply(SOCKS5_REPLY_HOST_UNREACHABLE);
     }
     for(a = res; a != nullptr; a = a->ai_next) {
         if(sizeof(struct sockaddr_in) != a->ai_addrlen) {
@@ -498,27 +549,32 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
         logger->warn("query dns doesn't get an ipv4 address");
         // TODO send a close packet
         if(clean) uv_freeaddrinfo(res);
-        return;
+        return socks5->send_reply(SOCKS5_REPLY_ADDRESSS_TYPE_NOT_SUPPORTED);
     }
     m = (struct sockaddr_in*)a->ai_addr; // FIXME
     m->sin_port = _this->m_port;
-    _this->__connect_to((sockaddr*)m);
+    _this->__connect_to((sockaddr*)m, socks5);
     if(clean) uv_freeaddrinfo(res);
 } //}
 
 void RelayConnection::connect_server_cb(uv_connect_t* req, int status) //{
 {
     __logger->debug("call RelayConnection::connect_server_cb() callback");
-    RelayConnection* _this = (RelayConnection*)uv_req_get_data((uv_req_t*)req);
+    std::tuple<RelayConnection*, Socks5Auth*>* x = (decltype(x))uv_req_get_data((uv_req_t*)req);
+    RelayConnection* _this;
+    Socks5Auth* socks5;
+    std::tie(_this, socks5) = *x;
+    delete x;
     delete req;
     if(status != 0) {
         __logger->debug("RelayConnection::conenct_sesrver_cb() fail");
         uv_close((uv_handle_t*) _this->mp_tcp_server, delete_closed_handle);
         _this->mp_tcp_server = nullptr;
         _this->close();
-        return;
+        return socks5->send_reply(SOCKS5_REPLY_CONNECTION_REFUSED);
+    } else {
+        return socks5->send_reply(SOCKS5_REPLY_SUCCEEDED);
     }
-    _this->__start_relay();
 } //}
 
 void RelayConnection::__start_relay() //{
@@ -637,6 +693,13 @@ void RelayConnection::client_write_cb(uv_write_t* req, int status) //{
 
     if(!_this->m_server_start_read && _this->m_in_buffer < RELAY_MAX_BUFFER_SIZE)
         _this->__relay_server_to_client();
+} //}
+
+RelayConnection::~RelayConnection() //{
+{
+    assert(this->mp_tcp_client == nullptr);
+    if(this->mp_tcp_server != nullptr)
+        uv_close((uv_handle_t*)this->mp_tcp_server, delete_closed_handle);
 } //}
 //}
 

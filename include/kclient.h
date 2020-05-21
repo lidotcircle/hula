@@ -34,7 +34,8 @@ enum ConnectionState {
 class Socks5Auth //{
 {
     public:
-        using finish_cb = void (*)(int status, Socks5Auth* self_ref, const std::string& addr, uint16_t port, uv_tcp_t* tcp, void* data);
+        using finish_cb = void (*)(int status, Socks5Auth* self_ref, const std::string& addr, 
+                uint16_t port, uv_tcp_t* tcp, void* data);
         enum SOCKS5_STAGE {
             SOCKS5_ERROR = 0,
             SOCKS5_INIT,
@@ -66,6 +67,8 @@ class Socks5Auth //{
         static void write_callback_reply(uv_write_t* req, int status);
 
         void return_to_server();
+        void close_this_with_error();
+        void try_to_build_connection();
 
         void __send_selection_method(socks5_authentication_method method);
         void __send_auth_status(uint8_t status);
@@ -73,6 +76,8 @@ class Socks5Auth //{
 
     public:
         Socks5Auth(uv_tcp_t* client, ClientConfig* config, finish_cb cb, void* data);
+
+        inline void send_reply(uint8_t reply) {this->__send_reply(reply);}
 }; //}
 
 /**
@@ -89,13 +94,21 @@ class Server: EventEmitter //{
 
         ClientConfig* m_config;
 
-        std::unordered_set<Socks5Auth*> m_auths;
-        std::unordered_map<RelayConnection*, bool> m_relay;
+        // bool indicate bypass or proxy
+        std::unordered_map<Socks5Auth*, std::tuple<bool, RelayConnection*>> m_auths;
+        std::unordered_set<RelayConnection*> m_relay;
 
         ConnectionState m_state;
 
         static void on_connection(uv_stream_t* stream, int status);
 
+        /** this callback function is used to close Socks5Auth handle, 
+         *  build a connection the endpoint is specified by @addr:@port and 
+         *  transfer connection to relay service. 
+         *  1. when (@con == nullptr), which means to make a connection to @addr:@port
+         *     and then call the @self_ref->__send_reply(uint8_t) with status
+         *  2. when (@con != nullptr && status < 0) means dispose Socks5Auth object and relay object
+         *  3. when (@con != nullptr && status > 0) means dispose object and transfer connection to relay */
         static void on_authentication(int status, Socks5Auth* self_ref, 
                 const std::string& addr, uint16_t port, 
                 uv_tcp_t* con, void* data);
@@ -103,8 +116,10 @@ class Server: EventEmitter //{
         static void on_config_load(int error, void* data);
         int __listen();
 
-        void dispath_base_on_addr(const std::string&, uint16_t, uv_tcp_t*);
-        void dispath_bypass(const std::string&, uint16_t, uv_tcp_t*);
+        void dispath_base_on_addr(const std::string&, uint16_t, Socks5Auth* socks5);
+        void dispath_bypass(const std::string&, uint16_t, Socks5Auth* socks5);
+
+        void redispatch(uv_tcp_t* client_tcp, Socks5Auth* socks5);
 
     public:
         Server(const Server&) = delete;
@@ -204,7 +219,7 @@ class RelayConnection: EventEmitter //{
         static void server_write_cb(uv_write_t* req, int status);
         static void client_write_cb(uv_write_t* req, int status);
 
-        void __connect_to(const sockaddr* addr);
+        void __connect_to(const sockaddr* addr, Socks5Auth* socks5);
         void __start_relay();
 
         void __relay_client_to_server();
@@ -212,8 +227,11 @@ class RelayConnection: EventEmitter //{
 
     public:
         RelayConnection(Server* kserver, uv_loop_t* loop, uv_tcp_t* tcp_client, const std::string& server, uint16_t port);
-        void run();
+        void connect(Socks5Auth* socks5);
+        void run(uv_tcp_t* client_tcp);
         void close();
+
+        ~RelayConnection();
 }; //}
 
 }
