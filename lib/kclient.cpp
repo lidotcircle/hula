@@ -17,8 +17,6 @@ static void malloc_cb(uv_handle_t*, size_t suggested_size, uv_buf_t* buf) //{
     buf->base = (char*)malloc(suggested_size);
     buf->len  = suggested_size;
 } //}
-static void malloc_cb1(uv_handle_t* a, size_t suggested_size, uv_buf_t* buf){malloc_cb(a, suggested_size, buf);}
-static void malloc_cb2(uv_handle_t* a, size_t suggested_size, uv_buf_t* buf){malloc_cb(a, suggested_size, buf);}
 static void delete_closed_handle(uv_handle_t* h) {delete h;}
 
 //                  class Socks5Auth                     //{
@@ -45,7 +43,7 @@ Socks5Auth::Socks5Auth(Server* server, uv_tcp_t* client, ClientConfig* config, f
 
 void Socks5Auth::setup_uv_tcp_data() //{
 {
-    auto ptr = new UVC::Socks5Auth$uv_read_start(this->mp_server, this); // FIXME
+    auto ptr = new UVC::Socks5Auth$uv_read_start(this->mp_server, this);
     uv_handle_set_data((uv_handle_t*)this->mp_client, ptr);
     this->mp_server->callback_insert(ptr);
 } //}
@@ -97,19 +95,16 @@ void Socks5Auth::read_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_
         dynamic_cast<decltype(_data)>(static_cast<UVC::UVCBaseClient*>(uv_handle_get_data((uv_handle_t*)stream)));
     assert(_data);
     if(nread == 0) {
+        free(buf->base);
         return;
     }
     if(nread < 0) {
+        free(buf->base);
         _data->_this->m_state = SOCKS5_ERROR;
         _data->_this->return_to_server();
         return;
     }
-    /*
-    ROBuf bufx = ROBuf(buf->base, nread, 0, free); // FIXME Is here memory leak ?
-    */
-    ROBuf bufx = ROBuf(nread);
-    memcpy(bufx.__base(), buf->base, bufx.size());
-    free(buf->base);
+    ROBuf bufx = ROBuf(buf->base, nread, 0, free);
     _data->_this->dispatch_data(bufx);
 } //}
 
@@ -733,7 +728,7 @@ void RelayConnection::__relay_client_to_server() //{
     __logger->debug("call RelayConnection::__relay_client_to_server()");
     assert(this->m_client_start_read == false);
     uv_read_start((uv_stream_t*)this->mp_tcp_client, 
-            malloc_cb1, 
+            malloc_cb, 
             RelayConnection::client_read_cb);
     this->m_client_start_read = true;
 } //}
@@ -742,7 +737,7 @@ void RelayConnection::__relay_server_to_client() //{
     __logger->debug("call RelayConnection::__relay_server_to_client()");
     assert(this->m_server_start_read == false);
     uv_read_start((uv_stream_t*)this->mp_tcp_server, 
-            malloc_cb2, 
+            malloc_cb, 
             RelayConnection::server_read_cb);
     this->m_server_start_read = true;
 } //}
