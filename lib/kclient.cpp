@@ -17,6 +17,8 @@ static void malloc_cb(uv_handle_t*, size_t suggested_size, uv_buf_t* buf) //{
     buf->base = (char*)malloc(suggested_size);
     buf->len  = suggested_size;
 } //}
+static void malloc_cb1(uv_handle_t* a, size_t suggested_size, uv_buf_t* buf){malloc_cb(a, suggested_size, buf);}
+static void malloc_cb2(uv_handle_t* a, size_t suggested_size, uv_buf_t* buf){malloc_cb(a, suggested_size, buf);}
 static void delete_closed_handle(uv_handle_t* h) {delete h;}
 
 //                  class Socks5Auth                     //{
@@ -102,7 +104,12 @@ void Socks5Auth::read_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_
         _data->_this->return_to_server();
         return;
     }
-    ROBuf bufx = ROBuf(buf->base, nread, 0, free);
+    /*
+    ROBuf bufx = ROBuf(buf->base, nread, 0, free); // FIXME Is here memory leak ?
+    */
+    ROBuf bufx = ROBuf(nread);
+    memcpy(bufx.__base(), buf->base, bufx.size());
+    free(buf->base);
     _data->_this->dispatch_data(bufx);
 } //}
 
@@ -265,6 +272,7 @@ void Socks5Auth::__send_reply(uint8_t reply) //{
 
 void Socks5Auth::write_callback_hello(uv_write_t* req, int status) //{
 {
+    __logger->debug("call Socks5Auth::write_callback_hello()");
     UVC::Socks5Auth$__send_selection_method$uv_write* x = 
         dynamic_cast<decltype(x)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
     assert(x);
@@ -275,10 +283,12 @@ void Socks5Auth::write_callback_hello(uv_write_t* req, int status) //{
     delete x;
     delete (__server_selection_msg*)buf->base;
     delete buf;
+    delete req;
     if(status != 0 && should_run) _this->return_to_server();
 } //}
 void Socks5Auth::write_callback_id(uv_write_t* req, int status) //{
 {
+    __logger->debug("call Socks5Auth::write_callback_id()");
     UVC::Socks5Auth$__send_auth_status$uv_write* x = 
         dynamic_cast<decltype(x)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
     assert(x);
@@ -289,10 +299,12 @@ void Socks5Auth::write_callback_id(uv_write_t* req, int status) //{
     delete x;
     delete (__socks5_user_authentication_reply*)buf->base;
     delete buf;
+    delete req;
     if(status != 0 && should_run) _this->return_to_server();
 } //}
 void Socks5Auth::write_callback_reply(uv_write_t* req, int status) //{
 {
+    __logger->debug("call Socks5Auth::write_callback_reply()");
     UVC::Socks5Auth$__send_reply$uv_write* x = 
         dynamic_cast<decltype(x)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
     assert(x);
@@ -303,6 +315,7 @@ void Socks5Auth::write_callback_reply(uv_write_t* req, int status) //{
     delete x;
     free(buf->base);
     delete buf;
+    delete req;
     if(should_run) {
         if(status != 0 || _this->m_remain.size() != 0)
             _this->close_this_with_error();
@@ -687,7 +700,6 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
 
 void RelayConnection::connect_server_cb(uv_connect_t* req, int status) //{
 {
-    // FIXME this function will still call when server is closed
     __logger->debug("call RelayConnection::connect_server_cb() callback");
     UVC::RelayConnection$__connect_to$uv_tcp_connect* x = 
         dynamic_cast<decltype(x)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
@@ -721,7 +733,7 @@ void RelayConnection::__relay_client_to_server() //{
     __logger->debug("call RelayConnection::__relay_client_to_server()");
     assert(this->m_client_start_read == false);
     uv_read_start((uv_stream_t*)this->mp_tcp_client, 
-            malloc_cb, 
+            malloc_cb1, 
             RelayConnection::client_read_cb);
     this->m_client_start_read = true;
 } //}
@@ -730,7 +742,7 @@ void RelayConnection::__relay_server_to_client() //{
     __logger->debug("call RelayConnection::__relay_server_to_client()");
     assert(this->m_server_start_read == false);
     uv_read_start((uv_stream_t*)this->mp_tcp_server, 
-            malloc_cb, 
+            malloc_cb2, 
             RelayConnection::server_read_cb);
     this->m_server_start_read = true;
 } //}
@@ -738,10 +750,14 @@ void RelayConnection::__relay_server_to_client() //{
 void RelayConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
     __logger->debug("call RelayConnection::client_read_cb() callback");
-    if(nread == 0) return;
+    if(nread == 0) {
+        free(buf->base);
+        return;
+    }
     RelayConnection* _this = (RelayConnection*)uv_handle_get_data((uv_handle_t*)stream);
     if(nread < 0) {
         _this->close();
+        free(buf->base);
         return;
     }
     uv_buf_t* bufx = new uv_buf_t();
@@ -762,10 +778,14 @@ void RelayConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const u
 void RelayConnection::server_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
     __logger->debug("call RelayConnection::server_read_cb() callback");
-    if(nread == 0) return;
+    if(nread == 0) {
+        free(buf->base);
+        return;
+    }
     RelayConnection* _this = (RelayConnection*)uv_handle_get_data((uv_handle_t*)stream);
     if(nread < 0) {
         _this->close();
+        free(buf->base);
         return;
     }
     uv_buf_t* bufx = new uv_buf_t();
@@ -794,13 +814,13 @@ void RelayConnection::server_write_cb(uv_write_t* req, int status) //{
     const uv_buf_t* buf = x->uv_buf;
     bool should_run = x->should_run;
     delete x;
+    delete req;
 
-    if(should_run)
-        _this->m_out_buffer -= buf->len;
+    _this->m_out_buffer -= buf->len;
     free(buf->base);
     delete buf;
 
-    if(!should_run) return;
+    if(!should_run) return _this->close();
 
     if(status != 0 || _this->m_error) {
         _this->m_error = true;
@@ -821,13 +841,13 @@ void RelayConnection::client_write_cb(uv_write_t* req, int status) //{
     const uv_buf_t* buf = x->uv_buf;
     bool should_run = x->should_run;
     delete x;
+    delete req;
 
-    if(should_run)
-        _this->m_in_buffer -= buf->len;
+    _this->m_in_buffer -= buf->len;
     free(buf->base);
     delete buf;
 
-    if(!should_run) return;
+    if(!should_run) return _this->close();
 
     if(status != 0 || _this->m_error) {
         _this->m_error = true;

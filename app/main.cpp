@@ -16,7 +16,7 @@ static bool uv_continue = true;
 static void interrupt_handle(int sig) //{
 {
     if(uv_continue == false) {
-        exit(1);
+        abort();
     }
     uv_continue = false;
 } //}
