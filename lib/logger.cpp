@@ -39,6 +39,22 @@ static bool ostream_is_tty(const std::ostream& os) //{
     return false;
 } //}
 
+struct __rgb_color {uint8_t r, g, b;};
+static char color_buf[256];
+static std::string color_string(const std::string& msg, __rgb_color color) //{
+{
+    sprintf(color_buf, "\033[38;2;%d;%d;%dm", color.r, color.g, color.b);
+    std::string result(color_buf);
+    result += msg;
+    sprintf(color_buf, "\033[0m");
+    result += std::string(color_buf);
+    return result;
+} //}
+static inline std::string red_string(const std::string& msg)    {return color_string(msg, {0xdb, 0x44, 0x37});}
+static inline std::string green_string(const std::string& msg)  {return color_string(msg, {0x0f, 0x9d, 0x58});}
+static inline std::string blue_string(const std::string& msg)   {return color_string(msg, {0x42, 0x85, 0xf4});}
+static inline std::string yello_string(const std::string& msg)  {return color_string(msg, {0xf4, 0xb4, 0x00});}
+
 namespace Logger {
 
 Logger* logger = nullptr;
@@ -213,22 +229,38 @@ void Logger::__logger(const std::string& level, const char* xmsg, va_list list) 
 void Logger::vdebug(const char* msg, va_list arg_list) //{
 {
     if(this->Level > LOGGER_DEBUG) return;
-    this->__logger("debug", msg, arg_list);
+    if(ostream_is_tty(*this->outputStream)) {
+        this->__logger(blue_string("debug"), msg, arg_list);
+    } else {
+        this->__logger("debug", msg, arg_list);
+    }
 } //}
 void Logger::vinfo (const char* msg, va_list arg_list) //{
 {
-    if(this->Level > LOGGER_DEBUG) return;
-    this->__logger("info", msg, arg_list);
+    if(this->Level > LOGGER_INFO) return;
+    if(ostream_is_tty(*this->outputStream)) {
+        this->__logger(green_string(" info"), msg, arg_list);
+    } else {
+        this->__logger(" info", msg, arg_list);
+    }
 } //}
 void Logger::vwarn(const char* msg, va_list arg_list) //{
 {
-    if(this->Level > LOGGER_DEBUG) return;
-    this->__logger("warn", msg, arg_list);
+    if(this->Level > LOGGER_WARN) return;
+    if(ostream_is_tty(*this->outputStream)) {
+        this->__logger(yello_string(" warn"), msg, arg_list);
+    } else {
+        this->__logger(" warn", msg, arg_list);
+    }
 } //}
 void Logger::verror(const char* msg, va_list arg_list) //{
 {
-    if(this->Level > LOGGER_DEBUG) return;
-    this->__logger("error", msg, arg_list);
+    if(this->Level > LOGGER_ERROR) return;
+    if(ostream_is_tty(*this->outputStream)) {
+        this->__logger(red_string("error"), msg, arg_list);
+    } else {
+        this->__logger("error", msg, arg_list);
+    }
 } //}
 
 void Logger::debug(const char* msg, ...) //{

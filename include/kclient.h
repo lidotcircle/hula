@@ -15,6 +15,10 @@
 #include "../include/dlinkedlist.hpp"
 #include "../include/socks5.h"
 
+// forward declaration
+namespace UVC {struct UVCBaseClient;}
+
+
 namespace KProxyClient {
 
 class Server;
@@ -28,6 +32,8 @@ enum ConnectionState {
     CONNECTION_CLOSING,
     CONNECTION_CLOSED
 };
+
+// FIXME CALLBACK MEMORY LEAK
 
 /**
  * @class Socks5Auth */
@@ -52,6 +58,7 @@ class Socks5Auth //{
         uv_loop_t*    mp_loop;
         uv_tcp_t*     mp_client;
         ClientConfig* mp_config;
+        Server*       mp_server;
         ROBuf         m_remain;
         void*         m_data;
 
@@ -74,10 +81,17 @@ class Socks5Auth //{
         void __send_auth_status(uint8_t status);
         void __send_reply(uint8_t reply);
 
+        void setup_uv_tcp_data();
+        void clean_uv_tcp_data();
+
     public:
-        Socks5Auth(uv_tcp_t* client, ClientConfig* config, finish_cb cb, void* data);
+        Socks5Auth(Server* server, uv_tcp_t* client, ClientConfig* config, finish_cb cb, void* data);
 
         inline void send_reply(uint8_t reply) {this->__send_reply(reply);}
+
+        inline ~Socks5Auth(){assert(uv_handle_get_data((uv_handle_t*)this->mp_client) == nullptr);}
+
+        void close();
 }; //}
 
 /**
@@ -85,6 +99,9 @@ class Socks5Auth //{
 class Server: EventEmitter //{
 {
     private:
+        bool exit__ = false;
+        bool run___ = false;
+
         uint32_t bind_addr;
         uint16_t bind_port;
 
@@ -98,7 +115,9 @@ class Server: EventEmitter //{
         std::unordered_map<Socks5Auth*, std::tuple<bool, RelayConnection*>> m_auths;
         std::unordered_set<RelayConnection*> m_relay;
 
-        ConnectionState m_state;
+        std::unordered_set<UVC::UVCBaseClient*> m_callback_list;
+
+//        ConnectionState m_state; TODO
 
         static void on_connection(uv_stream_t* stream, int status);
 
@@ -121,6 +140,8 @@ class Server: EventEmitter //{
 
         void redispatch(uv_tcp_t* client_tcp, Socks5Auth* socks5);
 
+        void try_close();
+
     public:
         Server(const Server&) = delete;
         Server(Server&& s) = delete;
@@ -132,7 +153,14 @@ class Server: EventEmitter //{
         int listen();
         void close();
 
+        void callback_insert(UVC::UVCBaseClient* ptr);
+        void callback_remove(UVC::UVCBaseClient* ptr);
+
         void close_relay(RelayConnection* relay);
+
+        ~Server();
+
+        inline bool IsRunning() {return this->run___;}
 }; //}
 
 /**
