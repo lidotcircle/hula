@@ -78,5 +78,35 @@ struct RelayConnection$xxxx_read_cb$uv_write: public UVCBaseClient {
             uv_buf_t* uv_buf): UVCBaseClient(server),_this(_this), uv_buf(uv_buf){}
 };
 
+struct ConnectionProxy$connectRemoteServerAndOpen$uv_getaddrinfo: public UVCBaseClient {
+    KProxyClient::ConnectionProxy* _this;
+    bool _clean;
+    std::string _addr;
+    uint16_t _port;
+    KProxyClient::Socks5Auth* _socks5;
+    inline ConnectionProxy$connectRemoteServerAndOpen$uv_getaddrinfo(
+            KProxyClient::Server* server, 
+            KProxyClient::ConnectionProxy* _this, 
+            bool clean,
+            const std::string& addr, 
+            uint16_t port,
+            KProxyClient::Socks5Auth* socks5): 
+        UVCBaseClient(server), _this(_this), _clean(clean), _addr(addr), _port(port), _socks5(socks5){}
+};
+
+struct ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect: public UVCBaseClient {
+    KProxyClient::ConnectionProxy* _this;
+    std::string _addr;
+    uint16_t _port;
+    KProxyClient::Socks5Auth* _socks5;
+    inline ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect(
+            KProxyClient::Server* server, 
+            KProxyClient::ConnectionProxy* _this, 
+            const std::string& addr, 
+            uint16_t port,
+            KProxyClient::Socks5Auth* socks5): 
+        UVCBaseClient(server), _this(_this), _addr(addr), _port(port), _socks5(socks5){}
+};
+
 }
 

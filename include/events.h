@@ -30,5 +30,7 @@ class EventEmitter {
         void  emit(const std::string&, void* argv);
         void  remove(void*);
         void  removeall();
+
+        inline virtual ~EventEmitter() {}
 };
 

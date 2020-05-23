@@ -108,21 +108,21 @@ class SingleServerInfo //{
         inline void increase() {this->m_current_connection++;}
         inline void decrease() {this->m_current_connection--;}
 
-        inline void new_port(uint16_t port){this->m_port = port;}
         inline void new_addr(const std::string& addr){this->m_addr = addr;}
+        inline void new_port(uint16_t port){this->m_port = port;}
         inline void new_user(const std::string& user){this->m_user = user;}
         inline void new_pass(const std::string& pass){this->m_pass = pass;}
         inline void new_cert(const std::string& cert){this->m_cert = cert;}
         inline void new_cipher(const std::string& cipher){this->m_cipher = cipher;}
         inline void new_name(const std::string& name){this->m_server_name = name;}
 
-        inline uint16_t Port(){return this->m_port;}
-        inline const std::string& new_addr(){return this->m_addr;}
-        inline const std::string& new_user(){return this->m_user;}
-        inline const std::string& new_pass(){return this->m_pass;}
-        inline const std::string& new_cert(){return this->m_cert;}
-        inline const std::string& new_cipher(){return this->m_cipher;}
-        inline const std::string& new_name(){return this->m_server_name;}
+        inline const std::string& addr(){return this->m_addr;}
+        inline uint16_t           port(){return this->m_port;}
+        inline const std::string& user(){return this->m_user;}
+        inline const std::string& pass(){return this->m_pass;}
+        inline const std::string& cert(){return this->m_cert;}
+        inline const std::string& cipher(){return this->m_cipher;}
+        inline const std::string& name(){return this->m_server_name;}
 
         json to_json();
 }; //}

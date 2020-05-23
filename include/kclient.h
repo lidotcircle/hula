@@ -33,11 +33,12 @@ enum ConnectionState {
     CONNECTION_CLOSED
 };
 
-// FIXME CALLBACK MEMORY LEAK
+class ClientConnection;
+
 
 /**
  * @class Socks5Auth */
-class Socks5Auth //{
+class Socks5Auth: public EventEmitter //{
 {
     public:
         using finish_cb = void (*)(int status, Socks5Auth* self_ref, const std::string& addr, 
@@ -96,8 +97,13 @@ class Socks5Auth //{
 
 /**
  * @class Server a socks5 proxy server */
-class Server: EventEmitter //{
+class Server: public EventEmitter //{
 {
+    public:
+        using M_CB = void (*)(Server*, ConnectionProxy*, 
+                              uint8_t id, const std::string& addr, 
+                              uint16_t port, Socks5Auth* socks5, uint8_t socks5_reply);
+
     private:
         bool exit__ = false;
         bool run___ = false;
@@ -112,10 +118,13 @@ class Server: EventEmitter //{
         ClientConfig* m_config;
 
         // bool indicate bypass or proxy
-        std::unordered_map<Socks5Auth*, std::tuple<bool, RelayConnection*>> m_auths;
+        using __relay_proxy = union {RelayConnection* relay; ClientConnection* proxy;};
+        std::unordered_map<Socks5Auth*, std::tuple<bool, EventEmitter*>> m_auths;
         std::unordered_set<RelayConnection*> m_relay;
 
         std::unordered_set<UVC::UVCBaseClient*> m_callback_list;
+
+        std::unordered_set<ConnectionProxy*> m_proxy;
 
 //        ConnectionState m_state; TODO
 
@@ -135,8 +144,15 @@ class Server: EventEmitter //{
         static void on_config_load(int error, void* data);
         int __listen();
 
-        void dispath_base_on_addr(const std::string&, uint16_t, Socks5Auth* socks5);
-        void dispath_bypass(const std::string&, uint16_t, Socks5Auth* socks5);
+        void dispatch_base_on_addr(const std::string&, uint16_t, Socks5Auth* socks5);
+        void dispatch_bypass(const std::string&, uint16_t, Socks5Auth* socks5);
+        void dispatch_proxy (const std::string&, uint16_t, Socks5Auth* socks5);
+
+        SingleServerInfo* select_remote_serever();
+
+        static void dispatch_proxy_real(Server*, ConnectionProxy*, uint8_t id, 
+                                        const std::string& addr,   uint16_t port, 
+                                        Socks5Auth* socks5, uint8_t socks5_reply);
 
         void redispatch(uv_tcp_t* client_tcp, Socks5Auth* socks5);
 
@@ -165,20 +181,27 @@ class Server: EventEmitter //{
 
 /**
  * @class represent a socks5 connection */
-class ClientConnection: EventEmitter //{
+class ClientConnection: public EventEmitter //{
 {
     private:
-        uv_tcp_t* mp_tcp;
-        Server* mp_server;
+        uv_loop_t* mp_loop;
+        uv_tcp_t*  mp_tcp_client;
         ConnectionProxy* mp_proxy;
+
+        bool m_client_start_read;
+
+        Server* mp_kserver;
         uint8_t m_id;
 
-        ConnectionState m_state;
+        std::string m_server;
+        uint16_t    m_port;
+        size_t      m_in_buffer;
+        size_t      m_out_buffer;
 
-        void socks5_authenticate();
+        bool m_error;
 
     public:
-        ClientConnection(const sockaddr* addr, Server* p);
+        ClientConnection(Server* kserver, uv_loop_t* loop, const std::string& server, uint16_t port, ConnectionProxy* mproxy);
 
         ClientConnection(const ClientConnection&) = delete;
         ClientConnection(ClientConnection&& a) = delete; 
@@ -186,40 +209,82 @@ class ClientConnection: EventEmitter //{
         ClientConnection& operator=(ClientConnection&&) = delete;
 
         int write(ROBuf buf);
+        void run(uv_tcp_t* client_tcp);
         void close();
 }; //}
 
 /**
  * @class ConnectionProxy Multiplexing a single ssl/tls connection to multiple tcp connection */
-class ConnectionProxy: EventEmitter //{
+class ConnectionProxy: public EventEmitter //{
 {
-    private:
+    public:
+        using WriteCallback = void (*)(ROBuf* buf, void* data);
+
+
+   private:
         std::map<uint8_t, ClientProxy*> m_map;
-        Server* m_server;
-        uv_tcp_t* m_connection;
+        Server* mp_server;
+        uv_loop_t* mp_loop;
+        uv_tcp_t* mp_connection;
+        SingleServerInfo* mp_server_info;
 
-        ConnectionState m_state;
+        bool m_error = false;
+        bool m_connected = false;
+        bool m_tsl_established = false;
 
-        void tsl_handshake();
-        void client_autheticate();
+//        ConnectionState m_state;
+
+        struct waitConnect {
+            ConnectionProxy* _this;
+            std::string _addr;
+            uint16_t    _port;
+            Socks5Auth* _socks5;
+        };
+        void tsl_handshake(waitConnect*);
+        void client_authenticate(waitConnect*);
+
+        uint8_t get_id();
+
+        static void connect_remote_getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct addrinfo* info);
+        static void connect_remote_tcp_connect_cb(uv_connect_t* req, int status);
+
+        void connect_to_with_sockaddr(sockaddr* sock, Socks5Auth* socks5, const std::string& d_addr, uint16_t d_port);
+
+
+   protected:
+        friend class Server;
+        void connect_to(const std::string& addr, uint16_t port, Socks5Auth* socks5);
+
 
     public:
-        ConnectionProxy(Server* server);
+        ConnectionProxy(uv_loop_t* loop, Server* server, SingleServerInfo* server_info);
 
         ConnectionProxy(const ConnectionProxy&) = delete;
         ConnectionProxy(ConnectionProxy&& a) = delete;
         ConnectionProxy& operator=(ConnectionProxy&&);
         ConnectionProxy& operator=(const ConnectionProxy&) = delete;
 
-        int write(uint8_t id,ROBuf buf);
-        void close();
+        int  write(uint8_t id, ROBuf buf, WriteCallback cb, void* data);
+        enum CloseReason {
+            CLOSE_NO_ERROR,
+            CLOSE_REMOTE_SERVER_DNS,
+            CLOSE_REMOTE_SERVER_CONNECT_ERROR,
+            CLOSE_TLS_ERROR,
+            CLOSE_AUTHENTICATION_ERROR,
+            CLOSE_REQUIRED,
+        };
+        void close(CloseReason reason);
+
+        void connectRemoteServerAndOpen(const std::string& addr, uint16_t port, Socks5Auth* socks5);
 
         inline size_t getConnectionNumbers() {return this->m_map.size();}
+
+        inline bool IsConnected() {return this->m_connected;}
 }; //}
 
 /**
  * @class RelayConnection direct relay connection between webserver and client */
-class RelayConnection: EventEmitter //{
+class RelayConnection: public EventEmitter //{
 {
     private:
         uv_loop_t* mp_loop;

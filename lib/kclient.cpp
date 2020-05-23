@@ -453,22 +453,25 @@ void Server::on_authentication(int status, Socks5Auth* self_ref,
         const std::string& addr, uint16_t port,
         uv_tcp_t* con, void* data) //{
 {
-    Server* _this = (Server*)data;
+    Server* _this = static_cast<Server*>(data);
     __logger->debug("call [static] Server::on_authentication(), connections: %d", _this->m_auths.size() + _this->m_relay.size());
     assert(_this->m_auths.find(self_ref) != _this->m_auths.end());
     if(con == nullptr) {     // 1. connect
         assert(status == 0);
-        _this->dispath_base_on_addr(addr, port, self_ref);
+        _this->dispatch_base_on_addr(addr, port, self_ref);
     } else {
         if(status < 0) { // 2. delete
             uv_close((uv_handle_t*)con, delete_closed_handle);
             delete self_ref;
             auto mm = _this->m_auths[self_ref];
+            RelayConnection*  cr = dynamic_cast<RelayConnection*>(std::get<1>(mm));
+            ClientConnection* cc = dynamic_cast<ClientConnection*>(std::get<1>(mm));
             if(std::get<0>(mm)) { // bypass
-                if(std::get<1>(mm) != nullptr)
-                    delete (RelayConnection*)std::get<1>(mm);
-            } else {
-                assert(false && "bug...");
+                assert(cr || cc == nullptr);
+                if(cr) delete cr;
+            } else { // proxy
+                assert(cc || cr == nullptr);
+                if(cc) delete cc; // TODO
             }
             _this->m_auths.erase(_this->m_auths.find(self_ref));
             _this->try_close();
@@ -481,29 +484,48 @@ void Server::on_authentication(int status, Socks5Auth* self_ref,
     }
 } //}
 
-void Server::dispath_base_on_addr(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
+void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
 {
-    this->dispath_bypass(addr, port, socks5);
+//    this->dispatch_bypass(addr, port, socks5);
+    this->dispatch_proxy(addr, port, socks5);
 } //}
 
-void Server::dispath_bypass(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
+void Server::dispatch_bypass(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
 {
     RelayConnection* relay = new RelayConnection(this, this->mp_uv_loop, nullptr, addr, port);
     this->m_auths[socks5] = std::make_tuple(true, relay);
     relay->connect(socks5);
 } //}
 
+void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
+{
+    for(auto& m: this->m_proxy) {
+        if(m->getConnectionNumbers() < (1 << 6) - 1) {
+            return m->connect_to(addr, port, socks5);
+        }
+    }
+
+    SingleServerInfo* s_info = this->select_remote_serever();
+    ConnectionProxy* new_proxy = new ConnectionProxy(this->mp_uv_loop, this, s_info);
+    this->m_proxy.insert(new_proxy);
+    new_proxy->connectRemoteServerAndOpen(addr, port, socks5); // TODO
+} //}
+
 void Server::redispatch(uv_tcp_t* client_tcp, Socks5Auth* socks5) //{
 {
     auto ff = this->m_auths.find(socks5);
     assert(ff != this->m_auths.end());
+    ClientConnection* cc = dynamic_cast<ClientConnection*>(std::get<1>(ff->second));
+    RelayConnection*  cr = dynamic_cast<RelayConnection*> (std::get<1>(ff->second));
     if(std::get<0>(ff->second)) {
-        RelayConnection* rl = (decltype(rl))std::get<1>(ff->second);
+        assert(cr);
         this->m_auths.erase(ff);
-        this->m_relay.insert(rl);
-        rl->run(client_tcp);
+        this->m_relay.insert(cr);
+        cr->run(client_tcp);
     } else {
-        assert(false && "bugggg");
+        assert(cc);
+        this->m_auths.erase(ff);
+        cc->run(client_tcp);
     }
 } //}
 
@@ -535,6 +557,191 @@ void Server::callback_remove(UVC::UVCBaseClient* ptr) //{
 //}
 
 
+/** proxy a single socks5 connection */
+//                class ClientConnection                      //{
+//ClientConnection::ClientConnection
+//}
+
+
+/** multiplex a tls connection */
+//                class ConnectionProxy                      //{
+ConnectionProxy::ConnectionProxy(uv_loop_t* loop, Server* server, SingleServerInfo* server_info) //{
+{
+    this->mp_loop = loop;
+    this->mp_server = server;
+    this->mp_server_info = server_info;
+    this->mp_connection = nullptr;
+} //}
+
+void ConnectionProxy::close(CloseReason reason) //{
+{
+    // TODO
+} //}
+
+uint8_t ConnectionProxy::get_id() //{
+{
+    for(uint8_t i=0; i<(1 << 6); i++) {
+        if(this->m_map.find(i) == this->m_map.end())
+            return i;
+    }
+    return (1 << 6);
+} //}
+
+void ConnectionProxy::connectRemoteServerAndOpen(const std::string& xaddr, uint16_t port, Socks5Auth* socks5) //{
+{
+    this->mp_server_info->increase();
+    this->mp_connection = new uv_tcp_t();
+    uv_tcp_init(this->mp_loop, this->mp_connection);
+
+    uint32_t ipv4_addr; // TODO maybe support IPV6
+    if(str_to_ip4(this->mp_server_info->addr().c_str(), &ipv4_addr)) {
+        struct addrinfo info;
+        struct sockaddr_in addr;
+        addr.sin_family = AF_INET;
+        addr.sin_port = k_ntohs(this->mp_server_info->port()); // FIXME
+        addr.sin_addr.s_addr = k_ntohl(ipv4_addr);
+        info.ai_family = AF_INET;
+        info.ai_addrlen = sizeof(sockaddr_in); // FIXME ??
+        info.ai_canonname = nullptr;
+        info.ai_next = nullptr;
+        info.ai_flags = 0;
+        info.ai_addr = (sockaddr*)&addr;
+
+        uv_getaddrinfo_t req;
+        auto ptr = new UVC::ConnectionProxy$connectRemoteServerAndOpen$uv_getaddrinfo(
+                this->mp_server, this, false, xaddr, port, socks5);
+        uv_req_set_data((uv_req_t*)&req, ptr);
+        this->mp_server->callback_insert(ptr);
+
+        ConnectionProxy::connect_remote_getaddrinfo_cb(&req, 0, &info);
+    } else {
+        struct addrinfo hints;
+        hints.ai_family = AF_INET;
+        hints.ai_protocol = IPPROTO_TCP;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_flags = 0;
+
+        uv_getaddrinfo_t* p_req = new uv_getaddrinfo_t();
+        auto ptr = new UVC::ConnectionProxy$connectRemoteServerAndOpen$uv_getaddrinfo(
+                this->mp_server, this, true, xaddr, port, socks5);
+        uv_req_set_data((uv_req_t*)p_req, ptr);
+        this->mp_server->callback_insert(ptr);
+
+        uv_getaddrinfo(this->mp_loop, p_req, 
+                       ConnectionProxy::connect_remote_getaddrinfo_cb, 
+                       this->mp_server_info->addr().c_str(), "80", &hints);
+    }
+} //}
+
+// static
+void ConnectionProxy::connect_remote_getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct addrinfo* res) //{
+{
+    __logger->debug("call ConnectionProxy::conenct_remote_getaddrinfo_cb()");
+    struct addrinfo *a;
+    struct sockaddr_in* m;
+
+    UVC::ConnectionProxy$connectRemoteServerAndOpen$uv_getaddrinfo* msg =
+        dynamic_cast<decltype(msg)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
+    msg->_server->callback_remove(msg);
+    bool clean = msg->_clean;
+    ConnectionProxy* _this = msg->_this;
+    Socks5Auth* socks5 = msg->_socks5;
+    bool should_run = msg->should_run;
+
+    std::string d_addr = msg->_addr;
+    uint16_t d_port = msg->_port;
+
+    if(clean) delete req;
+    delete msg;
+
+    if(!should_run) {
+        /* if(clean) */ uv_freeaddrinfo(res);
+        return;
+    }
+
+    if(status < 0) {
+        __logger->warn("In ConnectionProxy::connectRemoteServerAndOpen(): dns query fail");
+        if(clean) uv_freeaddrinfo(res);
+        _this->close(ConnectionProxy::CLOSE_REMOTE_SERVER_DNS);
+        return socks5->send_reply(SOCKS5_REPLY_HOST_UNREACHABLE);
+    }
+    for(a = res; a != nullptr; a = a->ai_next) {
+        if(sizeof(struct sockaddr_in) != a->ai_addrlen) {
+            __logger->debug("query dns get an address that isn't ipv4 address");
+            continue;
+        } else break;
+    }
+    if(a == nullptr) {
+        logger->warn("In ConnectionProxy::connectRemoteServerAndOpen(): query dns doesn't get an ipv4 address");
+        // TODO send a close packet
+        if(clean) uv_freeaddrinfo(res);
+        _this->close(ConnectionProxy::CLOSE_REMOTE_SERVER_DNS);
+        return socks5->send_reply(SOCKS5_REPLY_ADDRESSS_TYPE_NOT_SUPPORTED);
+    }
+    m = (struct sockaddr_in*)a->ai_addr; // FIXME ipv6
+    m->sin_port = _this->mp_server_info->port();
+    _this->connect_to_with_sockaddr((sockaddr*)m, socks5, d_addr, d_port);
+    if(clean) uv_freeaddrinfo(res);
+} //}
+
+void ConnectionProxy::connect_to_with_sockaddr(sockaddr* sock, Socks5Auth* socks5, const std::string& d_addr, uint16_t d_port) //{
+{
+    uv_connect_t* req = new uv_connect_t();
+    auto ptr = new UVC::ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect(this->mp_server, this, d_addr, d_port, socks5);
+    uv_handle_set_data((uv_handle_t*)req, ptr);
+    this->mp_server->callback_insert(ptr);
+
+    uv_tcp_connect(req, this->mp_connection, sock, ConnectionProxy::connect_remote_tcp_connect_cb);
+} //}
+
+// static
+void ConnectionProxy::connect_remote_tcp_connect_cb(uv_connect_t* req, int status) //{
+{
+    __logger->debug("call ConnectionProxy:;connect_remote_tcp_connect_cb()");
+    UVC::ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect* ptr =
+        dynamic_cast<decltype(ptr)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
+    assert(ptr);
+    Server* server = ptr->_server;
+    ConnectionProxy* _this = ptr->_this;
+    std::string _addr = ptr->_addr;
+    uint16_t _port = ptr->_port;
+    Socks5Auth* socks5 = ptr->_socks5;
+    bool should_run = ptr->should_run;
+    delete req;
+    delete ptr;
+
+    server->callback_remove(ptr);
+    if(!should_run) return;
+
+    if(status < 0) {
+        __logger->warn("ConnectionProxy: connect to remote server fail");
+        _this->close(ConnectionProxy::CLOSE_REMOTE_SERVER_CONNECT_ERROR);
+        socks5->send_reply(SOCKS5_REPLY_SERVER_FAILURE);
+        return;
+    }
+
+    _this->tsl_handshake(new waitConnect {._this = _this, ._addr = _addr, ._port = _port, ._socks5 = socks5});
+} //}
+
+void ConnectionProxy::tsl_handshake(waitConnect* wait) //{
+{
+    this->m_tsl_established = true;
+    this->client_authenticate(wait);
+} //}
+
+void ConnectionProxy::client_authenticate(waitConnect* wait) //{
+{
+    assert(this->m_tsl_established);
+} //}
+
+void ConnectionProxy::connect_to(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
+{
+} //}
+
+//}
+
+
+/** directly proxy a connection through this client */
 //                class RelayConnection                       //{
 RelayConnection::RelayConnection(Server* kserver, uv_loop_t* loop, uv_tcp_t* tcp_client, const std::string& server, uint16_t port) //{
 {
@@ -665,7 +872,7 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
     delete msg;
 
     if(!should_run) {
-        uv_freeaddrinfo(res);
+        /* if(clean) */ uv_freeaddrinfo(res);
         return;
     }
 
