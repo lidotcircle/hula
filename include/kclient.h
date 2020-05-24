@@ -7,6 +7,7 @@
 #include <tuple>
 #include <map>
 #include <unordered_set>
+#include <set>
 
 #include "../include/robuf.h"
 #include "../include/utils.h"
@@ -14,6 +15,9 @@
 #include "../include/config_file.h"
 #include "../include/dlinkedlist.hpp"
 #include "../include/socks5.h"
+
+
+#define SINGLE_TSL_MAX_CONNECTION (1 << 6)
 
 // forward declaration
 namespace UVC {struct UVCBaseClient;}
@@ -23,7 +27,6 @@ namespace KProxyClient {
 
 class Server;
 class ConnectionProxy;
-class ClientProxy;
 class RelayConnection;
 
 enum ConnectionState {
@@ -117,11 +120,12 @@ class Server: public EventEmitter //{
 
         ClientConfig* m_config;
 
-        // bool indicate bypass or proxy
-        using __relay_proxy = union {RelayConnection* relay; ClientConnection* proxy;};
+    protected:
+        friend class ConnectionProxy;
         std::unordered_map<Socks5Auth*, std::tuple<bool, EventEmitter*>> m_auths;
         std::unordered_set<RelayConnection*> m_relay;
 
+    private:
         std::unordered_set<UVC::UVCBaseClient*> m_callback_list;
 
         std::unordered_set<ConnectionProxy*> m_proxy;
@@ -148,11 +152,11 @@ class Server: public EventEmitter //{
         void dispatch_bypass(const std::string&, uint16_t, Socks5Auth* socks5);
         void dispatch_proxy (const std::string&, uint16_t, Socks5Auth* socks5);
 
-        SingleServerInfo* select_remote_serever();
-
         static void dispatch_proxy_real(Server*, ConnectionProxy*, uint8_t id, 
                                         const std::string& addr,   uint16_t port, 
                                         Socks5Auth* socks5, uint8_t socks5_reply);
+
+        SingleServerInfo* select_remote_serever();
 
         void redispatch(uv_tcp_t* client_tcp, Socks5Auth* socks5);
 
@@ -193,24 +197,45 @@ class ClientConnection: public EventEmitter //{
         Server* mp_kserver;
         uint8_t m_id;
 
+        Socks5Auth* m_socks5;
+
         std::string m_server;
         uint16_t    m_port;
+
+        enum __State {
+            INITIAL = 0,
+            CONNECTING,
+            RUNNING,
+            ERROR
+        };
+        __State m_state;
+
         size_t      m_in_buffer;
         size_t      m_out_buffer;
 
-        bool m_error;
+        void __start_relay();
+
+        static void connect_callback(bool should_run, int status, void* data);
+        void __connect(Socks5Auth* socks5);
 
     public:
-        ClientConnection(Server* kserver, uv_loop_t* loop, const std::string& server, uint16_t port, ConnectionProxy* mproxy);
+        ClientConnection(Server* kserver, uv_loop_t* loop, ConnectionProxy* mproxy, 
+                         const std::string& addr, uint16_t port, Socks5Auth* socks5);
 
         ClientConnection(const ClientConnection&) = delete;
         ClientConnection(ClientConnection&& a) = delete; 
         ClientConnection& operator=(ClientConnection&) = delete;
         ClientConnection& operator=(ClientConnection&&) = delete;
 
-        int write(ROBuf buf);
         void run(uv_tcp_t* client_tcp);
+        void PushData(ROBuf buf);
+        void connect(Socks5Auth* socks5);
         void close();
+
+        void reject();
+        void accept();
+
+        inline bool IsRun() {return this->m_state == __State::RUNNING;}
 }; //}
 
 /**
@@ -218,45 +243,81 @@ class ClientConnection: public EventEmitter //{
 class ConnectionProxy: public EventEmitter //{
 {
     public:
-        using WriteCallback = void (*)(ROBuf* buf, void* data);
+        // this callback should delete buf
+        using WriteCallback = void (*)(bool should_run, int status, ROBuf* buf, void* data);
+
+        using ConnectCallback = void (*)(bool should_run, int status, void* data);
 
 
    private:
-        std::map<uint8_t, ClientProxy*> m_map;
+        std::map<uint8_t, ClientConnection*> m_map;
+        //        std::map<uint8_t, Socks5Auth*> m_auths_map;
+        std::set<uint8_t> m_wait_new_connection;
+
         Server* mp_server;
         uv_loop_t* mp_loop;
+
         uv_tcp_t* mp_connection;
+        bool m_connection_read;
+
         SingleServerInfo* mp_server_info;
 
-        bool m_error = false;
-        bool m_connected = false;
-        bool m_tsl_established = false;
+        ROBuf m_remain_raw;
 
-//        ConnectionState m_state;
-
-        struct waitConnect {
-            ConnectionProxy* _this;
-            std::string _addr;
-            uint16_t    _port;
-            Socks5Auth* _socks5;
+        enum __State {
+            STATE_INITIAL = 0,
+            STATE_GETDNS,
+            STATE_CONNECTING,
+            STATE_TSL,
+            STATE_AUTH,
+            STATE_WAIT_AUTH_REPLY,
+            STATE_BUILD,
+            STATE_CLOSING,
+            STATE_CLOSED,
+            STATE_ERROR
         };
-        void tsl_handshake(waitConnect*);
-        void client_authenticate(waitConnect*);
+        __State m_state;
+
+        size_t m_out_buffer;
+
+        ConnectCallback m_connect_cb;
+        void* m_connect_cb_data;
+        struct ConnectCallbackState {
+            ConnectCallback m_cb;
+            void* m_cb_data;
+        };
+
+        void tsl_handshake(ConnectCallbackState state);
+        void client_authenticate(ConnectCallbackState state);
 
         uint8_t get_id();
 
         static void connect_remote_getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct addrinfo* info);
         static void connect_remote_tcp_connect_cb(uv_connect_t* req, int status);
 
-        void connect_to_with_sockaddr(sockaddr* sock, Socks5Auth* socks5, const std::string& d_addr, uint16_t d_port);
+        void connect_to_with_sockaddr(sockaddr* sock, ConnectCallback cb, void* data);
+
+        int _write(ROBuf buf, WriteCallback cb, void* data);
+        static void _write_callback(uv_write_t* req, int status);
+
+        int send_authentication_info();
+
+        void connect_to_remote_server();
+
+        static void on_authentication_write(bool should_run, int status, ROBuf* buf, void* data);
+
+        static void uv_stream_read_after_send_auth_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
+        static void uv_stream_read_packet(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
+        void authenticate_with(ROBuf buf, ConnectCallback cb, void* cb_data);
+
+        void dispatch_data_encrypted(ROBuf buf);
+        void dispatch_data(ROBuf buf);
+
+        static void new_connection_callback_wrapper(bool should_run, int status, ROBuf* buf, void* data);
+        static void new_connection_timer_callback(uv_timer_t* timer);
 
 
-   protected:
-        friend class Server;
-        void connect_to(const std::string& addr, uint16_t port, Socks5Auth* socks5);
-
-
-    public:
+   public:
         ConnectionProxy(uv_loop_t* loop, Server* server, SingleServerInfo* server_info);
 
         ConnectionProxy(const ConnectionProxy&) = delete;
@@ -271,15 +332,27 @@ class ConnectionProxy: public EventEmitter //{
             CLOSE_REMOTE_SERVER_CONNECT_ERROR,
             CLOSE_TLS_ERROR,
             CLOSE_AUTHENTICATION_ERROR,
+            CLOSE_WRITE_ERROR,
+            CLOSE_READ_ERROR,
+            CLOSE_PACKET_ERROR,
+            CLOSE_ID_ERROR,
+            CLOSE_OPCODE_ERROR,
             CLOSE_REQUIRED,
         };
         void close(CloseReason reason);
 
-        void connectRemoteServerAndOpen(const std::string& addr, uint16_t port, Socks5Auth* socks5);
+        int new_connection  (uint8_t id, 
+                             const std::string& addr, uint16_t port, 
+                             WriteCallback cb, void* data);
+        int close_connection(uint8_t id, WriteCallback cb, void* data);
+
+        void connect(ConnectCallback cb, void* data);
 
         inline size_t getConnectionNumbers() {return this->m_map.size();}
+        inline bool   IsIdFull() {return this->getConnectionNumbers() == SINGLE_TSL_MAX_CONNECTION;}
+        inline bool   IsConnected() {return this->m_state == __State::STATE_BUILD;}
 
-        inline bool IsConnected() {return this->m_connected;}
+        uint8_t requireAnId(ClientConnection*);
 }; //}
 
 /**

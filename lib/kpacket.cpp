@@ -15,8 +15,7 @@
 /**
  * @param {ROBuf} remain unfinished buffer
  * @param {ROBuf} income latest recieved buffer
- * @return if get<0>(return) is nullptr, frame doesn't complete
- * @exception if income equals nullptr then raise error
+ * @return if get<0>(return) is false, frame error
  */
 std::tuple<bool, ROBuf, ROBuf, PacketOp, ConnectionId> decode_packet(const ROBuf remain, const ROBuf income) //{
 {
@@ -59,7 +58,8 @@ std::tuple<bool, ROBuf, ROBuf, PacketOp, ConnectionId> decode_packet(const ROBuf
     if(remain.size() + income.size() < header_size)
         return std::make_tuple(true, ROBuf(), remain + income, op, id);
 
-    xassert(len != 0); // TODO
+    if(len == 0)
+        return std::make_tuple(false, ROBuf(), remain + income, op, id);
 
     if(len + header_size > remain.size() + income.size()) {
         if(!remain.empty()) {
@@ -98,12 +98,12 @@ std::tuple<bool, std::vector<std::tuple<ROBuf, PacketOp, uint8_t>>, ROBuf> decod
     std::vector<std::tuple<ROBuf, PacketOp, uint8_t>> ret;
 
     while(true) {
-        bool error;
+        bool noerror;
         ROBuf a, b;
         PacketOp op;
         uint8_t id;
-        std::tie(error, a, b, op, id) = decode_packet(x_remain, x_income);
-        if(error == false)
+        std::tie(noerror, a, b, op, id) = decode_packet(x_remain, x_income);
+        if(noerror == false)
             return std::make_tuple(false, ret, b);
         if(!a.empty()) ret.push_back(std::make_tuple(a, op, id));
         x_income = b;
@@ -121,7 +121,7 @@ std::tuple<bool, std::vector<std::tuple<ROBuf, PacketOp, uint8_t>>, ROBuf> decod
 /** create packet header buffer */
 ROBuf encode_packet_header(PacketOp op, ConnectionId id, size_t len) //{
 {
-    xassert(op < 1 << 2 && id < 1 << 6);
+    xassert(op < 1 << 4 && id < 1 << 6);
     xassert(len < 1l << 32);
     size_t header_size = 0;
     void* buf = nullptr;
@@ -156,5 +156,11 @@ ROBuf encode_packet(PacketOp op, ConnectionId id, size_t len, void* buf) //{
     ROBuf payload = ROBuf(buf, len);
     ROBuf ret = header + payload;
     return ret;
+} //}
+
+ROBuf encode_packet(PacketOp op, ConnectionId id, ROBuf buf) //{
+{
+    ROBuf header = encode_packet_header(op, id, buf.size());
+    return header + buf;
 } //}
 

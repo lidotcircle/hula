@@ -7,6 +7,7 @@
 #include <vector>
 #include <ostream>
 
+#define NEW_CONNECTION_TIMEOUT (3 * 2000)
 
 namespace KProxyClient {
 
@@ -499,16 +500,34 @@ void Server::dispatch_bypass(const std::string& addr, uint16_t port, Socks5Auth*
 
 void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
 {
+    ConnectionProxy* pp = nullptr;
     for(auto& m: this->m_proxy) {
-        if(m->getConnectionNumbers() < (1 << 6) - 1) {
-            return m->connect_to(addr, port, socks5);
+        if(!m->IsIdFull() && m->IsConnected()) {
+            pp = m;
+            break;
         }
     }
 
-    SingleServerInfo* s_info = this->select_remote_serever();
-    ConnectionProxy* new_proxy = new ConnectionProxy(this->mp_uv_loop, this, s_info);
-    this->m_proxy.insert(new_proxy);
-    new_proxy->connectRemoteServerAndOpen(addr, port, socks5); // TODO
+    if(pp == nullptr) {
+        auto c = this->select_remote_serever();
+        if(c == nullptr) {
+            socks5->send_reply(SOCKS5_REPLY_SERVER_FAILURE);
+            return;
+        }
+        pp = new ConnectionProxy(this->mp_uv_loop, this, c);
+        this->m_proxy.insert(pp);
+    }
+
+    ClientConnection* con = new ClientConnection(this, this->mp_uv_loop, pp, addr, port, socks5);
+    this->m_auths[socks5] = std::make_tuple(false, con);
+    con->connect(socks5);
+} //}
+
+SingleServerInfo* Server::select_remote_serever() //{
+{
+    for(auto& x: this->m_config->Servers())
+        return &x;
+    return nullptr;
 } //}
 
 void Server::redispatch(uv_tcp_t* client_tcp, Socks5Auth* socks5) //{
@@ -554,12 +573,96 @@ void Server::callback_remove(UVC::UVCBaseClient* ptr) //{
             this->m_callback_list.size(), this->m_relay.size(), this->m_auths.size());
     this->try_close();
 } //}
+
 //}
 
 
 /** proxy a single socks5 connection */
 //                class ClientConnection                      //{
-//ClientConnection::ClientConnection
+ClientConnection::ClientConnection(Server* kserver, uv_loop_t* loop, 
+                                   ConnectionProxy* mproxy,
+                                   const std::string& addr, uint16_t port, Socks5Auth* socks5):
+    mp_kserver(kserver), mp_loop(loop), mp_proxy(mproxy), m_server(addr), m_port(port), m_socks5(socks5) //{
+{
+    this->m_state = __State::INITIAL;
+    this->m_in_buffer = 0;
+    this->m_out_buffer = 0;
+
+    this->mp_tcp_client = nullptr;
+    this->m_client_start_read = false;
+
+    this->m_id = this->mp_proxy->requireAnId(this);
+    assert(this->m_id < SINGLE_TSL_MAX_CONNECTION);
+} //}
+
+void ClientConnection::run(uv_tcp_t* client_tcp) //{
+{
+    assert(client_tcp);
+    assert(this->mp_tcp_client == nullptr);
+
+    this->mp_tcp_client = client_tcp;
+    this->__start_relay();
+} //}
+
+void ClientConnection::__start_relay() //{
+{
+} //}
+
+void ClientConnection::close() //{
+{
+} //}
+
+void ClientConnection::PushData(ROBuf buf) //{
+{
+    assert(this->m_state == __State::RUNNING);
+} //}
+
+void ClientConnection::accept() //{
+{
+    assert(this->m_socks5);
+    this->m_socks5->send_reply(SOCKS5_REPLY_SUCCEEDED);
+    this->m_socks5 = nullptr;
+} //}
+
+void ClientConnection::reject() //{
+{
+    assert(this->m_socks5);
+    this->m_socks5->send_reply(SOCKS5_REPLY_SERVER_FAILURE);
+    this->m_socks5 = nullptr;
+    this->close();
+} //}
+
+void ClientConnection::connect(Socks5Auth* socks5) //{
+{
+    if(this->mp_proxy->IsConnected())
+        return this->__connect(socks5);
+
+    this->mp_proxy->connect(ClientConnection::connect_callback, new std::tuple<ClientConnection*, Socks5Auth*>(this, socks5));
+} //}
+// static
+void ClientConnection::connect_callback(bool should_run, int status, void* data) //{
+{
+    std::tuple<ClientConnection*, Socks5Auth*>* x = static_cast<decltype(x)>(data);
+    ClientConnection* _this;
+    Socks5Auth* socks5;
+    std::tie(_this, socks5) = *x;
+    delete x;
+
+    if(!should_run) return;
+
+    if(_this->mp_proxy->IsConnected() == false) {
+        assert(status < 0);
+        socks5->send_reply(SOCKS5_REPLY_SERVER_FAILURE);
+        return;
+    }
+
+    _this->__connect(socks5);
+} //}
+void ClientConnection::__connect(Socks5Auth* socks5) //{
+{
+    assert(this->mp_proxy->IsConnected());
+    this->mp_proxy->new_connection(this->m_id, this->m_server, this->m_port, nullptr, nullptr); // TODO
+} //}
 //}
 
 
@@ -571,27 +674,51 @@ ConnectionProxy::ConnectionProxy(uv_loop_t* loop, Server* server, SingleServerIn
     this->mp_server = server;
     this->mp_server_info = server_info;
     this->mp_connection = nullptr;
+
+    this->m_out_buffer = 0;
+    this->m_remain_raw = ROBuf();
+
+    this->m_state = __State::STATE_INITIAL;
+
+    this->m_connection_read = false;
 } //}
 
 void ConnectionProxy::close(CloseReason reason) //{
 {
+    this->m_state = __State::STATE_CLOSING;
     // TODO
 } //}
 
 uint8_t ConnectionProxy::get_id() //{
 {
-    for(uint8_t i=0; i<(1 << 6); i++) {
+    for(uint8_t i=0; i<SINGLE_TSL_MAX_CONNECTION; i++) {
         if(this->m_map.find(i) == this->m_map.end())
             return i;
     }
-    return (1 << 6);
+    return SINGLE_TSL_MAX_CONNECTION;
 } //}
 
-void ConnectionProxy::connectRemoteServerAndOpen(const std::string& xaddr, uint16_t port, Socks5Auth* socks5) //{
+void ConnectionProxy::connect(ConnectCallback cb, void* data) //{
 {
+    assert(this->m_connect_cb == nullptr);
+    assert(this->m_connect_cb_data == nullptr);
+    this->m_connect_cb = cb;
+    this->m_connect_cb_data = data;
+    this->connect_to_remote_server();
+} //}
+
+void ConnectionProxy::connect_to_remote_server() //{
+{
+    assert(this->m_state = __State::STATE_INITIAL);
+    this->m_state = __State::STATE_GETDNS;
+
     this->mp_server_info->increase();
     this->mp_connection = new uv_tcp_t();
     uv_tcp_init(this->mp_loop, this->mp_connection);
+    uv_handle_set_data((uv_handle_t*)this->mp_connection, this);
+
+    assert(this->m_connect_cb != nullptr);
+    assert(this->m_connect_cb_data != nullptr);
 
     uint32_t ipv4_addr; // TODO maybe support IPV6
     if(str_to_ip4(this->mp_server_info->addr().c_str(), &ipv4_addr)) {
@@ -608,8 +735,9 @@ void ConnectionProxy::connectRemoteServerAndOpen(const std::string& xaddr, uint1
         info.ai_addr = (sockaddr*)&addr;
 
         uv_getaddrinfo_t req;
-        auto ptr = new UVC::ConnectionProxy$connectRemoteServerAndOpen$uv_getaddrinfo(
-                this->mp_server, this, false, xaddr, port, socks5);
+        auto ptr = new UVC::ConnectionProxy$connect_to_remote_server$uv_getaddrinfo(
+                this->mp_server, this, false, 
+                this->m_connect_cb, this->m_connect_cb_data);
         uv_req_set_data((uv_req_t*)&req, ptr);
         this->mp_server->callback_insert(ptr);
 
@@ -622,8 +750,8 @@ void ConnectionProxy::connectRemoteServerAndOpen(const std::string& xaddr, uint1
         hints.ai_flags = 0;
 
         uv_getaddrinfo_t* p_req = new uv_getaddrinfo_t();
-        auto ptr = new UVC::ConnectionProxy$connectRemoteServerAndOpen$uv_getaddrinfo(
-                this->mp_server, this, true, xaddr, port, socks5);
+        auto ptr = new UVC::ConnectionProxy$connect_to_remote_server$uv_getaddrinfo(
+                this->mp_server, this, true, this->m_connect_cb, this->m_connect_cb_data);
         uv_req_set_data((uv_req_t*)p_req, ptr);
         this->mp_server->callback_insert(ptr);
 
@@ -640,30 +768,31 @@ void ConnectionProxy::connect_remote_getaddrinfo_cb(uv_getaddrinfo_t* req, int s
     struct addrinfo *a;
     struct sockaddr_in* m;
 
-    UVC::ConnectionProxy$connectRemoteServerAndOpen$uv_getaddrinfo* msg =
+    UVC::ConnectionProxy$connect_to_remote_server$uv_getaddrinfo* msg =
         dynamic_cast<decltype(msg)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
     msg->_server->callback_remove(msg);
     bool clean = msg->_clean;
     ConnectionProxy* _this = msg->_this;
-    Socks5Auth* socks5 = msg->_socks5;
+    ConnectCallback cb = msg->_cb;
+    void* cb_data = msg->_cb_data;
     bool should_run = msg->should_run;
-
-    std::string d_addr = msg->_addr;
-    uint16_t d_port = msg->_port;
 
     if(clean) delete req;
     delete msg;
 
     if(!should_run) {
         /* if(clean) */ uv_freeaddrinfo(res);
+        cb(false, -1, cb_data);
         return;
     }
 
     if(status < 0) {
-        __logger->warn("In ConnectionProxy::connectRemoteServerAndOpen(): dns query fail");
+        __logger->warn("In ConnectionProxy::connect_to_remote_server(): dns query fail");
         if(clean) uv_freeaddrinfo(res);
+        _this->m_state = __State::STATE_ERROR;
+        cb(true, -1, cb_data);
         _this->close(ConnectionProxy::CLOSE_REMOTE_SERVER_DNS);
-        return socks5->send_reply(SOCKS5_REPLY_HOST_UNREACHABLE);
+        return;
     }
     for(a = res; a != nullptr; a = a->ai_next) {
         if(sizeof(struct sockaddr_in) != a->ai_addrlen) {
@@ -672,24 +801,28 @@ void ConnectionProxy::connect_remote_getaddrinfo_cb(uv_getaddrinfo_t* req, int s
         } else break;
     }
     if(a == nullptr) {
-        logger->warn("In ConnectionProxy::connectRemoteServerAndOpen(): query dns doesn't get an ipv4 address");
-        // TODO send a close packet
+        logger->warn("In ConnectionProxy::connect_to_remote_server(): query dns doesn't get an ipv4 address");
         if(clean) uv_freeaddrinfo(res);
+        _this->m_state = __State::STATE_ERROR;
+        cb(true, -1, cb_data);
         _this->close(ConnectionProxy::CLOSE_REMOTE_SERVER_DNS);
-        return socks5->send_reply(SOCKS5_REPLY_ADDRESSS_TYPE_NOT_SUPPORTED);
+        return;
     }
     m = (struct sockaddr_in*)a->ai_addr; // FIXME ipv6
     m->sin_port = _this->mp_server_info->port();
-    _this->connect_to_with_sockaddr((sockaddr*)m, socks5, d_addr, d_port);
+    _this->connect_to_with_sockaddr((sockaddr*)m, cb, cb_data);
     if(clean) uv_freeaddrinfo(res);
 } //}
 
-void ConnectionProxy::connect_to_with_sockaddr(sockaddr* sock, Socks5Auth* socks5, const std::string& d_addr, uint16_t d_port) //{
+void ConnectionProxy::connect_to_with_sockaddr(sockaddr* sock, ConnectCallback cb, void* data) //{
 {
     uv_connect_t* req = new uv_connect_t();
-    auto ptr = new UVC::ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect(this->mp_server, this, d_addr, d_port, socks5);
-    uv_handle_set_data((uv_handle_t*)req, ptr);
+    auto ptr = new UVC::ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect(this->mp_server, this, cb, data);
+    uv_req_set_data((uv_req_t*)req, ptr);
     this->mp_server->callback_insert(ptr);
+
+    assert(this->m_state == __State::STATE_GETDNS);
+    this->m_state = __State::STATE_CONNECTING;
 
     uv_tcp_connect(req, this->mp_connection, sock, ConnectionProxy::connect_remote_tcp_connect_cb);
 } //}
@@ -703,39 +836,415 @@ void ConnectionProxy::connect_remote_tcp_connect_cb(uv_connect_t* req, int statu
     assert(ptr);
     Server* server = ptr->_server;
     ConnectionProxy* _this = ptr->_this;
-    std::string _addr = ptr->_addr;
-    uint16_t _port = ptr->_port;
-    Socks5Auth* socks5 = ptr->_socks5;
+    ConnectCallback cb = ptr->_cb;
+    void* cb_data = ptr->_cb_data;
     bool should_run = ptr->should_run;
     delete req;
     delete ptr;
 
     server->callback_remove(ptr);
-    if(!should_run) return;
-
-    if(status < 0) {
-        __logger->warn("ConnectionProxy: connect to remote server fail");
-        _this->close(ConnectionProxy::CLOSE_REMOTE_SERVER_CONNECT_ERROR);
-        socks5->send_reply(SOCKS5_REPLY_SERVER_FAILURE);
+    if(!should_run) {
+        cb(false, -1, cb_data);
         return;
     }
 
-    _this->tsl_handshake(new waitConnect {._this = _this, ._addr = _addr, ._port = _port, ._socks5 = socks5});
+    assert(_this->m_state == __State::STATE_CONNECTING);
+
+    if(status < 0) {
+        __logger->warn("ConnectionProxy: connect to remote server fail");
+        cb(true, status, cb_data);
+        _this->close(ConnectionProxy::CLOSE_REMOTE_SERVER_CONNECT_ERROR);
+        return;
+    }
+
+    auto state = ConnectCallbackState{.m_cb = cb, .m_cb_data = cb_data};
+    _this->tsl_handshake(state);
 } //}
 
-void ConnectionProxy::tsl_handshake(waitConnect* wait) //{
+void ConnectionProxy::tsl_handshake(ConnectCallbackState state) //{
 {
-    this->m_tsl_established = true;
-    this->client_authenticate(wait);
+    assert(this->m_state == __State::STATE_CONNECTING);
+    this->m_state = __State::STATE_TSL;
+    this->client_authenticate(state);
 } //}
 
-void ConnectionProxy::client_authenticate(waitConnect* wait) //{
+struct __authentication_param {
+    ConnectionProxy* _this;
+    ConnectionProxy::ConnectCallback _cb;
+    void* _cb_data;
+};
+void ConnectionProxy::client_authenticate(ConnectCallbackState state) //{
 {
-    assert(this->m_tsl_established);
+    assert(this->m_state == __State::STATE_TSL);
+    this->m_state = __State::STATE_AUTH;
+
+    if (this->mp_server_info->name().size() >= 256 || 
+        this->mp_server_info->pass().size() >= 256) {
+        __logger->warn("ConnectionProxy::client_authenticate(): length of username and password should less than 256");
+        state.m_cb(true, -1, state.m_cb_data);
+        this->close(CLOSE_AUTHENTICATION_ERROR);
+        return;
+    }
+    ROBuf auth_buf = ROBuf(this->mp_server_info->name().size() + this->mp_server_info->pass().size() + 2);
+    auth_buf.__base()[0] = (uint8_t)this->mp_server_info->name().size();
+    memcpy(auth_buf.__base() + 1, this->mp_server_info->name().c_str(), this->mp_server_info->name().size());
+    auth_buf.__base()[this->mp_server_info->name().size() + 1] = (uint8_t)this->mp_server_info->pass().size();
+    memcpy(auth_buf.__base() + this->mp_server_info->name().size() + 2, 
+            this->mp_server_info->pass().c_str(), this->mp_server_info->pass().size());
+
+    this->_write(auth_buf, ConnectionProxy::on_authentication_write, new __authentication_param{this, state.m_cb, state.m_cb_data});
 } //}
 
-void ConnectionProxy::connect_to(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
+// static
+void ConnectionProxy::on_authentication_write(bool should_run, int status, ROBuf* buf, void* data) //{
 {
+    __authentication_param* _msg = static_cast<decltype(_msg)>(data);
+    ConnectionProxy* _this = _msg->_this;
+    ConnectCallback  _cb = _msg->_cb;
+    void* _cb_data = _msg->_cb_data;
+    delete buf;
+
+    if(!should_run || status < 0) {
+        _cb(should_run, status, _cb_data);
+        return;
+    }
+
+    assert(_this->m_state == __State::STATE_AUTH);
+    _this->m_state = __State::STATE_WAIT_AUTH_REPLY;
+
+    uv_handle_set_data((uv_handle_t*)_this->mp_connection, _msg);
+    uv_read_start((uv_stream_t*)_this->mp_connection, malloc_cb, ConnectionProxy::uv_stream_read_after_send_auth_callback);
+    _this->m_connection_read = true;
+} //}
+
+// static
+void ConnectionProxy::uv_stream_read_after_send_auth_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
+{
+    __authentication_param* _msg = 
+        static_cast<decltype(_msg)>(uv_handle_get_data((uv_handle_t*)stream));
+    ConnectionProxy* _this = dynamic_cast<decltype(_this)>(static_cast<EventEmitter*>(_msg->_this));
+    assert(_this);
+    ConnectCallback cb = _msg->_cb;
+    void* cb_data = _msg->_cb_data;
+    delete _msg;
+
+    if(nread <= 0) {
+        _this->close(CLOSE_READ_ERROR);
+        free(buf->base);
+        cb(false, -1, cb_data);
+        return;
+    }
+
+    ROBuf bufx = ROBuf(buf->base, nread, 0, free);
+
+    switch(_this->m_state) {
+        case __State::STATE_WAIT_AUTH_REPLY:
+            _this->authenticate_with(bufx, cb, cb_data);
+            break;
+        case __State::STATE_ERROR:
+            cb(false, -1, cb_data);
+            _this->close(CLOSE_PACKET_ERROR);
+            break;
+        case __State::STATE_BUILD:
+        case __State::STATE_TSL:
+        case __State::STATE_AUTH:
+        case __State::STATE_INITIAL:
+        case __State::STATE_GETDNS:
+        case __State::STATE_CONNECTING:
+        case __State::STATE_CLOSING:
+        case __State::STATE_CLOSED:
+        default:
+            assert(false && "It isn't a correct time to call ConnectionProxy::uv_stream_read_after_send_auth_callback()");
+            break;
+    }
+
+    uv_read_stop((uv_stream_t*)_this->mp_connection);
+    uv_handle_set_data((uv_handle_t*)_this->mp_connection, _this);
+    uv_read_start((uv_stream_t*)_this->mp_connection, malloc_cb, ConnectionProxy::uv_stream_read_packet);
+} //}
+
+void ConnectionProxy::uv_stream_read_packet(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
+{
+    ConnectionProxy* _this = dynamic_cast<decltype(_this)>(static_cast<EventEmitter*>(uv_handle_get_data((uv_handle_t*)stream)));
+    assert(_this);
+
+    if(nread == 0) return;
+
+    if(nread < 0) {
+        _this->close(CLOSE_READ_ERROR);
+        free(buf->base);
+        return;
+    }
+
+    ROBuf bufx = ROBuf(buf->base, nread, 0, free);
+
+    switch(_this->m_state) {
+        case __State::STATE_ERROR:
+            _this->close(CLOSE_PACKET_ERROR);
+            break;
+        case __State::STATE_BUILD:
+            _this->dispatch_data_encrypted(bufx);
+            break;
+        case __State::STATE_TSL:
+        case __State::STATE_AUTH:
+        case __State::STATE_INITIAL:
+        case __State::STATE_GETDNS:
+        case __State::STATE_CONNECTING:
+        case __State::STATE_CLOSING:
+        case __State::STATE_CLOSED:
+        case __State::STATE_WAIT_AUTH_REPLY:
+        default:
+            assert(false && "It isn't a correct time to call ConnectionProxy::uv_stream_read_packet()");
+            break;
+    }
+} //}
+
+void ConnectionProxy::dispatch_data_encrypted(ROBuf buf) //{
+{
+    this->dispatch_data(buf);
+} //}
+
+void ConnectionProxy::dispatch_data(ROBuf buf) //{
+{
+    std::tuple<bool, std::vector<std::tuple<ROBuf, PacketOp, uint8_t>>, ROBuf> mm = 
+        decode_all_packet(this->m_remain_raw, buf);
+    bool noerror;
+    std::vector<std::tuple<ROBuf, PacketOp, uint8_t>> packets;
+    std::tie(noerror, packets, this->m_remain_raw) = mm;
+    if(noerror == false) {
+        this->close(CLOSE_PACKET_ERROR);
+        return;
+    }
+
+    for(auto& p: packets) {
+        ROBuf frame;
+        PacketOp opcode;
+        uint8_t id;
+        std::tie(frame, opcode, id) = p;
+
+        if(this->m_map.find(id) == this->m_map.end()) {
+            this->close(CLOSE_ID_ERROR);
+            return;
+        }
+
+        ClientConnection* cc = this->m_map[id];
+
+        switch (opcode) {
+            case PACKET_OP_REG:
+                if(this->m_map.find(id) == this->m_map.end()) {
+                    __logger->warn("ConnectionProxy recieves a packet to to ClientConnection which doesn't exists. REG");
+                    this->close_connection(id, nullptr, nullptr);
+                } else {
+                    cc->PushData(frame);
+                }
+                break;
+            case PACKET_OP_CLOSE:
+                if(this->m_map.find(id) == this->m_map.end()) {
+                    __logger->warn("ConnectionProxy recieves a packet to to ClientConnection which doesn't exists. CLOSE");
+                } else {
+                    cc->close();
+                }
+                break;
+            case PACKET_OP_CONNECT:
+                if(this->m_wait_new_connection.find(id) == this->m_wait_new_connection.end()) {
+                    __logger->warn("ConnectionProxy recieves a packet to to ClientConnection which doesn't exists. CONNECT");
+                    this->close_connection(id, nullptr, nullptr);
+                } else {
+                    assert(this->m_map.find(id) != this->m_map.end());
+                    this->m_map[id]->accept();
+                }
+                break;
+            case PACKET_OP_REJECT:
+                if(this->m_wait_new_connection.find(id) == this->m_wait_new_connection.end()) {
+                    __logger->warn("ConnectionProxy recieves a packet to to ClientConnection which doesn't exists. REJECT");
+                } else {
+                    assert(this->m_map.find(id) != this->m_map.end());
+                    this->m_map[id]->reject();
+                }
+                break;
+            case PACKET_OP_NEW:
+            case PACKET_OP_RESERVED:
+            default:
+                __logger->warn("KProxyClient recieve a packet with unexpected opcode. IGNORE it");
+                return;
+        }
+    }
+} //}
+
+void ConnectionProxy::authenticate_with(ROBuf buf, ConnectCallback cb, void* cb_data) //{
+{
+    ROBuf merge = this->m_remain_raw + buf;
+    assert(merge.size() > 0);
+    if(merge.size() < 2) {
+        this->m_remain_raw = merge;
+        return;
+    }
+
+    if((uint8_t)merge.base()[0] != 0xFF ||
+       (uint8_t)merge.base()[0] != 0x00) {
+        __logger->warn("authentication fail");
+        this->close(CLOSE_AUTHENTICATION_ERROR);
+        cb(false, -1, cb_data);
+        return;
+    }
+
+    this->m_state = __State::STATE_BUILD;
+    this->m_remain_raw = merge + 2;
+    cb(true, 0, cb_data);
+    return;
+} //}
+
+int ConnectionProxy::_write(ROBuf buf, WriteCallback cb, void* data) //{
+{
+    assert(this->mp_connection != nullptr);
+
+    uv_buf_t* uv_buf = new uv_buf_t();
+    uv_buf->base = buf.__base();
+    uv_buf->len = buf.size();
+
+    ROBuf* mem_holder = new ROBuf(buf);
+
+    uv_write_t* req = new uv_write_t();
+    auto ptr = new UVC::ConnectionProxy$_write$uv_write(this->mp_server, this, cb, data, mem_holder, uv_buf);
+    uv_req_set_data((uv_req_t*)req, ptr);
+    this->mp_server->callback_insert(ptr);
+
+    this->m_out_buffer += buf.size();
+    return uv_write(req, (uv_stream_t*)this->mp_connection, uv_buf, 1, ConnectionProxy::_write_callback);
+} //}
+
+// static
+void ConnectionProxy::_write_callback(uv_write_t* req, int status) //{
+{
+    UVC::ConnectionProxy$_write$uv_write* msg = 
+        dynamic_cast<decltype(msg)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
+    assert(msg);
+    auto _this = msg->_this;
+    auto cb = msg->_cb;
+    auto data = msg->_data;
+    auto uv_buf = msg->_uv_buf;
+    auto mem_holder = msg->_mem_holder;
+    bool should_run = msg->should_run;
+    _this->mp_server->callback_remove(msg);
+
+    if(should_run) _this->m_out_buffer -= mem_holder->size();
+
+    delete msg;
+    delete uv_buf;
+
+    if(cb != nullptr)
+        cb(should_run, status, mem_holder, data);
+    else
+        delete mem_holder;
+
+    if(!should_run) return;
+
+    if(status < 0) {
+        _this->close(CLOSE_WRITE_ERROR);
+        return;
+    }
+} //}
+
+struct new_connection_wrapper_data {
+    ConnectionProxy* _this;
+    uint8_t m_id;
+    ConnectionProxy::WriteCallback m_cb;
+    void* m_data;
+    bool  m_writecallback_called;
+    bool  m_timer_called;
+};
+int ConnectionProxy::new_connection(uint8_t id, 
+        const std::string& addr, uint16_t port, 
+        WriteCallback cb, void* data) //{
+{
+    assert(this->m_map.find(id) != this->m_map.end());
+    assert(this->m_map[id]->IsRun() == false);
+
+    ROBuf buf = ROBuf(addr.size() + 2);
+    memcpy(buf.__base(), addr.c_str(), addr.size());
+    *(uint16_t*)(&buf.__base()[addr.size()]) = k_htons(port);
+    auto x = encode_packet(PACKET_OP_NEW, id, buf);
+    new_connection_wrapper_data* new_data = new new_connection_wrapper_data{this, id, cb, data, false, false};
+    int ret = this->_write(x, ConnectionProxy::new_connection_callback_wrapper, new_data);
+    this->m_wait_new_connection.insert(id);
+
+    uv_timer_t* timer = new uv_timer_t();
+    uv_timer_init(this->mp_loop, timer);
+    auto ptr = new UVC::ConnectionProxy$new_connection$uv_timer_start(this->mp_server, this, new_data);
+    uv_handle_set_data((uv_handle_t*)timer, ptr);
+    this->mp_server->callback_insert(ptr);
+    uv_timer_start(timer, ConnectionProxy::new_connection_timer_callback, NEW_CONNECTION_TIMEOUT, 0);
+
+    return ret;
+} //}
+
+// static
+void ConnectionProxy::new_connection_callback_wrapper(bool should_run, int status, ROBuf* buf, void* data) //{
+{
+    new_connection_wrapper_data* kdata = static_cast<decltype(kdata)>(data);
+    ConnectionProxy* _this = kdata->_this;
+    uint8_t id = kdata->m_id;
+    WriteCallback cb = kdata->m_cb;
+    void* cb_data = kdata->m_data;
+    bool timer_called = kdata->m_timer_called;
+    if(timer_called)
+        delete kdata;
+    else
+        kdata->m_writecallback_called = true;
+
+    if(!timer_called) {
+        cb(should_run, status, buf, data);
+    } else {
+        delete buf;
+    }
+} //}
+void ConnectionProxy::new_connection_timer_callback(uv_timer_t* timer) //{
+{
+    UVC::ConnectionProxy$new_connection$uv_timer_start* msg = 
+        dynamic_cast<decltype(msg)>(static_cast<EventEmitter*>(uv_handle_get_data((uv_handle_t*)timer)));
+    assert(msg);
+    msg->_server->callback_remove(msg);
+    ConnectionProxy* _this = msg->_this;
+    new_connection_wrapper_data* _data = static_cast<decltype(_data)>(msg->_data);
+    bool should_run = msg->should_run;
+    uv_timer_stop(timer);
+    uv_close((uv_handle_t*)timer, delete_closed_handle);
+    delete timer;
+    delete msg;
+
+    bool writecallback_called = _data->m_writecallback_called;
+    WriteCallback cb = _data->m_cb;
+    void* cb_data = _data->m_data;
+    uint8_t id = _data->m_id;
+
+    if(writecallback_called) {
+        delete _data;
+    } else {
+        _data->m_timer_called = true;
+        cb(should_run, -1, new ROBuf(), cb_data);
+    }
+
+    if(should_run) {
+        if(writecallback_called && _this->m_wait_new_connection.find(id) != _this->m_wait_new_connection.end()) {
+            _this->m_wait_new_connection.erase(_this->m_wait_new_connection.find(id));
+            assert(_this->m_map.find(id) != _this->m_map.end());
+            _this->m_map[id]->reject();
+        }
+    }
+} //}
+
+int ConnectionProxy::close_connection(uint8_t id, WriteCallback cb, void* data) //{
+{
+    auto x = encode_packet(PACKET_OP_CLOSE, id, ROBuf((char*)"close", 5));
+    return this->_write(x, cb, data);
+} //}
+
+uint8_t ConnectionProxy::requireAnId(ClientConnection* cc) //{
+{
+    uint8_t id = this->get_id();
+    assert(id < (1 << 6));
+    this->m_map[id] = cc;
+    return id;
 } //}
 
 //}

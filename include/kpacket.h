@@ -31,6 +31,8 @@
 enum PacketOp: uint8_t {
     PACKET_OP_REG = 0,
     PACKET_OP_NEW,
+    PACKET_OP_CONNECT,
+    PACKET_OP_REJECT,
     PACKET_OP_CLOSE,
     PACKET_OP_RESERVED
 };
@@ -40,8 +42,8 @@ typedef uint8_t ConnectionId;
 
 PACK(
 struct PacketHeader {
-    uint8_t opcode: 2;
-    uint8_t id: 6;
+    uint8_t opcode;
+    uint8_t id;
     uint8_t length;
     union {
         struct {
@@ -59,4 +61,5 @@ std::tuple<bool, std::vector<std::tuple<ROBuf, PacketOp, uint8_t>>, ROBuf> decod
 
 ROBuf encode_packet_header(PacketOp op, ConnectionId id, size_t len);
 ROBuf encode_packet(PacketOp op, ConnectionId id, size_t len, void* buf);
+ROBuf encode_packet(PacketOp op, ConnectionId id, ROBuf buf);
 

@@ -78,34 +78,53 @@ struct RelayConnection$xxxx_read_cb$uv_write: public UVCBaseClient {
             uv_buf_t* uv_buf): UVCBaseClient(server),_this(_this), uv_buf(uv_buf){}
 };
 
-struct ConnectionProxy$connectRemoteServerAndOpen$uv_getaddrinfo: public UVCBaseClient {
+struct ConnectionProxy$connect_to_remote_server$uv_getaddrinfo: public UVCBaseClient {
     KProxyClient::ConnectionProxy* _this;
     bool _clean;
-    std::string _addr;
-    uint16_t _port;
-    KProxyClient::Socks5Auth* _socks5;
-    inline ConnectionProxy$connectRemoteServerAndOpen$uv_getaddrinfo(
+    KProxyClient::ConnectionProxy::ConnectCallback _cb;
+    void* _cb_data;
+    inline ConnectionProxy$connect_to_remote_server$uv_getaddrinfo(
             KProxyClient::Server* server, 
             KProxyClient::ConnectionProxy* _this, 
             bool clean,
-            const std::string& addr, 
-            uint16_t port,
-            KProxyClient::Socks5Auth* socks5): 
-        UVCBaseClient(server), _this(_this), _clean(clean), _addr(addr), _port(port), _socks5(socks5){}
+            KProxyClient::ConnectionProxy::ConnectCallback _cb, void* _cb_data): 
+        UVCBaseClient(server), _this(_this), _clean(clean), _cb(_cb), _cb_data(_cb_data){}
 };
 
 struct ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect: public UVCBaseClient {
     KProxyClient::ConnectionProxy* _this;
-    std::string _addr;
-    uint16_t _port;
-    KProxyClient::Socks5Auth* _socks5;
+    KProxyClient::ConnectionProxy::ConnectCallback _cb;
+    void* _cb_data;
     inline ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect(
             KProxyClient::Server* server, 
-            KProxyClient::ConnectionProxy* _this, 
-            const std::string& addr, 
-            uint16_t port,
-            KProxyClient::Socks5Auth* socks5): 
-        UVCBaseClient(server), _this(_this), _addr(addr), _port(port), _socks5(socks5){}
+            KProxyClient::ConnectionProxy* _this,
+            KProxyClient::ConnectionProxy::ConnectCallback _cb,
+            void* _cb_data): 
+        UVCBaseClient(server), _this(_this), _cb(_cb), _cb_data(_cb_data){}
+};
+
+struct ConnectionProxy$_write$uv_write: public UVCBaseClient {
+    KProxyClient::ConnectionProxy* _this;
+    KProxyClient::ConnectionProxy::WriteCallback _cb;
+    void* _data;
+    ROBuf* _mem_holder;
+    uv_buf_t* _uv_buf;
+
+    ConnectionProxy$_write$uv_write(
+            KProxyClient::Server* server, 
+            KProxyClient::ConnectionProxy* proxy, 
+            KProxyClient::ConnectionProxy::WriteCallback cb,
+            void* data, ROBuf* mem_holder, uv_buf_t* uv_buf): 
+        UVCBaseClient(server), _this(proxy), _cb(cb), 
+        _data(data), _mem_holder(mem_holder), _uv_buf(uv_buf) {}
+};
+
+struct ConnectionProxy$new_connection$uv_timer_start: public UVCBaseClient {
+    KProxyClient::ConnectionProxy* _this;
+    void* _data;
+    inline ConnectionProxy$new_connection$uv_timer_start(KProxyClient::Server* server,
+            KProxyClient::ConnectionProxy* _this, void* data):
+        UVCBaseClient(server), _this(_this), _data(data) {}
 };
 
 }
