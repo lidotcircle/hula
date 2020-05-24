@@ -152,10 +152,6 @@ class Server: public EventEmitter //{
         void dispatch_bypass(const std::string&, uint16_t, Socks5Auth* socks5);
         void dispatch_proxy (const std::string&, uint16_t, Socks5Auth* socks5);
 
-        static void dispatch_proxy_real(Server*, ConnectionProxy*, uint8_t id, 
-                                        const std::string& addr,   uint16_t port, 
-                                        Socks5Auth* socks5, uint8_t socks5_reply);
-
         SingleServerInfo* select_remote_serever();
 
         void redispatch(uv_tcp_t* client_tcp, Socks5Auth* socks5);
@@ -187,6 +183,9 @@ class Server: public EventEmitter //{
  * @class represent a socks5 connection */
 class ClientConnection: public EventEmitter //{
 {
+    public:
+        struct __proxyWriteInfo {ClientConnection* _this; bool exited;};
+
     private:
         uv_loop_t* mp_loop;
         uv_tcp_t*  mp_tcp_client;
@@ -209,11 +208,16 @@ class ClientConnection: public EventEmitter //{
             ERROR
         };
         __State m_state;
+        std::unordered_set<__proxyWriteInfo*> m_callbacks;
 
         size_t      m_in_buffer;
         size_t      m_out_buffer;
 
         void __start_relay();
+        static void client_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
+        static void ProxyWriteCallback(bool should_run, int status, ROBuf* buf, void* data);
+
+        static void write_to_client_callback(uv_write_t* req, int status);
 
         static void connect_callback(bool should_run, int status, void* data);
         void __connect(Socks5Auth* socks5);
@@ -230,7 +234,7 @@ class ClientConnection: public EventEmitter //{
         void run(uv_tcp_t* client_tcp);
         void PushData(ROBuf buf);
         void connect(Socks5Auth* socks5);
-        void close();
+        void close(bool send_close);
 
         void reject();
         void accept();
@@ -251,10 +255,9 @@ class ConnectionProxy: public EventEmitter //{
 
    private:
         std::map<uint8_t, ClientConnection*> m_map;
-        //        std::map<uint8_t, Socks5Auth*> m_auths_map;
         std::set<uint8_t> m_wait_new_connection;
 
-        Server* mp_server;
+        Server*    mp_server;
         uv_loop_t* mp_loop;
 
         uv_tcp_t* mp_connection;
@@ -346,6 +349,8 @@ class ConnectionProxy: public EventEmitter //{
                              WriteCallback cb, void* data);
         int close_connection(uint8_t id, WriteCallback cb, void* data);
 
+        void remove_connection(uint8_t id, ClientConnection* obj);
+
         void connect(ConnectCallback cb, void* data);
 
         inline size_t getConnectionNumbers() {return this->m_map.size();}
@@ -353,6 +358,8 @@ class ConnectionProxy: public EventEmitter //{
         inline bool   IsConnected() {return this->m_state == __State::STATE_BUILD;}
 
         uint8_t requireAnId(ClientConnection*);
+
+        ~ConnectionProxy();
 }; //}
 
 /**

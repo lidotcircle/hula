@@ -37,20 +37,18 @@ std::tuple<bool, ROBuf, ROBuf, PacketOp, ConnectionId> decode_packet(const ROBuf
     size_t header_size = 0;
     switch(header.length) {
         case 0xFE:
-            header_size = 4;
+            header_size = offsetof(PacketHeader, extend_length) + 2;
             len = k_ntohs(header.extend_length.e16);
             break;
         case 0xFF:
-            header_size = 6;
+            header_size = offsetof(PacketHeader, extend_length) + 4;
             len = k_ntohl(header.extend_length.e32);
             break;
         default:
-            header_size = 2;
+            header_size = offsetof(PacketHeader, extend_length);
             len = header.length;
             break;
     }
-
-    Logger::logger->debug("len: %d, header_size: %d", len, header_size);
 
     PacketOp op     = (PacketOp)header.opcode;
     ConnectionId id = header.id;

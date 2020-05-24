@@ -46,8 +46,9 @@ struct Socks5Auth$__send_auth_status$uv_write: public UVCBaseClient {
 struct Socks5Auth$__send_reply$uv_write: public UVCBaseClient {
     KProxyClient::Socks5Auth* _this;
     uv_buf_t* uv_buf;
+    uint8_t reply;
     Socks5Auth$__send_reply$uv_write(KProxyClient::Server* server, KProxyClient::Socks5Auth* _this, 
-            uv_buf_t* buf): UVCBaseClient(server), _this(_this), uv_buf(buf){}
+            uv_buf_t* buf, uint8_t reply): UVCBaseClient(server), _this(_this), uv_buf(buf), reply(reply){}
 };
 
 struct KProxyClient$Server$uv_listen: public UVCBaseClient {
@@ -125,6 +126,16 @@ struct ConnectionProxy$new_connection$uv_timer_start: public UVCBaseClient {
     inline ConnectionProxy$new_connection$uv_timer_start(KProxyClient::Server* server,
             KProxyClient::ConnectionProxy* _this, void* data):
         UVCBaseClient(server), _this(_this), _data(data) {}
+};
+
+struct ClientConnection$write_to_client_callback$uv_write: public UVCBaseClient {
+    KProxyClient::ClientConnection::__proxyWriteInfo* _info;
+    ROBuf* _rbuf;
+    uv_buf_t* _ubuf;
+    inline ClientConnection$write_to_client_callback$uv_write(KProxyClient::Server* server,
+            KProxyClient::ClientConnection::__proxyWriteInfo* info,
+            ROBuf* rbuf, uv_buf_t* ubuf):
+        UVCBaseClient(server), _info(info), _rbuf(rbuf), _ubuf(ubuf) {}
 };
 
 }

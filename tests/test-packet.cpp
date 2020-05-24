@@ -14,7 +14,7 @@ void packet_decode_test(ROBuf remain, ROBuf income, int q, int w, int e, int r, 
 
     std::tie(error, a, b, c, d) = m;
 
-    Logger::logger->debug("%d, %d, %d, %d", a.size(), b.size(), c, d);
+    Logger::logger->debug("%d, %d, 0x%x, 0x%x", a.size(), b.size(), c, d);
     assert(error == k && "buffer length should be 1");
     assert(a.size() == q && "buffer length should be 1");
     assert(b.size() == w && "remain should be nullptr");
