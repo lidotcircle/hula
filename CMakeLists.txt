@@ -21,6 +21,7 @@ set(kproxy_lib_src
     lib/events.cpp
     lib/config_file.cpp
     lib/socks5.cpp
+    lib/libuv_utils.cpp
     )
 
 include_directories("${CMAKE_CURRENT_LIST_DIR}/include")

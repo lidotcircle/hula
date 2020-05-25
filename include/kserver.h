@@ -7,12 +7,14 @@
 #include <vector>
 #include <tuple>
 #include <map>
+#include <set>
+#include <unordered_set>
 
 #include "events.h"
 #include "utils.h"
 #include "kpacket.h"
-#include "dlinkedlist.hpp"
 #include "config_file.h"
+#include "config.h"
 
 #define DEFAULT_BACKLOG 100
 
@@ -76,6 +78,7 @@
  *                                                                             
  *///}
 
+namespace UVC {class UVCBaseServer;}
 
 namespace KProxyServer {
 
@@ -103,9 +106,9 @@ class Server: public EventEmitter //{
         uv_loop_t* mp_uv_loop;
         uv_tcp_t*  mp_uv_tcp;
 
-        ServerConfig* config;
+        ServerConfig* mp_config;
 
-        DLinkedList<ClientConnectionProxy*>* tsl_list;
+        std::unordered_set<ClientConnectionProxy*> m_tsl_list;
 
         static void on_connection(uv_stream_t* stream, int status);
 
@@ -113,6 +116,11 @@ class Server: public EventEmitter //{
 
         static void on_config_load(int error, void* data);
         int __listen();
+
+    protected:
+        friend class ClientConnectionProxy;
+
+        void remove_proxy(ClientConnectionProxy* p);
 
     public:
         Server(uv_loop_t* loop, const std::string& config_file);
@@ -124,6 +132,8 @@ class Server: public EventEmitter //{
 
         int listen();
         int close();
+
+        inline bool HasConnection() {return this->m_tsl_list.size() != 0;}
 }; //}
 
 
@@ -134,40 +144,49 @@ class ServerToNetConnection: public EventEmitter //{
     public:
         using data_callback = void (*)(ServerToNetConnection* con, uint8_t id, ROBuf buf);
 
+    protected:
+        using WriteCallback = void (*)(bool should_run, int status, ROBuf* buf, void* data);
+
     private:
         uv_loop_t* mp_loop;
+
         uv_tcp_t* mp_tcp;
-        ClientConnectionProxy* m_connectionWrapper;
-        size_t used_buffer_size;
-        ConnectionId id;
+        bool m_net_tcp_start_read;
 
-        using write_callback = void (*)(void*);
+        bool m_inform_client_stop_read = false;
 
-        static void tcp_read_callback   (uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
-        static void tcp_connect_callback(uv_connect_t* req, int status);
-        static void tcp_alloc_callback  (uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
-        static void tcp_write_callback  (uv_write_t* req, int status);
+        ClientConnectionProxy* mp_proxy;
+        ConnectionId m_id;
 
-        /** wrapper of uv_write() */
-        int _write(uv_buf_t bufs[], unsigned int nbufs, write_callback cb, void* arg);
+        size_t m_net_to_user_buffer;
+        size_t m_user_to_net_buffer;
+
+        std::string m_addr;
+        uint16_t m_port;
+
+        void __connect();
+        static void tcp2net_getaddrinfo_callback(uv_getaddrinfo_t* req, int status, struct addrinfo* res);
+        void __connect_with_sockaddr(sockaddr* addr);
+        static void tcp2net_connect_callback(uv_connect_t* req, int status);
+        static void tcp2net_alloc_callback  (uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
+        static void tcp2net_read_callback   (uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
+        static void tcp2net_write_callback  (uv_write_t* req, int status); // write buffer to net_tpc_connection
+
+        void __start_net_to_user();
+        void _write_to_user(ROBuf buf);
+        static void _write_to_user_callback(bool should_run, int status, ROBuf* buf, void* data);
+
 
     public:
-        ServerToNetConnection(uv_loop_t* loop, const sockaddr* addr, ConnectionId id, ClientConnectionProxy* p);
+        ServerToNetConnection(ClientConnectionProxy* p, uv_loop_t* loop, ConnectionId id, 
+                              const std::string& addr, uint16_t port);
 
         ServerToNetConnection(const ServerToNetConnection&) = delete;
         ServerToNetConnection(ServerToNetConnection&& a) = delete;
         ServerToNetConnection& operator=(const ServerToNetConnection&) = delete;
         ServerToNetConnection& operator=(ServerToNetConnection&&) = delete;
 
-        /* 
-         * @return indicate congestion state, #return < 0 means connection is congested. */
-        int write(ROBuf buf);
-
-        int realy_back(uv_buf_t buf);
-
-        inline bool readable() const {return this->mp_tcp != nullptr && uv_is_readable((uv_stream_t*)this->mp_tcp);}
-        inline bool writable() const {return this->mp_tcp != nullptr && uv_is_writable((uv_stream_t*)this->mp_tcp);}
-
+        void PushData(ROBuf buf);
         void close();
 
         ~ServerToNetConnection();
@@ -179,58 +198,61 @@ class ServerToNetConnection: public EventEmitter //{
 class ClientConnectionProxy: public EventEmitter //{
 {
     public:
-        using write_callback = void (*)(ClientConnectionProxy* proxy, uint8_t id, uv_buf_t*, int status);
+        using WriteCallback = void (*)(bool should_run, int status, ROBuf* buf, void* data);
 
     private:
         std::map<uint8_t, ServerToNetConnection*> m_map;
+        std::set<uint8_t> m_wait_connect;
         Server* m_server;
         uv_loop_t* mp_loop;
-        uv_tcp_t* m_connection;
-        DLinkedList<ClientConnectionProxy*>* m_entry;
 
-        ROBuf remains = ROBuf();
+        uv_tcp_t* mp_connection;
+        bool m_connection_read;
+
+        size_t m_user_to_net_buffer = 0;
+        size_t m_net_to_user_buffer = 0;
+
+        std::unordered_set<UVC::UVCBaseServer*> m_callbacks;
+
+        ROBuf m_remains;
 
         static void malloc_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* out);
-        static void read_cb  (uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
-        static void write_cb (uv_write_t*  write,  int status);
+        static void user_read_cb (uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
+        static void user_stream_write_cb(uv_write_t*  write,  int status);
 
-        static void query_dns_cb(uv_getaddrinfo_t* req, int status, struct addrinfo* res);
-
-        void query_dns_connection(char* addr, uint16_t port, uint8_t id);
-
-        void dispatch_new_encrypted_data  (ssize_t nread, ROBuf buf);
-        void dispatch_new_unencrypted_data(ssize_t nread, ROBuf buf);
+        void dispatch_new_encrypted_data  (ROBuf buf);
+        void dispatch_new_unencrypted_data(ROBuf buf);
 
         void dispatch_reg  (uint8_t id, ROBuf buf);  // OPCODE PACKET_OP_REG
         void dispatch_new  (uint8_t id, ROBuf buf);  // OPCODE PACKET_OP_NEW
         void dispatch_close(uint8_t id, ROBuf buf);  // OPCODE PACKET_OP_CLOSE
 
-        void to_internet_ipv4_connection(const sockaddr_in* addr, uint8_t id);
+        void server_tsl_handshake();
+        void user_authenticate();
 
-        void write_encrypted(uint8_t id, const uv_buf_t* buf, write_callback cb);
+        int _write(ROBuf buf, WriteCallback cb, void* data);
+
 
     public:
-        ClientConnectionProxy(Server* server, uv_tcp_t* connection, DLinkedList<ClientConnectionProxy*>* list_entry);
+        ClientConnectionProxy(Server* server, uv_tcp_t* connection);
 
         ClientConnectionProxy(const ClientConnectionProxy&) = delete;
         ClientConnectionProxy(ClientConnectionProxy&& a) = delete;
         ClientConnectionProxy& operator=(ClientConnectionProxy&&) = delete;
         ClientConnectionProxy& operator=(const ClientConnectionProxy&) = delete;
 
-        /**
-         * @param addr network address
-         * @return return 0 means everything is ok, otherwise error occurs
-         */
-        int new_connection(sockaddr* addr);
+        int close_connection (uint8_t id);
+        int accept_connection(uint8_t id);
+        int reject_connection(uint8_t id, NEW_CONNECTION_REPLY reason);
 
-        int release_connection(uint8_t);
+        void remove_connection(uint8_t id, ServerToNetConnection* con);
 
-        void server_tsl_handshake();
-        void user_authenticate();
+        void close();
 
-        int close();
+        int write(uint8_t id, ROBuf buf, WriteCallback cb, void* data);
 
-        void write(PacketOp opcode, uint8_t id, const uv_buf_t* buf, write_callback cb);
+        void callback_insert(UVC::UVCBaseServer* ptr);
+        void callback_remove(UVC::UVCBaseServer* ptr);
 
         inline size_t getConnectionNumbers() {return this->m_map.size();}
 }; //}

@@ -28,13 +28,20 @@
 #endif
 
 
-enum PacketOp: uint8_t {
+enum PACKET_OPCODE: uint8_t {
     PACKET_OP_REG = 0,
     PACKET_OP_NEW,
     PACKET_OP_CONNECT,
     PACKET_OP_REJECT,
     PACKET_OP_CLOSE,
     PACKET_OP_RESERVED
+};
+
+enum NEW_CONNECTION_REPLY: uint8_t {
+    SUCCESS = 0,
+    SERVER_FAIL,
+    GET_DNS_FAIL,
+    CONNECT_FAIL
 };
 
 typedef uint8_t ConnectionId;
@@ -56,10 +63,10 @@ struct PacketHeader {
 
 
 /** @return <frame, remain, opcode, id> */
-std::tuple<bool, ROBuf, ROBuf, PacketOp, ConnectionId> decode_packet(ROBuf remain, ROBuf income);
-std::tuple<bool, std::vector<std::tuple<ROBuf, PacketOp, uint8_t>>, ROBuf> decode_all_packet(ROBuf remain, ROBuf income);
+std::tuple<bool, ROBuf, ROBuf, PACKET_OPCODE, ConnectionId> decode_packet(ROBuf remain, ROBuf income);
+std::tuple<bool, std::vector<std::tuple<ROBuf, PACKET_OPCODE, uint8_t>>, ROBuf> decode_all_packet(ROBuf remain, ROBuf income);
 
-ROBuf encode_packet_header(PacketOp op, ConnectionId id, size_t len);
-ROBuf encode_packet(PacketOp op, ConnectionId id, size_t len, void* buf);
-ROBuf encode_packet(PacketOp op, ConnectionId id, ROBuf buf);
+ROBuf encode_packet_header(PACKET_OPCODE op, ConnectionId id, size_t len);
+ROBuf encode_packet(PACKET_OPCODE op, ConnectionId id, size_t len, void* buf);
+ROBuf encode_packet(PACKET_OPCODE op, ConnectionId id, ROBuf buf);
 

@@ -3,6 +3,7 @@
 #include "kclient.h"
 #include "kserver.h"
 
+// UVCCLIENT //{
 namespace UVC {
 
 /** struct naming convention
@@ -138,5 +139,56 @@ struct ClientConnection$write_to_client_callback$uv_write: public UVCBaseClient 
         UVCBaseClient(server), _info(info), _rbuf(rbuf), _ubuf(ubuf) {}
 };
 
-}
+} //}
+
+// UVCSERVER //{
+namespace UVC {
+    
+struct UVCBaseServer: public UVC::Base {
+    KProxyServer::ClientConnectionProxy* _proxy;
+    inline UVCBaseServer(KProxyServer::ClientConnectionProxy* _server): Base(), _proxy(_server){}
+};
+
+struct ServerToNetConnection$__connect$uv_getaddrinfo: public UVC::UVCBaseServer {
+    KProxyServer::ServerToNetConnection* _this;
+    uint16_t _port;
+    bool _clean;
+
+    inline ServerToNetConnection$__connect$uv_getaddrinfo(KProxyServer::ClientConnectionProxy* _server,
+            KProxyServer::ServerToNetConnection* _this, uint16_t port, bool clean): 
+        UVCBaseServer(_server), _this(_this), _port(port), _clean(clean){}
+};
+
+struct ServerToNetConnection$__connect_with_sockaddr$uv_tcp_connect: public UVCBaseServer {
+    KProxyServer::ServerToNetConnection* _this;
+    inline ServerToNetConnection$__connect_with_sockaddr$uv_tcp_connect(
+            KProxyServer::ClientConnectionProxy* proxy,
+            KProxyServer::ServerToNetConnection* _this): UVCBaseServer(proxy), _this(_this){}
+};
+
+struct ClientConnectionProxy$_write$uv_write: public UVCBaseServer {
+    KProxyServer::ClientConnectionProxy* _this;
+    KProxyServer::ClientConnectionProxy::WriteCallback _cb;
+    void* _data;
+    ROBuf* _mem_holder;
+    uv_buf_t* _uv_buf;
+
+    ClientConnectionProxy$_write$uv_write(
+            KProxyServer::ClientConnectionProxy* proxy, 
+            KProxyServer::ClientConnectionProxy::WriteCallback cb,
+            void* data, ROBuf* mem_holder, uv_buf_t* uv_buf): 
+        UVCBaseServer(proxy), _this(proxy), _cb(cb), 
+        _data(data), _mem_holder(mem_holder), _uv_buf(uv_buf) {}
+};
+
+struct ServerToNetConnection$PushData$uv_write: public UVCBaseServer {
+    KProxyServer::ServerToNetConnection* _this;
+    ROBuf* _robuf;
+    uv_buf_t* _uv_buf;
+    inline ServerToNetConnection$PushData$uv_write(KProxyServer::ClientConnectionProxy* _proxy,
+           KProxyServer::ServerToNetConnection* _this, ROBuf* _robuf, uv_buf_t* uv_buf):
+       UVCBaseServer(_proxy), _this(_this), _robuf(_robuf), _uv_buf(uv_buf) {} 
+};
+
+} //}
 

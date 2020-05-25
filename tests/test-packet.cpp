@@ -22,13 +22,13 @@ void packet_decode_test(ROBuf remain, ROBuf income, int q, int w, int e, int r, 
     assert(d == r && "id 0b111111");
 } //}
 
-void packet_encode_test(PacketOp op, uint8_t id, ROBuf buf) //{
+void packet_encode_test(PACKET_OPCODE op, uint8_t id, ROBuf buf) //{
 {
     auto x = encode_packet(op, id, buf.size(), buf.__base());
     auto y = decode_packet(ROBuf(), x);
     bool a;
     ROBuf f, r;
-    PacketOp op_;
+    PACKET_OPCODE op_;
     uint8_t id_;
     std::tie(a, f, r, op_, id_) = y;
 
@@ -66,9 +66,9 @@ int main() //{
     packet_decode_test(ROBuf(c, 50000, 0, free), ROBuf(d, 50000, 0, free), 
             1 << 16, 100000 - (1 << 16) - 7, 0xff, 0xee);
 
-    packet_encode_test((PacketOp)0x01, 0x00, ROBuf((char*)"xyz", 3));
-    packet_encode_test((PacketOp)0x01, 0x0e, ROBuf((char*)"xyzzyzzz", 3));
-    packet_encode_test((PacketOp)0x01, 0x00, ROBuf((char*)"xyzyzlliimm", 7));
+    packet_encode_test((PACKET_OPCODE)0x01, 0x00, ROBuf((char*)"xyz", 3));
+    packet_encode_test((PACKET_OPCODE)0x01, 0x0e, ROBuf((char*)"xyzzyzzz", 3));
+    packet_encode_test((PACKET_OPCODE)0x01, 0x00, ROBuf((char*)"xyzyzlliimm", 7));
 
     return 0;
 } //}

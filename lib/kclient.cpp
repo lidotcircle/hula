@@ -18,7 +18,8 @@ static void malloc_cb(uv_handle_t*, size_t suggested_size, uv_buf_t* buf) //{
     buf->base = (char*)malloc(suggested_size);
     buf->len  = suggested_size;
 } //}
-static void delete_closed_handle(uv_handle_t* h) {delete h;}
+template<typename T>
+static void delete_closed_handle(uv_handle_t* h) {delete static_cast<T>(static_cast<void*>(h));}
 
 //                  class Socks5Auth                     //{
 Socks5Auth::Socks5Auth(Server* server, uv_tcp_t* client, ClientConfig* config, finish_cb cb, void* data) //{
@@ -373,7 +374,7 @@ void Server::on_connection(uv_stream_t* stream, int status) //{
 
     if(uv_accept(stream, (uv_stream_t*)client) < 0) {
         __logger->warn("accept new connection error");
-        uv_close((uv_handle_t*)client, delete_closed_handle);
+        uv_close((uv_handle_t*)client, delete_closed_handle<decltype(client)>);
         return;
     }
     Socks5Auth* auth = new Socks5Auth(_this, client, _this->m_config, Server::on_authentication, _this);
@@ -392,7 +393,7 @@ void Server::on_authentication(int status, Socks5Auth* self_ref,
         _this->dispatch_base_on_addr(addr, port, self_ref);
     } else {
         if(status < 0) { // 2. delete
-            uv_close((uv_handle_t*)con, delete_closed_handle);
+            uv_close((uv_handle_t*)con, delete_closed_handle<decltype(con)>);
             delete self_ref;
             auto mm = _this->m_auths[self_ref];
             RelayConnection*  cr = dynamic_cast<RelayConnection*>(std::get<1>(mm));
@@ -745,7 +746,7 @@ void ClientConnection::close(bool send_close) //{
         this->m_client_start_read = false;
     }
     if(this->mp_tcp_client) {
-        uv_close((uv_handle_t*)this->mp_tcp_client, delete_closed_handle);
+        uv_close((uv_handle_t*)this->mp_tcp_client, delete_closed_handle<decltype(this->mp_tcp_client)>);
         this->mp_tcp_client = nullptr;
     }
     if(send_close)
@@ -1131,10 +1132,10 @@ void ConnectionProxy::dispatch_data_encrypted(ROBuf buf) //{
 
 void ConnectionProxy::dispatch_data(ROBuf buf) //{
 {
-    std::tuple<bool, std::vector<std::tuple<ROBuf, PacketOp, uint8_t>>, ROBuf> mm = 
+    std::tuple<bool, std::vector<std::tuple<ROBuf, PACKET_OPCODE, uint8_t>>, ROBuf> mm = 
         decode_all_packet(this->m_remain_raw, buf);
     bool noerror;
-    std::vector<std::tuple<ROBuf, PacketOp, uint8_t>> packets;
+    std::vector<std::tuple<ROBuf, PACKET_OPCODE, uint8_t>> packets;
     std::tie(noerror, packets, this->m_remain_raw) = mm;
     if(noerror == false) {
         this->close(CLOSE_PACKET_ERROR);
@@ -1143,7 +1144,7 @@ void ConnectionProxy::dispatch_data(ROBuf buf) //{
 
     for(auto& p: packets) {
         ROBuf frame;
-        PacketOp opcode;
+        PACKET_OPCODE opcode;
         uint8_t id;
         std::tie(frame, opcode, id) = p;
 
@@ -1273,7 +1274,7 @@ void ConnectionProxy::_write_callback(uv_write_t* req, int status) //{
 int ConnectionProxy::write(uint8_t id, ROBuf buf, WriteCallback cb, void* data) //{
 {
     assert(id < SINGLE_TSL_MAX_CONNECTION);
-    ROBuf x = encode_packet_header(PacketOp::PACKET_OP_REG, id, buf.size()) + buf;
+    ROBuf x = encode_packet_header(PACKET_OPCODE::PACKET_OP_REG, id, buf.size()) + buf;
     return this->_write(x, cb, data);
 } //} 
 
@@ -1340,7 +1341,7 @@ void ConnectionProxy::new_connection_timer_callback(uv_timer_t* timer) //{
     new_connection_wrapper_data* _data = static_cast<decltype(_data)>(msg->_data);
     bool should_run = msg->should_run;
     uv_timer_stop(timer);
-    uv_close((uv_handle_t*)timer, delete_closed_handle);
+    uv_close((uv_handle_t*)timer, delete_closed_handle<decltype(timer)>);
     delete timer;
     delete msg;
 
@@ -1393,7 +1394,7 @@ ConnectionProxy::~ConnectionProxy() //{
         this->m_connection_read = false;
     }
     if(this->mp_connection != nullptr) {
-        uv_close((uv_handle_t*)this->mp_connection, delete_closed_handle);
+        uv_close((uv_handle_t*)this->mp_connection, delete_closed_handle<decltype(this->mp_connection)>);
         this->mp_connection = nullptr;
     }
 
@@ -1491,10 +1492,10 @@ void RelayConnection::close() //{
     __logger->debug("0x%lx -- buf1: %d, buf2: %d", (long)this, this->m_in_buffer, this->m_out_buffer);
     if(this->m_in_buffer == 0 && this->m_out_buffer == 0) {
         if(this->mp_tcp_server != nullptr) {
-            uv_close((uv_handle_t*)this->mp_tcp_server, delete_closed_handle);
+            uv_close((uv_handle_t*)this->mp_tcp_server, delete_closed_handle<decltype(this->mp_tcp_server)>);
             this->mp_tcp_server = nullptr;
         }
-        uv_close((uv_handle_t*)this->mp_tcp_client, delete_closed_handle);
+        uv_close((uv_handle_t*)this->mp_tcp_client, delete_closed_handle<decltype(this->mp_tcp_client)>);
         this->mp_tcp_client = nullptr;
         return this->m_kserver->close_relay(this);
     }
@@ -1578,7 +1579,7 @@ void RelayConnection::connect_server_cb(uv_connect_t* req, int status) //{
     if(should_run) {
         if(status != 0) {
             __logger->debug("RelayConnection::conenct_sesrver_cb() fail");
-            uv_close((uv_handle_t*) _this->mp_tcp_server, delete_closed_handle);
+            uv_close((uv_handle_t*) _this->mp_tcp_server, delete_closed_handle<decltype(_this->mp_tcp_server)>);
             _this->mp_tcp_server = nullptr;
             return socks5->send_reply(SOCKS5_REPLY_CONNECTION_REFUSED);
         } else {
@@ -1729,7 +1730,7 @@ RelayConnection::~RelayConnection() //{
 {
     assert(this->mp_tcp_client == nullptr);
     if(this->mp_tcp_server != nullptr)
-        uv_close((uv_handle_t*)this->mp_tcp_server, delete_closed_handle);
+        uv_close((uv_handle_t*)this->mp_tcp_server, delete_closed_handle<decltype(this->mp_tcp_server)>);
 } //}
 //}
 
