@@ -96,7 +96,12 @@ class ServerToNetConnection;
 class Server: public EventEmitter //{
 {
     public:
-        using connectionType = std::tuple<uv_tcp_t*>;
+        struct connectionArgv: public EventArgs::Base {
+            Server*   m_this;
+            uv_tcp_t* m_new_connection;
+            inline connectionArgv(Server* _this, uv_tcp_t* new_con): 
+                m_this(_this), m_new_connection(new_con){}
+        };
 
     private:
         uint32_t bind_addr;

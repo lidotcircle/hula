@@ -17,7 +17,6 @@
 
 template<typename T>
 static void delete_closed_handle(uv_handle_t* h) {
-    __logger->warn("asdfasdf");
     delete static_cast<T>(static_cast<void*>(h));
 }
 
@@ -128,9 +127,8 @@ void Server::on_connection(uv_stream_t* stream, int status) //{
         return;
     }
 
-    connectionType* cb_arg = new connectionType(client);
-    _this->emit("connection", cb_arg);
-    delete cb_arg;
+    connectionArgv cb_arg = connectionArgv(_this, client);
+    _this->emit("connection", &cb_arg);
 
     _this->dispatch_new_connection(client);
     return;
@@ -332,6 +330,10 @@ void ClientConnectionProxy::dispatch_new(uint8_t id, ROBuf buf) //{
     assert(id < 1 << 6);
     if(this->m_map.find(id) != this->m_map.end()) {
         logger->warn("ClientConnectionProxy::dispatch_new(): bad connection id");
+        std::cout << (int)id << std::endl;
+        for(auto& x: this->m_map)
+            std::cout << (int)x.first << " ";
+        std::cout << std::endl;
         this->close();
         return;
     }
@@ -462,15 +464,18 @@ void ClientConnectionProxy::remove_connection(uint8_t id, ServerToNetConnection*
 
 static void __close(void* data) {static_cast<ClientConnectionProxy*>(data)->close();}
 static int close_ticks = 0;
-#define MAX_CLOSE_TICK 1000
+#define PER_INFO_BY_CLOSE_TICK 1000
 void ClientConnectionProxy::close() //{
 {
-    __logger->debug("call %s", FUNCNAME);
-    if(close_ticks++ > MAX_CLOSE_TICK)
-        abort();
+    if((close_ticks++ % PER_INFO_BY_CLOSE_TICK) == 0)
+        __logger->debug("call %s", FUNCNAME);
+
     auto m = this->m_map;
     for(auto& x: m)
         x.second->close();
+
+    for(auto& x: this->m_callbacks)
+        x->should_run =false;
 
     if(this->mp_connection) {
         if(this->m_connection_read)
@@ -513,7 +518,7 @@ void ClientConnectionProxy::callback_remove(UVC::UVCBaseServer* ptr) //{
 ServerToNetConnection::ServerToNetConnection(ClientConnectionProxy* p, uv_loop_t* loop, ConnectionId id, 
                               const std::string& addr, uint16_t port) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    __logger->debug("call %s: [%s:%d]", FUNCNAME, addr.c_str(), port);
     this->mp_proxy = p;
     this->m_id = id;
 

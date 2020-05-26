@@ -5,8 +5,6 @@
 
 namespace UVU {
 
-template<typename T>
-static void delete_closed_handle(uv_handle_t* h) {delete static_cast<T>(static_cast<void*>(h));}
 struct __nextTick__ {void(*m_func)(void*); void* m_data;};
 static void nextTick__callback(uv_timer_t* timer) //{
 {

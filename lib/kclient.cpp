@@ -525,7 +525,12 @@ void Server::try_close() //{
 {
     __logger->debug("call %s", FUNCNAME);
     if(this->exit__ == false) return;
-    if(this->m_auths.size() == 0 && this->m_relay.size() == 0 && this->m_callback_list.size() == 0) this->run___ = false;
+
+    if(this->m_auths.size() == 0 && 
+       this->m_relay.size() == 0 && 
+       this->m_proxy.size() == 0 && 
+       this->m_callback_list.size() == 0) 
+        this->run___ = false;
 } //}
 
 void Server::close_relay(RelayConnection* relay) //{
@@ -610,6 +615,7 @@ ClientConnection::ClientConnection(Server* kserver, uv_loop_t* loop,
     this->m_client_start_read = false;
 
     this->m_id = this->mp_proxy->requireAnId(this);
+    std::cout << "get new id: " << (int)this->m_id << std::endl;
     assert(this->m_id < SINGLE_TSL_MAX_CONNECTION);
 } //}
 
@@ -731,7 +737,7 @@ void ClientConnection::reject() //{
     assert(this->m_socks5);
     this->m_socks5->send_reply(SOCKS5_REPLY_SERVER_FAILURE);
     this->m_socks5 = nullptr;
-    this->close(false);
+    this->close(true);
 } //}
 
 void ClientConnection::run(uv_tcp_t* client_tcp) //{
@@ -845,13 +851,6 @@ ConnectionProxy::ConnectionProxy(uv_loop_t* loop, Server* server, SingleServerIn
 
     this->m_connect_cb = nullptr;
     this->m_connect_cb_data = nullptr;
-} //}
-
-void ConnectionProxy::close(CloseReason reason) //{
-{
-    __logger->debug("call %s", FUNCNAME);
-    this->m_state = __State::STATE_CLOSING;
-    // TODO
 } //}
 
 uint8_t ConnectionProxy::get_id() //{
@@ -1102,7 +1101,7 @@ void ConnectionProxy::uv_stream_read_after_send_auth_callback(uv_stream_t* strea
     if(nread <= 0) {
         _this->close(CLOSE_READ_ERROR);
         free(buf->base);
-        _this->m_connect_cb(false, -1, _this->m_connect_cb_data);
+        _this->m_connect_cb(true, -1, _this->m_connect_cb_data);
         _this->m_connect_cb = nullptr;
         _this->m_connect_cb_data = nullptr;
         return;
@@ -1118,7 +1117,7 @@ void ConnectionProxy::uv_stream_read_after_send_auth_callback(uv_stream_t* strea
             _this->authenticate_with_remains();
             break;
         case __State::STATE_ERROR:
-            _this->m_connect_cb(false, -1, _this->m_connect_cb_data);
+            _this->m_connect_cb(true, -1, _this->m_connect_cb_data);
             _this->m_connect_cb = nullptr;
             _this->m_connect_cb_data = nullptr;
             _this->close(CLOSE_PACKET_ERROR);
@@ -1213,7 +1212,7 @@ void ConnectionProxy::dispatch_data(ROBuf buf) //{
         switch (opcode) {
             case PACKET_OP_REG:
                 if(this->m_map.find(id) == this->m_map.end()) {
-                    __logger->warn("ConnectionProxy recieves a packet to to ClientConnection which doesn't exists. REG");
+                    __logger->warn("ConnectionProxy recieves a packet to ClientConnection which doesn't exists. REG");
                     this->close_connection(id, nullptr, nullptr);
                 } else {
                     cc->PushData(frame);
@@ -1221,14 +1220,14 @@ void ConnectionProxy::dispatch_data(ROBuf buf) //{
                 break;
             case PACKET_OP_CLOSE:
                 if(this->m_map.find(id) == this->m_map.end()) {
-                    __logger->warn("ConnectionProxy recieves a packet to to ClientConnection which doesn't exists. CLOSE");
+                    __logger->warn("ConnectionProxy recieves a packet to ClientConnection which doesn't exists. CLOSE");
                 } else {
                     cc->close(false);
                 }
                 break;
             case PACKET_OP_CONNECT:
                 if(this->m_wait_new_connection.find(id) == this->m_wait_new_connection.end()) {
-                    __logger->warn("ConnectionProxy recieves a packet to to ClientConnection which doesn't exists. CONNECT");
+                    __logger->warn("ConnectionProxy recieves a packet to ClientConnection which doesn't exists. CONNECT");
                     this->close_connection(id, nullptr, nullptr);
                 } else {
                     assert(this->m_map.find(id) != this->m_map.end());
@@ -1238,7 +1237,7 @@ void ConnectionProxy::dispatch_data(ROBuf buf) //{
                 break;
             case PACKET_OP_REJECT:
                 if(this->m_wait_new_connection.find(id) == this->m_wait_new_connection.end()) {
-                    __logger->warn("ConnectionProxy recieves a packet to to ClientConnection which doesn't exists. REJECT");
+                    __logger->warn("ConnectionProxy recieves a packet to ClientConnection which doesn't exists. REJECT");
                 } else {
                     assert(this->m_map.find(id) != this->m_map.end());
                     this->m_wait_new_connection.erase(this->m_wait_new_connection.find(id));
@@ -1264,12 +1263,13 @@ void ConnectionProxy::authenticate_with_remains() //{
        (uint8_t)merge.base()[1] != 0x00) {
         __logger->warn("AUTHENTICATION FAIL");
         this->close(CLOSE_AUTHENTICATION_ERROR);
-        this->m_connect_cb(false, -1, this->m_connect_cb_data);
+        this->m_connect_cb(true, -1, this->m_connect_cb_data);
         this->m_connect_cb = nullptr;
         this->m_connect_cb_data = nullptr;
         return;
     }
 
+    __logger->info("AUTHENTICATION SUCCESS");
     this->m_state = __State::STATE_BUILD;
     this->m_remain_raw = merge + 2;
     this->m_connect_cb(true, 0, this->m_connect_cb_data);
@@ -1451,9 +1451,11 @@ uint8_t ConnectionProxy::requireAnId(ClientConnection* cc) //{
     return id;
 } //}
 
-ConnectionProxy::~ConnectionProxy() //{
+void ConnectionProxy::close(CloseReason reason) //{
 {
     __logger->debug("call %s", FUNCNAME);
+    this->m_state = __State::STATE_CLOSING;
+
     if(this->m_connection_read) {
         uv_read_stop((uv_stream_t*)this->mp_connection);
         this->m_connection_read = false;
@@ -1466,6 +1468,13 @@ ConnectionProxy::~ConnectionProxy() //{
     auto mm = this->m_map;
     for(auto& x: mm)
         x.second->close(false);
+
+    this->m_state = __State::STATE_CLOSED;
+} //}
+
+ConnectionProxy::~ConnectionProxy() //{
+{
+    __logger->debug("call %s", FUNCNAME);
 } //}
 
 //}

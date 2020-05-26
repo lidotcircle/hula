@@ -19,7 +19,11 @@ struct CBList {
     CBFlags flags;
 };
 
-typedef void (*EventCallback)(EventEmitter* target, const std::string& event, void* argv);
+namespace EventArgs {
+struct Base {inline virtual ~Base() {};};
+}
+
+typedef void (*EventCallback)(EventEmitter* target, const std::string& event, EventArgs::Base* argv);
 
 class EventEmitter {
     private:
@@ -27,7 +31,7 @@ class EventEmitter {
 
     public:
         void* on(const std::string&, EventCallback cb, CBFlags flags = CB_NONE);
-        void  emit(const std::string&, void* argv);
+        void  emit(const std::string&, EventArgs::Base* argv);
         void  remove(void*);
         void  removeall();
 

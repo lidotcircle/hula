@@ -104,7 +104,7 @@ void* EventEmitter::on(const std::string& event, EventCallback cb, CBFlags flags
     CBList_tail(&x);
     return x;
 } //}
-void  EventEmitter::emit(const std::string& event, void* argv) //{
+void  EventEmitter::emit(const std::string& event, EventArgs::Base* argv) //{
 {
     if(this->m_listeners.find(event) == this->m_listeners.end()) return;
     CBList_head(&this->m_listeners[event]);
