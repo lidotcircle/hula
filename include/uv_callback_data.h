@@ -183,5 +183,12 @@ struct ServerToNetConnection$PushData$uv_write: public UVCBaseServer {
        UVCBaseServer(_proxy), _this(_this), _robuf(_robuf), _uv_buf(uv_buf) {} 
 };
 
+struct ServerToNetConnection$_write_to_user$write: public UVCBaseServer {
+    KProxyServer::ServerToNetConnection* _this;
+    inline ServerToNetConnection$_write_to_user$write(KProxyServer::ClientConnectionProxy* _proxy,
+           KProxyServer::ServerToNetConnection* _this):
+       UVCBaseServer(_proxy), _this(_this){} 
+};
+
 } //}
 

@@ -11,8 +11,6 @@
 
 namespace KProxyClient {
 
-using Logger::logger;
-
 static void malloc_cb(uv_handle_t*, size_t suggested_size, uv_buf_t* buf) //{
 {
     buf->base = (char*)malloc(suggested_size);
@@ -604,7 +602,7 @@ void Server::close() //{
 ClientConnection::ClientConnection(Server* kserver, uv_loop_t* loop, 
                                    ConnectionProxy* mproxy,
                                    const std::string& addr, uint16_t port, Socks5Auth* socks5):
-    mp_kserver(kserver), mp_loop(loop), mp_proxy(mproxy), m_server(addr), m_port(port), m_socks5(socks5) //{
+    mp_kserver(kserver), mp_loop(loop), mp_proxy(mproxy), m_server(addr), m_port(port), m_socks5(socks5), m_proxy_write_callbacks() //{
 {
     __logger->debug("call %s", FUNCNAME);
     this->m_state = __State::INITIAL;
@@ -615,7 +613,6 @@ ClientConnection::ClientConnection(Server* kserver, uv_loop_t* loop,
     this->m_client_start_read = false;
 
     this->m_id = this->mp_proxy->requireAnId(this);
-    std::cout << "get new id: " << (int)this->m_id << std::endl;
     assert(this->m_id < SINGLE_TSL_MAX_CONNECTION);
 } //}
 
@@ -641,6 +638,7 @@ void ClientConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const 
 
     ROBuf bufx = ROBuf(buf->base, nread, 0, free);
     __proxyWriteInfo* x = new __proxyWriteInfo{_this, false};
+    _this->m_proxy_write_callbacks.insert(x);
     _this->mp_proxy->write(_this->m_id, bufx, ClientConnection::ProxyWriteCallback, x);
 
     if(_this->m_out_buffer > PROXY_MAX_BUFFER_SIZE) {
@@ -656,11 +654,14 @@ void ClientConnection::ProxyWriteCallback(bool should_run, int status, ROBuf* bu
 
     __proxyWriteInfo* _data = static_cast<decltype(_data)>(data);
     ClientConnection* _this = _data->_this;
-
-    should_run = should_run && (!_data->exited);
-    if(should_run) _this->m_callbacks.erase(_this->m_callbacks.find(_data));
+    bool exited = _data->exited;
     delete _data;
+
+    should_run = should_run && !exited;
     if(!should_run) return;
+
+    assert(_this->m_proxy_write_callbacks.find(_data) != _this->m_proxy_write_callbacks.end());
+    _this->m_proxy_write_callbacks.erase(_this->m_proxy_write_callbacks.find(_data)); //
 
     _this->m_out_buffer -= buf_size;
 
@@ -681,7 +682,7 @@ void ClientConnection::PushData(ROBuf buf) //{
     assert(this->m_state == __State::RUNNING);
 
     __proxyWriteInfo* x = new __proxyWriteInfo{this, false};
-    this->m_callbacks.insert(x);
+    this->m_proxy_write_callbacks.insert(x);
 
     uv_buf_t* uv_buf = new uv_buf_t();
     uv_buf->base = buf.__base();
@@ -701,7 +702,10 @@ void ClientConnection::write_to_client_callback(uv_write_t* req, int status) //{
 {
     __logger->debug("call %s", FUNCNAME);
     UVC::ClientConnection$write_to_client_callback$uv_write* m = 
-        dynamic_cast<decltype(m)>(static_cast<EventEmitter*>(uv_req_get_data((uv_req_t*)req)));
+        dynamic_cast<decltype(m)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
+    assert(m);
+    m->_server->callback_remove(m);
+//    m->_info->_this->mp_kserver->callback_remove(m); // TODO TODO
     ROBuf* rbuf = m->_rbuf;
     uv_buf_t* ubuf = m->_ubuf;
     __proxyWriteInfo* info = m->_info;
@@ -714,7 +718,7 @@ void ClientConnection::write_to_client_callback(uv_write_t* req, int status) //{
 
     should_run = should_run && !info->exited;
     delete info;
-    if(should_run) _this->m_callbacks.erase(_this->m_callbacks.find(info));
+    if(should_run) _this->m_proxy_write_callbacks.erase(_this->m_proxy_write_callbacks.find(info));
 
     if(!should_run) return;
 
@@ -757,7 +761,7 @@ void ClientConnection::close(bool send_close) //{
     __logger->debug("call %s", FUNCNAME);
     auto prev_stat = this->m_state;
     this->m_state = __State::ERROR;
-    for(auto& x: this->m_callbacks)
+    for(auto& x: this->m_proxy_write_callbacks)
         x->exited = true;
 
     switch(prev_stat) {
@@ -1012,6 +1016,7 @@ void ConnectionProxy::connect_remote_tcp_connect_cb(uv_connect_t* req, int statu
     delete ptr;
 
     server->callback_remove(ptr);
+
     if(!should_run) {
         _this->m_connect_cb(false, -1, _this->m_connect_cb_data);
         _this->m_connect_cb = nullptr;
@@ -1617,7 +1622,6 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
 
     if(status < 0) {
         __logger->warn("%s: dns query fail", FUNCNAME);
-        // TODO send a close packet
         if(clean) uv_freeaddrinfo(res);
         return socks5->send_reply(SOCKS5_REPLY_HOST_UNREACHABLE);
     }
@@ -1629,7 +1633,6 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
     }
     if(a == nullptr) {
         logger->warn("%s: query dns doesn't get an ipv4 address", FUNCNAME);
-        // TODO send a close packet
         if(clean) uv_freeaddrinfo(res);
         return socks5->send_reply(SOCKS5_REPLY_ADDRESSS_TYPE_NOT_SUPPORTED);
     }

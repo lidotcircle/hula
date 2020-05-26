@@ -208,7 +208,7 @@ class ClientConnection: public EventEmitter //{
             ERROR
         };
         __State m_state;
-        std::unordered_set<__proxyWriteInfo*> m_callbacks;
+        std::unordered_set<__proxyWriteInfo*> m_proxy_write_callbacks;
 
         size_t      m_in_buffer;
         size_t      m_out_buffer;

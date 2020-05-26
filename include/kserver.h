@@ -219,7 +219,7 @@ class ClientConnectionProxy: public EventEmitter //{
         size_t m_user_to_net_buffer = 0;
         size_t m_net_to_user_buffer = 0;
 
-        std::unordered_set<UVC::UVCBaseServer*> m_callbacks;
+        std::map<UVC::UVCBaseServer*, void*> m_callbacks;
 
         ROBuf m_remains;
 
@@ -272,8 +272,8 @@ class ClientConnectionProxy: public EventEmitter //{
 
         int write(uint8_t id, ROBuf buf, WriteCallback cb, void* data);
 
-        void callback_insert(UVC::UVCBaseServer* ptr);
-        void callback_remove(UVC::UVCBaseServer* ptr);
+        void  callback_insert(UVC::UVCBaseServer* ptr, void* obj);
+        void* callback_remove(UVC::UVCBaseServer* ptr);
 
         inline size_t getConnectionNumbers() {return this->m_map.size();}
 }; //}
