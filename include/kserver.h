@@ -131,7 +131,9 @@ class Server: public EventEmitter //{
         Server& operator=(Server&&) = delete;
 
         int listen();
-        int close();
+        void close();
+
+        ~Server();
 
         inline bool HasConnection() {return this->m_tsl_list.size() != 0;}
 }; //}
@@ -203,7 +205,7 @@ class ClientConnectionProxy: public EventEmitter //{
     private:
         std::map<uint8_t, ServerToNetConnection*> m_map;
         std::set<uint8_t> m_wait_connect;
-        Server* m_server;
+        Server* mp_server;
         uv_loop_t* mp_loop;
 
         uv_tcp_t* mp_connection;
@@ -216,12 +218,25 @@ class ClientConnectionProxy: public EventEmitter //{
 
         ROBuf m_remains;
 
+        enum __State {
+            INIT = 0,
+            TSL_HAND_SHAKE,
+            USER_AUTHENTICATION,
+            BUILD,
+            ERROR,
+            CLOSING,
+            CLOSED
+        };
+        __State m_state;
+
         static void malloc_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* out);
         static void user_read_cb (uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
         static void user_stream_write_cb(uv_write_t*  write,  int status);
 
         void dispatch_new_encrypted_data  (ROBuf buf);
         void dispatch_new_unencrypted_data(ROBuf buf);
+        void dispatch_authentication_data(ROBuf buf);
+        void dispatch_packet_data(ROBuf buf);
 
         void dispatch_reg  (uint8_t id, ROBuf buf);  // OPCODE PACKET_OP_REG
         void dispatch_new  (uint8_t id, ROBuf buf);  // OPCODE PACKET_OP_NEW
@@ -229,6 +244,7 @@ class ClientConnectionProxy: public EventEmitter //{
 
         void server_tsl_handshake();
         void user_authenticate();
+        void start_relay();
 
         int _write(ROBuf buf, WriteCallback cb, void* data);
 

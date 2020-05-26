@@ -83,26 +83,19 @@ struct RelayConnection$xxxx_read_cb$uv_write: public UVCBaseClient {
 struct ConnectionProxy$connect_to_remote_server$uv_getaddrinfo: public UVCBaseClient {
     KProxyClient::ConnectionProxy* _this;
     bool _clean;
-    KProxyClient::ConnectionProxy::ConnectCallback _cb;
-    void* _cb_data;
     inline ConnectionProxy$connect_to_remote_server$uv_getaddrinfo(
             KProxyClient::Server* server, 
             KProxyClient::ConnectionProxy* _this, 
-            bool clean,
-            KProxyClient::ConnectionProxy::ConnectCallback _cb, void* _cb_data): 
-        UVCBaseClient(server), _this(_this), _clean(clean), _cb(_cb), _cb_data(_cb_data){}
+            bool clean): 
+        UVCBaseClient(server), _this(_this), _clean(clean){}
 };
 
 struct ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect: public UVCBaseClient {
     KProxyClient::ConnectionProxy* _this;
-    KProxyClient::ConnectionProxy::ConnectCallback _cb;
-    void* _cb_data;
     inline ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect(
             KProxyClient::Server* server, 
-            KProxyClient::ConnectionProxy* _this,
-            KProxyClient::ConnectionProxy::ConnectCallback _cb,
-            void* _cb_data): 
-        UVCBaseClient(server), _this(_this), _cb(_cb), _cb_data(_cb_data){}
+            KProxyClient::ConnectionProxy* _this): 
+        UVCBaseClient(server), _this(_this){}
 };
 
 struct ConnectionProxy$_write$uv_write: public UVCBaseClient {

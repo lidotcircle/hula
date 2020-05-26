@@ -106,7 +106,7 @@ std::tuple<bool, std::vector<std::tuple<ROBuf, PACKET_OPCODE, uint8_t>>, ROBuf> 
         if(!a.empty()) ret.push_back(std::make_tuple(a, op, id));
         x_income = b;
         x_remain = ROBuf();
-        if(a.empty()) {
+        if(a.empty() || b.empty()) {
             x_remain = b;
             break;
         }

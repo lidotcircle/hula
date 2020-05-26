@@ -13,7 +13,7 @@
             "certificate": "fake certificate",
             "cipher": "chacha20",
             "username": "admin",
-            "password": "king"
+            "password": "password"
         }
     ],
 

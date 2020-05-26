@@ -24,7 +24,7 @@ static void delete_closed_handle(uv_handle_t* h) {delete static_cast<T>(static_c
 //                  class Socks5Auth                     //{
 Socks5Auth::Socks5Auth(Server* server, uv_tcp_t* client, ClientConfig* config, finish_cb cb, void* data) //{
 {
-    __logger->debug("Socks5Auth::Socks5Auth() new socks5 authentication session");
+    __logger->debug("call %s: new socks5 authentication session", FUNCNAME);
     this->mp_server = server;
     this->m_state = SOCKS5_INIT;
     this->mp_loop = uv_handle_get_loop((uv_handle_t*)client);
@@ -45,12 +45,14 @@ Socks5Auth::Socks5Auth(Server* server, uv_tcp_t* client, ClientConfig* config, f
 
 void Socks5Auth::setup_uv_tcp_data() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     auto ptr = new UVC::Socks5Auth$uv_read_start(this->mp_server, this);
     uv_handle_set_data((uv_handle_t*)this->mp_client, ptr);
     this->mp_server->callback_insert(ptr);
 } //}
 void Socks5Auth::clean_uv_tcp_data() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     UVC::Socks5Auth$uv_read_start* _data =
         dynamic_cast<decltype(_data)>(static_cast<UVC::UVCBaseClient*>(uv_handle_get_data((uv_handle_t*)this->mp_client)));
     _data->_server->callback_remove(_data);
@@ -60,7 +62,7 @@ void Socks5Auth::clean_uv_tcp_data() //{
 
 void Socks5Auth::return_to_server() //{ 
 {
-    __logger->debug("call Socks5Auth::return_to_server()");
+    __logger->debug("call %s", FUNCNAME);
     if(m_client_read_start) {
         uv_read_stop((uv_stream_t*)this->mp_client);
         this->m_client_read_start = false;
@@ -70,7 +72,7 @@ void Socks5Auth::return_to_server() //{
 } //}
 void Socks5Auth::try_to_build_connection() //{
 {
-    __logger->debug("Socks5Auth::try_to_build_connection() -> try to build a connection to server");
+    __logger->debug("call %s: try to build a connection to server", FUNCNAME);
     assert(this->m_state == SOCKS5_FINISH);
     if(m_client_read_start) {
         uv_read_stop((uv_stream_t*)this->mp_client);
@@ -80,7 +82,7 @@ void Socks5Auth::try_to_build_connection() //{
 } //}
 void Socks5Auth::close_this_with_error() //{
 {
-    __logger->debug("Socks5Auth::close_this_with_error()");
+    __logger->debug("call %s", FUNCNAME);
     this->m_state = SOCKS5_ERROR;
     if(m_client_read_start) {
         uv_read_stop((uv_stream_t*)this->mp_client);
@@ -92,7 +94,7 @@ void Socks5Auth::close_this_with_error() //{
 
 void Socks5Auth::read_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
-    __logger->debug("call Socks5Auth::read_callback(0x%lx, %d, 0x%lx)", (long)stream, (int)nread, (long)buf);
+    __logger->debug("call %s = (0x%lx, %d, 0x%lx)", FUNCNAME, (long)stream, (int)nread, (long)buf);
     UVC::Socks5Auth$uv_read_start* _data =
         dynamic_cast<decltype(_data)>(static_cast<UVC::UVCBaseClient*>(uv_handle_get_data((uv_handle_t*)stream)));
     assert(_data);
@@ -112,7 +114,7 @@ void Socks5Auth::read_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_
 
 void Socks5Auth::dispatch_data(ROBuf buf) //{
 {
-    __logger->debug("call Socks5Auth::dispatch_data(buf.size()=%d)", buf.size());
+    __logger->debug("call %s = (buf.size()=%d)", FUNCNAME, buf.size());
     switch (this->m_state) {
         case SOCKS5_INIT: {
             auto x = parse_client_hello(this->m_remain, buf);
@@ -196,7 +198,7 @@ void Socks5Auth::dispatch_data(ROBuf buf) //{
 
 void Socks5Auth::__send_selection_method(socks5_authentication_method method) //{
 {
-    __logger->debug("send selection mothod: %d", (uint8_t)method);
+    __logger->debug("call %s: send selection mothod: %d", FUNCNAME, (uint8_t)method);
     __server_selection_msg* msg = new __server_selection_msg();
     msg->m_version = 0x5;
     msg->m_method = method;
@@ -212,7 +214,7 @@ void Socks5Auth::__send_selection_method(socks5_authentication_method method) //
 } //}
 void Socks5Auth::__send_auth_status(uint8_t status) //{
 {
-    __logger->debug("send authenticate status: %d", status);
+    __logger->debug("call %s: send authenticate status: %d", FUNCNAME, status);
     __socks5_user_authentication_reply* msg = new __socks5_user_authentication_reply();
     msg->m_version = 0x5;
     msg->m_status = status;
@@ -228,7 +230,7 @@ void Socks5Auth::__send_auth_status(uint8_t status) //{
 } //}
 void Socks5Auth::__send_reply(uint8_t reply) //{
 {
-    __logger->debug("send reply for client request, status: %d, remain_size: %d", reply, this->m_remain.size());
+    __logger->debug("call %s, status: %d, remain_size: %d", FUNCNAME, reply, this->m_remain.size());
     if(this->m_client_read_start) {
         uv_read_stop((uv_stream_t*)this->mp_client);
     }
@@ -269,7 +271,7 @@ void Socks5Auth::__send_reply(uint8_t reply) //{
 
 void Socks5Auth::write_callback_hello(uv_write_t* req, int status) //{
 {
-    __logger->debug("call Socks5Auth::write_callback_hello()");
+    __logger->debug("call %s", FUNCNAME);
     UVC::Socks5Auth$__send_selection_method$uv_write* x = 
         dynamic_cast<decltype(x)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
     assert(x);
@@ -285,7 +287,7 @@ void Socks5Auth::write_callback_hello(uv_write_t* req, int status) //{
 } //}
 void Socks5Auth::write_callback_id(uv_write_t* req, int status) //{
 {
-    __logger->debug("call Socks5Auth::write_callback_id()");
+    __logger->debug("call %s", FUNCNAME);
     UVC::Socks5Auth$__send_auth_status$uv_write* x = 
         dynamic_cast<decltype(x)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
     assert(x);
@@ -301,7 +303,7 @@ void Socks5Auth::write_callback_id(uv_write_t* req, int status) //{
 } //}
 void Socks5Auth::write_callback_reply(uv_write_t* req, int status) //{
 {
-    __logger->debug("call Socks5Auth::write_callback_reply()");
+    __logger->debug("call %s", FUNCNAME);
     UVC::Socks5Auth$__send_reply$uv_write* x = 
         dynamic_cast<decltype(x)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
     assert(x);
@@ -325,6 +327,7 @@ void Socks5Auth::write_callback_reply(uv_write_t* req, int status) //{
 
 void Socks5Auth::close() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     this->close_this_with_error();
 } //}
 //}
@@ -333,6 +336,7 @@ void Socks5Auth::close() //{
 //                class Server                                //{
 Server::Server(uv_loop_t* loop, const std::string& config_file) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     this->mp_uv_loop = loop;
     this->m_config = new ClientConfig(this->mp_uv_loop, config_file.c_str());
     this->bind_addr = 0;
@@ -344,6 +348,7 @@ Server::Server(uv_loop_t* loop, const std::string& config_file) //{
 
 Server::~Server() //{
 {
+    __logger->debug("call %s", FUNCNAME);
      UVC::KProxyClient$Server$uv_listen* x = 
         dynamic_cast<UVC::KProxyClient$Server$uv_listen*>(static_cast<UVC::UVCBaseClient*>(uv_handle_get_data((uv_handle_t*)this->mp_uv_tcp)));
      delete x;
@@ -355,7 +360,7 @@ Server::~Server() //{
 /** connection callback function */
 void Server::on_connection(uv_stream_t* stream, int status) //{
 {
-    __logger->debug("call Server::on_connection()");
+    __logger->debug("call %s", FUNCNAME);
     if(status < 0) {
         __logger->warn("new connection error");
         return;
@@ -365,7 +370,6 @@ void Server::on_connection(uv_stream_t* stream, int status) //{
         dynamic_cast<decltype(x)>(static_cast<UVC::UVCBaseClient*>(uv_handle_get_data((uv_handle_t*)stream)));
     assert(x);
     Server* _this = x->_this;
-    __logger->debug("connections: %d", _this->m_auths.size() + _this->m_relay.size());
 
     if(_this->exit__) return;
 
@@ -386,7 +390,7 @@ void Server::on_authentication(int status, Socks5Auth* self_ref,
         uv_tcp_t* con, void* data) //{
 {
     Server* _this = static_cast<Server*>(data);
-    __logger->debug("call [static] Server::on_authentication(), connections: %d", _this->m_auths.size() + _this->m_relay.size());
+    __logger->debug("call %s: connections: %d", FUNCNAME, _this->m_auths.size() + _this->m_relay.size());
     assert(_this->m_auths.find(self_ref) != _this->m_auths.end());
     if(con == nullptr) {     // 1. connect
         assert(status == 0);
@@ -396,8 +400,8 @@ void Server::on_authentication(int status, Socks5Auth* self_ref,
             uv_close((uv_handle_t*)con, delete_closed_handle<decltype(con)>);
             delete self_ref;
             auto mm = _this->m_auths[self_ref];
-            RelayConnection*  cr = dynamic_cast<RelayConnection*>(std::get<1>(mm));
             ClientConnection* cc = dynamic_cast<ClientConnection*>(std::get<1>(mm));
+            RelayConnection*  cr = dynamic_cast<RelayConnection*>(std::get<1>(mm));
             if(std::get<0>(mm)) { // bypass
                 assert(cr || cc == nullptr);
                 if(cr) delete cr;
@@ -418,6 +422,7 @@ void Server::on_authentication(int status, Socks5Auth* self_ref,
 
 void Server::on_config_load(int error, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     Server* _this = (Server*) data;
     if(error > 0) {
         logger->error("load config file fail");
@@ -429,7 +434,7 @@ void Server::on_config_load(int error, void* data) //{
 } //}
 int Server::__listen() //{ 
 {
-    logger->debug("call __listen()");
+    logger->debug("call %s", FUNCNAME);
     sockaddr_in addr;
 
     uint32_t network_order_addr = this->bind_addr;
@@ -452,18 +457,20 @@ int Server::__listen() //{
 
 void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
 {
+    __logger->debug("call %s", FUNCNAME);
 //    this->dispatch_bypass(addr, port, socks5);
     this->dispatch_proxy(addr, port, socks5);
 } //}
 void Server::dispatch_bypass(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     RelayConnection* relay = new RelayConnection(this, this->mp_uv_loop, nullptr, addr, port);
     this->m_auths[socks5] = std::make_tuple(true, relay);
     relay->connect(socks5);
 } //}
 void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
 {
-    __logger->debug("call Server::dispatch_proxy(%s, %d, 0x%lx)", addr.c_str(), port, (long)socks5);
+    __logger->debug("call %s = (%s, %d, 0x%lx)", FUNCNAME, addr.c_str(), port, (long)socks5);
     ConnectionProxy* pp = nullptr;
     for(auto& m: this->m_proxy) {
         if(!m->IsIdFull() && m->IsConnected()) {
@@ -489,6 +496,7 @@ void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5Auth* 
 
 SingleServerInfo* Server::select_remote_serever() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     for(auto& x: this->m_config->Servers())
         return &x;
     return nullptr;
@@ -496,6 +504,7 @@ SingleServerInfo* Server::select_remote_serever() //{
 
 void Server::redispatch(uv_tcp_t* client_tcp, Socks5Auth* socks5) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     auto ff = this->m_auths.find(socks5);
     assert(ff != this->m_auths.end());
     ClientConnection* cc = dynamic_cast<ClientConnection*>(std::get<1>(ff->second));
@@ -514,13 +523,14 @@ void Server::redispatch(uv_tcp_t* client_tcp, Socks5Auth* socks5) //{
 
 void Server::try_close() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     if(this->exit__ == false) return;
     if(this->m_auths.size() == 0 && this->m_relay.size() == 0 && this->m_callback_list.size() == 0) this->run___ = false;
 } //}
 
 void Server::close_relay(RelayConnection* relay) //{
 {
-    __logger->debug("connections: %d", this->m_auths.size() + this->m_relay.size());
+    __logger->debug("call %s, connections: %d", FUNCNAME, this->m_auths.size() + this->m_relay.size());
     assert(this->m_relay.find(relay) != this->m_relay.end());
     this->m_relay.erase(this->m_relay.find(relay));
     delete relay;
@@ -529,12 +539,14 @@ void Server::close_relay(RelayConnection* relay) //{
 
 void Server::callback_insert(UVC::UVCBaseClient* ptr) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(ptr != nullptr);
     assert(this->m_callback_list.find(ptr) == this->m_callback_list.end());
     this->m_callback_list.insert(ptr);
 } //}
 void Server::callback_remove(UVC::UVCBaseClient* ptr) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(ptr != nullptr);
     assert(this->m_callback_list.find(ptr) != this->m_callback_list.end());
     this->m_callback_list.erase(this->m_callback_list.find(ptr));
@@ -545,12 +557,13 @@ void Server::callback_remove(UVC::UVCBaseClient* ptr) //{
 
 int Server::listen() //{ 
 {
-    logger->debug("call Server::listen()");
+    logger->debug("call %s", FUNCNAME);
     this->m_config->loadFromFile(Server::on_config_load, this);
     return 0;
 } //}
 void Server::close() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->exit__ == false);
     this->exit__ = true;
     uv_close((uv_handle_t*)this->mp_uv_tcp, nullptr); // block api
@@ -588,6 +601,7 @@ ClientConnection::ClientConnection(Server* kserver, uv_loop_t* loop,
                                    const std::string& addr, uint16_t port, Socks5Auth* socks5):
     mp_kserver(kserver), mp_loop(loop), mp_proxy(mproxy), m_server(addr), m_port(port), m_socks5(socks5) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     this->m_state = __State::INITIAL;
     this->m_in_buffer = 0;
     this->m_out_buffer = 0;
@@ -601,6 +615,7 @@ ClientConnection::ClientConnection(Server* kserver, uv_loop_t* loop,
 
 void ClientConnection::__start_relay() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_client_start_read == false);
     uv_read_start((uv_stream_t*)this->mp_tcp_client, malloc_cb, ClientConnection::client_read_cb);
     this->m_client_start_read = true;
@@ -608,6 +623,7 @@ void ClientConnection::__start_relay() //{
 // static
 void ClientConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     ClientConnection* _this = static_cast<decltype(_this)>(uv_handle_get_data((uv_handle_t*)stream));
     if(nread <= 0) {
         free(buf->base);
@@ -628,6 +644,7 @@ void ClientConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const 
 } //}
 void ClientConnection::ProxyWriteCallback(bool should_run, int status, ROBuf* buf, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     size_t buf_size = buf->size();
     delete buf;
 
@@ -654,6 +671,7 @@ void ClientConnection::ProxyWriteCallback(bool should_run, int status, ROBuf* bu
 
 void ClientConnection::PushData(ROBuf buf) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_state == __State::RUNNING);
 
     __proxyWriteInfo* x = new __proxyWriteInfo{this, false};
@@ -675,6 +693,7 @@ void ClientConnection::PushData(ROBuf buf) //{
 // static
 void ClientConnection::write_to_client_callback(uv_write_t* req, int status) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     UVC::ClientConnection$write_to_client_callback$uv_write* m = 
         dynamic_cast<decltype(m)>(static_cast<EventEmitter*>(uv_req_get_data((uv_req_t*)req)));
     ROBuf* rbuf = m->_rbuf;
@@ -699,6 +718,7 @@ void ClientConnection::write_to_client_callback(uv_write_t* req, int status) //{
 
 void ClientConnection::accept() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_socks5);
     assert(this->m_state == INITIAL);
     this->m_state = CONNECTING;
@@ -707,6 +727,7 @@ void ClientConnection::accept() //{
 } //}
 void ClientConnection::reject() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_socks5);
     this->m_socks5->send_reply(SOCKS5_REPLY_SERVER_FAILURE);
     this->m_socks5 = nullptr;
@@ -715,6 +736,7 @@ void ClientConnection::reject() //{
 
 void ClientConnection::run(uv_tcp_t* client_tcp) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(client_tcp);
     assert(this->mp_tcp_client == nullptr);
     assert(this->m_state == CONNECTING);
@@ -726,6 +748,7 @@ void ClientConnection::run(uv_tcp_t* client_tcp) //{
 } //}
 void ClientConnection::close(bool send_close) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     auto prev_stat = this->m_state;
     this->m_state = __State::ERROR;
     for(auto& x: this->m_callbacks)
@@ -752,11 +775,12 @@ void ClientConnection::close(bool send_close) //{
     if(send_close)
         this->mp_proxy->close_connection(this->m_id, nullptr, nullptr);
 
-    this->mp_proxy->remove_connection(this->m_id, this);
+    this->mp_proxy->remove_connection(this->m_id, this, prev_stat == __State::RUNNING);
 } //}
 
 void ClientConnection::connect(Socks5Auth* socks5) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     if(this->mp_proxy->IsConnected())
         return this->__connect(socks5);
 
@@ -765,6 +789,7 @@ void ClientConnection::connect(Socks5Auth* socks5) //{
 // static
 void ClientConnection::connect_callback(bool should_run, int status, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     std::tuple<ClientConnection*, Socks5Auth*>* x = static_cast<decltype(x)>(data);
     ClientConnection* _this;
     Socks5Auth* socks5;
@@ -781,10 +806,22 @@ void ClientConnection::connect_callback(bool should_run, int status, void* data)
 
     _this->__connect(socks5);
 } //}
+static void __connect_new_connection_callback(bool should_run, int status, ROBuf* buf, void* data) //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    delete buf;
+    if(!should_run) return;
+    if(status < 0) {
+        ClientConnection* _this = 
+            dynamic_cast<decltype(_this)>(static_cast<EventEmitter*>(data));
+        _this->reject();
+    }
+} //}
 void ClientConnection::__connect(Socks5Auth* socks5) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->mp_proxy->IsConnected());
-    this->mp_proxy->new_connection(this->m_id, this->m_server, this->m_port, nullptr, nullptr); // TODO
+    this->mp_proxy->new_connection(this->m_id, this->m_server, this->m_port, __connect_new_connection_callback, this); // TODO
 } //}
 //}
 
@@ -793,6 +830,7 @@ void ClientConnection::__connect(Socks5Auth* socks5) //{
 //                class ConnectionProxy                      //{
 ConnectionProxy::ConnectionProxy(uv_loop_t* loop, Server* server, SingleServerInfo* server_info) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     this->mp_loop = loop;
     this->mp_server = server;
     this->mp_server_info = server_info;
@@ -811,12 +849,14 @@ ConnectionProxy::ConnectionProxy(uv_loop_t* loop, Server* server, SingleServerIn
 
 void ConnectionProxy::close(CloseReason reason) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     this->m_state = __State::STATE_CLOSING;
     // TODO
 } //}
 
 uint8_t ConnectionProxy::get_id() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     for(uint8_t i=0; i<SINGLE_TSL_MAX_CONNECTION; i++) {
         if(this->m_map.find(i) == this->m_map.end())
             return i;
@@ -826,6 +866,7 @@ uint8_t ConnectionProxy::get_id() //{
 
 void ConnectionProxy::connect(ConnectCallback cb, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_connect_cb == nullptr);
     assert(this->m_connect_cb_data == nullptr);
     this->m_connect_cb = cb;
@@ -835,6 +876,7 @@ void ConnectionProxy::connect(ConnectCallback cb, void* data) //{
 
 void ConnectionProxy::connect_to_remote_server() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_state == __State::STATE_INITIAL);
     this->m_state = __State::STATE_GETDNS;
 
@@ -862,8 +904,7 @@ void ConnectionProxy::connect_to_remote_server() //{
 
         uv_getaddrinfo_t req;
         auto ptr = new UVC::ConnectionProxy$connect_to_remote_server$uv_getaddrinfo(
-                this->mp_server, this, false, 
-                this->m_connect_cb, this->m_connect_cb_data);
+                this->mp_server, this, false);
         uv_req_set_data((uv_req_t*)&req, ptr);
         this->mp_server->callback_insert(ptr);
 
@@ -877,7 +918,7 @@ void ConnectionProxy::connect_to_remote_server() //{
 
         uv_getaddrinfo_t* p_req = new uv_getaddrinfo_t();
         auto ptr = new UVC::ConnectionProxy$connect_to_remote_server$uv_getaddrinfo(
-                this->mp_server, this, true, this->m_connect_cb, this->m_connect_cb_data);
+                this->mp_server, this, true);
         uv_req_set_data((uv_req_t*)p_req, ptr);
         this->mp_server->callback_insert(ptr);
 
@@ -890,7 +931,7 @@ void ConnectionProxy::connect_to_remote_server() //{
 // static
 void ConnectionProxy::connect_remote_getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct addrinfo* res) //{
 {
-    __logger->debug("call ConnectionProxy::conenct_remote_getaddrinfo_cb()");
+    __logger->debug("call %s", FUNCNAME);
     struct addrinfo *a;
     struct sockaddr_in* m;
 
@@ -899,8 +940,6 @@ void ConnectionProxy::connect_remote_getaddrinfo_cb(uv_getaddrinfo_t* req, int s
     msg->_server->callback_remove(msg);
     bool clean = msg->_clean;
     ConnectionProxy* _this = msg->_this;
-    ConnectCallback cb = msg->_cb;
-    void* cb_data = msg->_cb_data;
     bool should_run = msg->should_run;
 
     if(clean) delete req;
@@ -908,42 +947,49 @@ void ConnectionProxy::connect_remote_getaddrinfo_cb(uv_getaddrinfo_t* req, int s
 
     if(!should_run) {
         /* if(clean) */ uv_freeaddrinfo(res);
-        cb(false, -1, cb_data);
+        _this->m_connect_cb(false, -1, _this->m_connect_cb_data);
+        _this->m_connect_cb = nullptr;
+        _this->m_connect_cb_data = nullptr;
         return;
     }
 
     if(status < 0) {
-        __logger->warn("In ConnectionProxy::connect_to_remote_server(): dns query fail");
+        __logger->warn("%s: dns query fail", FUNCNAME);
         if(clean) uv_freeaddrinfo(res);
         _this->m_state = __State::STATE_ERROR;
-        cb(true, -1, cb_data);
+        _this->m_connect_cb(true, -1, _this->m_connect_cb_data);
+        _this->m_connect_cb = nullptr;
+        _this->m_connect_cb_data = nullptr;
         _this->close(ConnectionProxy::CLOSE_REMOTE_SERVER_DNS);
         return;
     }
     for(a = res; a != nullptr; a = a->ai_next) {
         if(sizeof(struct sockaddr_in) != a->ai_addrlen) {
-            __logger->debug("query dns get an address that isn't ipv4 address");
+            __logger->warn("%s: query dns get an address that isn't ipv4 address", FUNCNAME);
             continue;
         } else break;
     }
     if(a == nullptr) {
-        logger->warn("In ConnectionProxy::connect_to_remote_server(): query dns doesn't get an ipv4 address");
+        logger->warn("%s: query dns doesn't get an ipv4 address", FUNCNAME);
         if(clean) uv_freeaddrinfo(res);
         _this->m_state = __State::STATE_ERROR;
-        cb(true, -1, cb_data);
+        _this->m_connect_cb(true, -1, _this->m_connect_cb_data);
+        _this->m_connect_cb = nullptr;
+        _this->m_connect_cb_data = nullptr;
         _this->close(ConnectionProxy::CLOSE_REMOTE_SERVER_DNS);
         return;
     }
     m = (struct sockaddr_in*)a->ai_addr; // FIXME ipv6
     m->sin_port = _this->mp_server_info->port();
-    _this->connect_to_with_sockaddr((sockaddr*)m, cb, cb_data);
+    _this->connect_to_with_sockaddr((sockaddr*)m);
     if(clean) uv_freeaddrinfo(res);
 } //}
 
-void ConnectionProxy::connect_to_with_sockaddr(sockaddr* sock, ConnectCallback cb, void* data) //{
+void ConnectionProxy::connect_to_with_sockaddr(sockaddr* sock) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     uv_connect_t* req = new uv_connect_t();
-    auto ptr = new UVC::ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect(this->mp_server, this, cb, data);
+    auto ptr = new UVC::ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect(this->mp_server, this);
     uv_req_set_data((uv_req_t*)req, ptr);
     this->mp_server->callback_insert(ptr);
 
@@ -956,21 +1002,21 @@ void ConnectionProxy::connect_to_with_sockaddr(sockaddr* sock, ConnectCallback c
 // static
 void ConnectionProxy::connect_remote_tcp_connect_cb(uv_connect_t* req, int status) //{
 {
-    __logger->debug("call ConnectionProxy:;connect_remote_tcp_connect_cb()");
+    __logger->debug("call %s", FUNCNAME);
     UVC::ConnectionProxy$connect_to_with_sockaddr$uv_tcp_connect* ptr =
         dynamic_cast<decltype(ptr)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
     assert(ptr);
     Server* server = ptr->_server;
     ConnectionProxy* _this = ptr->_this;
-    ConnectCallback cb = ptr->_cb;
-    void* cb_data = ptr->_cb_data;
     bool should_run = ptr->should_run;
     delete req;
     delete ptr;
 
     server->callback_remove(ptr);
     if(!should_run) {
-        cb(false, -1, cb_data);
+        _this->m_connect_cb(false, -1, _this->m_connect_cb_data);
+        _this->m_connect_cb = nullptr;
+        _this->m_connect_cb_data = nullptr;
         return;
     }
 
@@ -978,67 +1024,69 @@ void ConnectionProxy::connect_remote_tcp_connect_cb(uv_connect_t* req, int statu
 
     if(status < 0) {
         __logger->warn("ConnectionProxy: connect to remote server fail");
-        cb(true, status, cb_data);
+        _this->m_connect_cb(true, status, _this->m_connect_cb_data);
+        _this->m_connect_cb = nullptr;
+        _this->m_connect_cb_data = nullptr;
         _this->close(ConnectionProxy::CLOSE_REMOTE_SERVER_CONNECT_ERROR);
         return;
     }
 
-    auto state = ConnectCallbackState{.m_cb = cb, .m_cb_data = cb_data};
-    _this->tsl_handshake(state);
+    _this->tsl_handshake();
 } //}
 
-void ConnectionProxy::tsl_handshake(ConnectCallbackState state) //{
+void ConnectionProxy::tsl_handshake() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_state == __State::STATE_CONNECTING);
     this->m_state = __State::STATE_TSL;
-    this->client_authenticate(state);
+    this->client_authenticate();
 } //}
 
-struct __authentication_param {
-    ConnectionProxy* _this;
-    ConnectionProxy::ConnectCallback _cb;
-    void* _cb_data;
-};
-void ConnectionProxy::client_authenticate(ConnectCallbackState state) //{
+void ConnectionProxy::client_authenticate() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_state == __State::STATE_TSL);
     this->m_state = __State::STATE_AUTH;
 
-    if (this->mp_server_info->name().size() >= 256 || 
+    if (this->mp_server_info->user().size() >= 256 || 
         this->mp_server_info->pass().size() >= 256) {
-        __logger->warn("ConnectionProxy::client_authenticate(): length of username and password should less than 256");
-        state.m_cb(true, -1, state.m_cb_data);
+        __logger->warn("%s: length of username and password should less than 256", FUNCNAME);
+        this->m_connect_cb(true, -1, this->m_connect_cb_data);
+        this->m_connect_cb = nullptr;
+        this->m_connect_cb_data = nullptr;
         this->close(CLOSE_AUTHENTICATION_ERROR);
         return;
     }
-    ROBuf auth_buf = ROBuf(this->mp_server_info->name().size() + this->mp_server_info->pass().size() + 2);
-    auth_buf.__base()[0] = (uint8_t)this->mp_server_info->name().size();
-    memcpy(auth_buf.__base() + 1, this->mp_server_info->name().c_str(), this->mp_server_info->name().size());
-    auth_buf.__base()[this->mp_server_info->name().size() + 1] = (uint8_t)this->mp_server_info->pass().size();
-    memcpy(auth_buf.__base() + this->mp_server_info->name().size() + 2, 
+    ROBuf auth_buf = ROBuf(this->mp_server_info->user().size() + this->mp_server_info->pass().size() + 2);
+    auth_buf.__base()[0] = (uint8_t)this->mp_server_info->user().size();
+    memcpy(auth_buf.__base() + 1, this->mp_server_info->user().c_str(), this->mp_server_info->user().size());
+    auth_buf.__base()[this->mp_server_info->user().size() + 1] = (uint8_t)this->mp_server_info->pass().size();
+    memcpy(auth_buf.__base() + this->mp_server_info->user().size() + 2, 
             this->mp_server_info->pass().c_str(), this->mp_server_info->pass().size());
 
-    this->_write(auth_buf, ConnectionProxy::on_authentication_write, new __authentication_param{this, state.m_cb, state.m_cb_data});
+    this->_write(auth_buf, ConnectionProxy::on_authentication_write, this);
 } //}
 
 // static
 void ConnectionProxy::on_authentication_write(bool should_run, int status, ROBuf* buf, void* data) //{
 {
-    __authentication_param* _msg = static_cast<decltype(_msg)>(data);
-    ConnectionProxy* _this = _msg->_this;
-    ConnectCallback  _cb = _msg->_cb;
-    void* _cb_data = _msg->_cb_data;
+    __logger->debug("call %s", FUNCNAME);
+    ConnectionProxy* _this = dynamic_cast<decltype(_this)>(static_cast<EventEmitter*>(data));
+    assert(_this);
     delete buf;
 
     if(!should_run || status < 0) {
-        _cb(should_run, status, _cb_data);
+        _this->m_connect_cb(should_run, status, _this->m_connect_cb_data);
+        _this->m_connect_cb = nullptr;
+        _this->m_connect_cb_data = nullptr;
         return;
     }
 
     assert(_this->m_state == __State::STATE_AUTH);
     _this->m_state = __State::STATE_WAIT_AUTH_REPLY;
 
-    uv_handle_set_data((uv_handle_t*)_this->mp_connection, _msg);
+    uv_handle_set_data((uv_handle_t*)_this->mp_connection, _this);
+    assert(_this->m_connection_read == false);
     uv_read_start((uv_stream_t*)_this->mp_connection, malloc_cb, ConnectionProxy::uv_stream_read_after_send_auth_callback);
     _this->m_connection_read = true;
 } //}
@@ -1046,29 +1094,33 @@ void ConnectionProxy::on_authentication_write(bool should_run, int status, ROBuf
 // static
 void ConnectionProxy::uv_stream_read_after_send_auth_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
-    __authentication_param* _msg = 
-        static_cast<decltype(_msg)>(uv_handle_get_data((uv_handle_t*)stream));
-    ConnectionProxy* _this = dynamic_cast<decltype(_this)>(static_cast<EventEmitter*>(_msg->_this));
+    __logger->debug("call %s", FUNCNAME);
+    ConnectionProxy* _this = 
+        dynamic_cast<decltype(_this)>(static_cast<EventEmitter*>(uv_handle_get_data((uv_handle_t*)stream)));
     assert(_this);
-    ConnectCallback cb = _msg->_cb;
-    void* cb_data = _msg->_cb_data;
-    delete _msg;
 
     if(nread <= 0) {
         _this->close(CLOSE_READ_ERROR);
         free(buf->base);
-        cb(false, -1, cb_data);
+        _this->m_connect_cb(false, -1, _this->m_connect_cb_data);
+        _this->m_connect_cb = nullptr;
+        _this->m_connect_cb_data = nullptr;
         return;
     }
 
     ROBuf bufx = ROBuf(buf->base, nread, 0, free);
+    _this->m_remain_raw = _this->m_remain_raw + bufx;
+
+    if(_this->m_remain_raw.size() < 2) return;
 
     switch(_this->m_state) {
         case __State::STATE_WAIT_AUTH_REPLY:
-            _this->authenticate_with(bufx, cb, cb_data);
+            _this->authenticate_with_remains();
             break;
         case __State::STATE_ERROR:
-            cb(false, -1, cb_data);
+            _this->m_connect_cb(false, -1, _this->m_connect_cb_data);
+            _this->m_connect_cb = nullptr;
+            _this->m_connect_cb_data = nullptr;
             _this->close(CLOSE_PACKET_ERROR);
             break;
         case __State::STATE_BUILD:
@@ -1091,6 +1143,7 @@ void ConnectionProxy::uv_stream_read_after_send_auth_callback(uv_stream_t* strea
 
 void ConnectionProxy::uv_stream_read_packet(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     ConnectionProxy* _this = dynamic_cast<decltype(_this)>(static_cast<EventEmitter*>(uv_handle_get_data((uv_handle_t*)stream)));
     assert(_this);
 
@@ -1127,11 +1180,13 @@ void ConnectionProxy::uv_stream_read_packet(uv_stream_t* stream, ssize_t nread, 
 
 void ConnectionProxy::dispatch_data_encrypted(ROBuf buf) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     this->dispatch_data(buf);
 } //}
 
 void ConnectionProxy::dispatch_data(ROBuf buf) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     std::tuple<bool, std::vector<std::tuple<ROBuf, PACKET_OPCODE, uint8_t>>, ROBuf> mm = 
         decode_all_packet(this->m_remain_raw, buf);
     bool noerror;
@@ -1177,6 +1232,7 @@ void ConnectionProxy::dispatch_data(ROBuf buf) //{
                     this->close_connection(id, nullptr, nullptr);
                 } else {
                     assert(this->m_map.find(id) != this->m_map.end());
+                    this->m_wait_new_connection.erase(this->m_wait_new_connection.find(id));
                     this->m_map[id]->accept();
                 }
                 break;
@@ -1185,6 +1241,7 @@ void ConnectionProxy::dispatch_data(ROBuf buf) //{
                     __logger->warn("ConnectionProxy recieves a packet to to ClientConnection which doesn't exists. REJECT");
                 } else {
                     assert(this->m_map.find(id) != this->m_map.end());
+                    this->m_wait_new_connection.erase(this->m_wait_new_connection.find(id));
                     this->m_map[id]->reject();
                 }
                 break;
@@ -1197,31 +1254,33 @@ void ConnectionProxy::dispatch_data(ROBuf buf) //{
     }
 } //}
 
-void ConnectionProxy::authenticate_with(ROBuf buf, ConnectCallback cb, void* cb_data) //{
+void ConnectionProxy::authenticate_with_remains() //{
 {
-    ROBuf merge = this->m_remain_raw + buf;
-    assert(merge.size() > 0);
-    if(merge.size() < 2) {
-        this->m_remain_raw = merge;
-        return;
-    }
+    __logger->debug("call %s", FUNCNAME);
+    ROBuf merge = this->m_remain_raw;
+    assert(merge.size() >= 2);
 
     if((uint8_t)merge.base()[0] != 0xFF ||
-       (uint8_t)merge.base()[0] != 0x00) {
-        __logger->warn("authentication fail");
+       (uint8_t)merge.base()[1] != 0x00) {
+        __logger->warn("AUTHENTICATION FAIL");
         this->close(CLOSE_AUTHENTICATION_ERROR);
-        cb(false, -1, cb_data);
+        this->m_connect_cb(false, -1, this->m_connect_cb_data);
+        this->m_connect_cb = nullptr;
+        this->m_connect_cb_data = nullptr;
         return;
     }
 
     this->m_state = __State::STATE_BUILD;
     this->m_remain_raw = merge + 2;
-    cb(true, 0, cb_data);
+    this->m_connect_cb(true, 0, this->m_connect_cb_data);
+    this->m_connect_cb = nullptr;
+    this->m_connect_cb_data = nullptr;
     return;
 } //}
 
 int ConnectionProxy::_write(ROBuf buf, WriteCallback cb, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->mp_connection != nullptr);
 
     uv_buf_t* uv_buf = new uv_buf_t();
@@ -1242,6 +1301,7 @@ int ConnectionProxy::_write(ROBuf buf, WriteCallback cb, void* data) //{
 // static
 void ConnectionProxy::_write_callback(uv_write_t* req, int status) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     UVC::ConnectionProxy$_write$uv_write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
     assert(msg);
@@ -1273,6 +1333,7 @@ void ConnectionProxy::_write_callback(uv_write_t* req, int status) //{
 
 int ConnectionProxy::write(uint8_t id, ROBuf buf, WriteCallback cb, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(id < SINGLE_TSL_MAX_CONNECTION);
     ROBuf x = encode_packet_header(PACKET_OPCODE::PACKET_OP_REG, id, buf.size()) + buf;
     return this->_write(x, cb, data);
@@ -1290,6 +1351,7 @@ int ConnectionProxy::new_connection(uint8_t id,
         const std::string& addr, uint16_t port, 
         WriteCallback cb, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_map.find(id) != this->m_map.end());
     assert(this->m_map[id]->IsRun() == false);
 
@@ -1314,6 +1376,7 @@ int ConnectionProxy::new_connection(uint8_t id,
 // static
 void ConnectionProxy::new_connection_callback_wrapper(bool should_run, int status, ROBuf* buf, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     new_connection_wrapper_data* kdata = static_cast<decltype(kdata)>(data);
     ConnectionProxy* _this = kdata->_this;
     uint8_t id = kdata->m_id;
@@ -1333,8 +1396,9 @@ void ConnectionProxy::new_connection_callback_wrapper(bool should_run, int statu
 } //}
 void ConnectionProxy::new_connection_timer_callback(uv_timer_t* timer) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     UVC::ConnectionProxy$new_connection$uv_timer_start* msg = 
-        dynamic_cast<decltype(msg)>(static_cast<EventEmitter*>(uv_handle_get_data((uv_handle_t*)timer)));
+        dynamic_cast<decltype(msg)>(static_cast<UVC::UVCBaseClient*>(uv_handle_get_data((uv_handle_t*)timer)));
     assert(msg);
     msg->_server->callback_remove(msg);
     ConnectionProxy* _this = msg->_this;
@@ -1342,7 +1406,6 @@ void ConnectionProxy::new_connection_timer_callback(uv_timer_t* timer) //{
     bool should_run = msg->should_run;
     uv_timer_stop(timer);
     uv_close((uv_handle_t*)timer, delete_closed_handle<decltype(timer)>);
-    delete timer;
     delete msg;
 
     bool writecallback_called = _data->m_writecallback_called;
@@ -1358,29 +1421,30 @@ void ConnectionProxy::new_connection_timer_callback(uv_timer_t* timer) //{
     }
 
     if(should_run) {
-        if(writecallback_called && _this->m_wait_new_connection.find(id) != _this->m_wait_new_connection.end()) {
+        if(_this->m_wait_new_connection.find(id) != _this->m_wait_new_connection.end()) {
             _this->m_wait_new_connection.erase(_this->m_wait_new_connection.find(id));
-            assert(_this->m_map.find(id) != _this->m_map.end());
-            _this->m_map[id]->reject();
         }
     }
 } //}
 
 int ConnectionProxy::close_connection(uint8_t id, WriteCallback cb, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     auto x = encode_packet(PACKET_OP_CLOSE, id, ROBuf((char*)"close", 5));
     return this->_write(x, cb, data);
 } //}
 
-void ConnectionProxy::remove_connection(uint8_t id, ClientConnection* obj) //{
+void ConnectionProxy::remove_connection(uint8_t id, ClientConnection* obj, bool remove) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_map.find(id) != this->m_map.end());
     this->m_map.erase(this->m_map.find(id));
-    delete obj;
+    if(remove) delete obj;
 } //}
 
 uint8_t ConnectionProxy::requireAnId(ClientConnection* cc) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     uint8_t id = this->get_id();
     assert(id < (1 << 6));
     this->m_map[id] = cc;
@@ -1389,6 +1453,7 @@ uint8_t ConnectionProxy::requireAnId(ClientConnection* cc) //{
 
 ConnectionProxy::~ConnectionProxy() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     if(this->m_connection_read) {
         uv_read_stop((uv_stream_t*)this->mp_connection);
         this->m_connection_read = false;
@@ -1410,7 +1475,7 @@ ConnectionProxy::~ConnectionProxy() //{
 //                class RelayConnection                       //{
 RelayConnection::RelayConnection(Server* kserver, uv_loop_t* loop, uv_tcp_t* tcp_client, const std::string& server, uint16_t port) //{
 {
-    __logger->debug("RelayConnection() to %s:%d", server.c_str(), k_ntohs(port));
+    __logger->debug("call %s: relay connection to %s:%d", FUNCNAME, server.c_str(), k_ntohs(port));
     assert(tcp_client == nullptr);
     this->m_kserver = kserver;
     this->mp_loop = loop;
@@ -1429,7 +1494,7 @@ RelayConnection::RelayConnection(Server* kserver, uv_loop_t* loop, uv_tcp_t* tcp
 
 void RelayConnection::connect(Socks5Auth* socks5) //{
 {
-    __logger->debug("call RelayConnection::connect()");
+    __logger->debug("call %s", FUNCNAME);
     uint32_t addr_ipv4;
 
     if(str_to_ip4(this->m_server.c_str(), &addr_ipv4)) {
@@ -1468,7 +1533,7 @@ void RelayConnection::connect(Socks5Auth* socks5) //{
 
 void RelayConnection::run(uv_tcp_t* client_tcp) //{
 {
-    __logger->debug("call RelayConnection::run()");
+    __logger->debug("call %s", FUNCNAME);
     this->mp_tcp_client = client_tcp;
     uv_handle_set_data((uv_handle_t*)this->mp_tcp_client, this);
     if(this->mp_tcp_server != nullptr)
@@ -1479,7 +1544,7 @@ void RelayConnection::run(uv_tcp_t* client_tcp) //{
 
 void RelayConnection::close() //{
 {
-    __logger->debug("call RelayConnection::close(this=0x%lx)", (long)this);
+    __logger->debug("call %s = (this=0x%lx)", FUNCNAME, (long)this);
     this->m_error = true;
     if(this->m_server_start_read) {
         uv_read_stop((uv_stream_t*)this->mp_tcp_server);
@@ -1503,7 +1568,7 @@ void RelayConnection::close() //{
 
 void RelayConnection::__connect_to(const sockaddr* addr, Socks5Auth* socks5) //{
 {
-    __logger->debug("call RelayConnection::__connect_to(this=0x%lx)", (long)this);
+    __logger->debug("call %s = (this=0x%lx)", FUNCNAME, (long)this);
 
     uv_connect_t* req = new uv_connect_t();
     auto ptr = new UVC::RelayConnection$__connect_to$uv_tcp_connect(this->m_kserver, this, socks5);
@@ -1522,7 +1587,7 @@ void RelayConnection::__connect_to(const sockaddr* addr, Socks5Auth* socks5) //{
 // static
 void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct addrinfo* res) //{
 {
-    __logger->debug("call RelayConnection::getaddrinfo_callback()");
+    __logger->debug("call %s", FUNCNAME);
     struct addrinfo *a;
     struct sockaddr_in* m;
 
@@ -1542,19 +1607,19 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
     }
 
     if(status < 0) {
-        __logger->warn("dns query fail");
+        __logger->warn("%s: dns query fail", FUNCNAME);
         // TODO send a close packet
         if(clean) uv_freeaddrinfo(res);
         return socks5->send_reply(SOCKS5_REPLY_HOST_UNREACHABLE);
     }
     for(a = res; a != nullptr; a = a->ai_next) {
         if(sizeof(struct sockaddr_in) != a->ai_addrlen) {
-            __logger->debug("query dns get an address that isn't ipv4 address");
+            __logger->debug("%s: query dns get an address that isn't ipv4 address", FUNCNAME);
             continue;
         } else break;
     }
     if(a == nullptr) {
-        logger->warn("query dns doesn't get an ipv4 address");
+        logger->warn("%s: query dns doesn't get an ipv4 address", FUNCNAME);
         // TODO send a close packet
         if(clean) uv_freeaddrinfo(res);
         return socks5->send_reply(SOCKS5_REPLY_ADDRESSS_TYPE_NOT_SUPPORTED);
@@ -1567,7 +1632,7 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
 
 void RelayConnection::connect_server_cb(uv_connect_t* req, int status) //{
 {
-    __logger->debug("call RelayConnection::connect_server_cb() callback");
+    __logger->debug("call %s", FUNCNAME);
     UVC::RelayConnection$__connect_to$uv_tcp_connect* x = 
         dynamic_cast<decltype(x)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
     x->_server->callback_remove(x);
@@ -1578,7 +1643,7 @@ void RelayConnection::connect_server_cb(uv_connect_t* req, int status) //{
     delete req;
     if(should_run) {
         if(status != 0) {
-            __logger->debug("RelayConnection::conenct_sesrver_cb() fail");
+            __logger->debug("%s: fail", FUNCNAME);
             uv_close((uv_handle_t*) _this->mp_tcp_server, delete_closed_handle<decltype(_this->mp_tcp_server)>);
             _this->mp_tcp_server = nullptr;
             return socks5->send_reply(SOCKS5_REPLY_CONNECTION_REFUSED);
@@ -1590,14 +1655,14 @@ void RelayConnection::connect_server_cb(uv_connect_t* req, int status) //{
 
 void RelayConnection::__start_relay() //{
 {
-    __logger->debug("call RelayConnection::__start_relay()");
+    __logger->debug("call %s", FUNCNAME);
     this->__relay_client_to_server();
     this->__relay_server_to_client();
 } //}
 
 void RelayConnection::__relay_client_to_server() //{
 {
-    __logger->debug("call RelayConnection::__relay_client_to_server()");
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_client_start_read == false);
     uv_read_start((uv_stream_t*)this->mp_tcp_client, 
             malloc_cb, 
@@ -1606,7 +1671,7 @@ void RelayConnection::__relay_client_to_server() //{
 } //}
 void RelayConnection::__relay_server_to_client() //{
 {
-    __logger->debug("call RelayConnection::__relay_server_to_client()");
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_server_start_read == false);
     uv_read_start((uv_stream_t*)this->mp_tcp_server, 
             malloc_cb, 
@@ -1616,7 +1681,7 @@ void RelayConnection::__relay_server_to_client() //{
 
 void RelayConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
-    __logger->debug("call RelayConnection::client_read_cb() callback");
+    __logger->debug("call %s", FUNCNAME);
     if(nread == 0) {
         free(buf->base);
         return;
@@ -1644,7 +1709,7 @@ void RelayConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const u
 } //}
 void RelayConnection::server_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
-    __logger->debug("call RelayConnection::server_read_cb() callback");
+    __logger->debug("call %s", FUNCNAME);
     if(nread == 0) {
         free(buf->base);
         return;
@@ -1673,7 +1738,7 @@ void RelayConnection::server_read_cb(uv_stream_t* stream, ssize_t nread, const u
 
 void RelayConnection::server_write_cb(uv_write_t* req, int status) //{
 {
-    __logger->debug("call RelayConnection::server_write_cb() callback");
+    __logger->debug("call %s", FUNCNAME);
     UVC::RelayConnection$xxxx_read_cb$uv_write* x = 
         dynamic_cast<decltype(x)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
     x->_server->callback_remove(x);
@@ -1700,7 +1765,7 @@ void RelayConnection::server_write_cb(uv_write_t* req, int status) //{
 } //}
 void RelayConnection::client_write_cb(uv_write_t* req, int status) //{
 {
-    __logger->debug("call RelayConnection::client_write_cb() callback");
+    __logger->debug("call %s", FUNCNAME);
     UVC::RelayConnection$xxxx_read_cb$uv_write* x = 
         dynamic_cast<decltype(x)>(static_cast<UVC::UVCBaseClient*>(uv_req_get_data((uv_req_t*)req)));
     x->_server->callback_remove(x);
@@ -1728,6 +1793,7 @@ void RelayConnection::client_write_cb(uv_write_t* req, int status) //{
 
 RelayConnection::~RelayConnection() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->mp_tcp_client == nullptr);
     if(this->mp_tcp_server != nullptr)
         uv_close((uv_handle_t*)this->mp_tcp_server, delete_closed_handle<decltype(this->mp_tcp_server)>);

@@ -249,7 +249,6 @@ class ConnectionProxy: public EventEmitter //{
     public:
         // this callback should delete buf
         using WriteCallback = void (*)(bool should_run, int status, ROBuf* buf, void* data);
-
         using ConnectCallback = void (*)(bool should_run, int status, void* data);
 
 
@@ -284,21 +283,17 @@ class ConnectionProxy: public EventEmitter //{
         size_t m_out_buffer;
 
         ConnectCallback m_connect_cb;
-        void* m_connect_cb_data;
-        struct ConnectCallbackState {
-            ConnectCallback m_cb;
-            void* m_cb_data;
-        };
+        void*           m_connect_cb_data;
 
-        void tsl_handshake(ConnectCallbackState state);
-        void client_authenticate(ConnectCallbackState state);
+        void tsl_handshake();
+        void client_authenticate();
 
         uint8_t get_id();
 
         static void connect_remote_getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct addrinfo* info);
         static void connect_remote_tcp_connect_cb(uv_connect_t* req, int status);
 
-        void connect_to_with_sockaddr(sockaddr* sock, ConnectCallback cb, void* data);
+        void connect_to_with_sockaddr(sockaddr* sock);
 
         int _write(ROBuf buf, WriteCallback cb, void* data);
         static void _write_callback(uv_write_t* req, int status);
@@ -310,8 +305,8 @@ class ConnectionProxy: public EventEmitter //{
         static void on_authentication_write(bool should_run, int status, ROBuf* buf, void* data);
 
         static void uv_stream_read_after_send_auth_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
+        void authenticate_with_remains();
         static void uv_stream_read_packet(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
-        void authenticate_with(ROBuf buf, ConnectCallback cb, void* cb_data);
 
         void dispatch_data_encrypted(ROBuf buf);
         void dispatch_data(ROBuf buf);
@@ -349,15 +344,29 @@ class ConnectionProxy: public EventEmitter //{
                              WriteCallback cb, void* data);
         int close_connection(uint8_t id, WriteCallback cb, void* data);
 
-        void remove_connection(uint8_t id, ClientConnection* obj);
+        /** remove a ClientConnection object, and release the id associated with the object
+         * @param {uint8_t id} this id should exists, otherwise assert(false);
+         * @param {ClientConnection* obj} pointer to the object
+         * @param {bool remove} whether delete the object, which may be clean by other function. CAREFUL
+         */
+        void remove_connection(uint8_t id, ClientConnection* obj, bool remove);
 
+        /** connect to KProxyServer::Server endpoint
+         * @param {ConnectCallback cb} when connecting is end either success or fail, #cb will be called with 
+         *                             proper arguments
+         * @param {void* data} a pointer pass to #cb
+         */
         void connect(ConnectCallback cb, void* data);
 
         inline size_t getConnectionNumbers() {return this->m_map.size();}
         inline bool   IsIdFull() {return this->getConnectionNumbers() == SINGLE_TSL_MAX_CONNECTION;}
         inline bool   IsConnected() {return this->m_state == __State::STATE_BUILD;}
 
-        uint8_t requireAnId(ClientConnection*);
+        /** register a ClientConnection object, and allocate an id to this object
+         * @precondition assert(this.IsIdFull() == false)
+         * @param {ClientConnection* obj) the object
+         */
+        uint8_t requireAnId(ClientConnection* obj);
 
         ~ConnectionProxy();
 }; //}

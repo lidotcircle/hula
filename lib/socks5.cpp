@@ -71,11 +71,12 @@ std::tuple<bool, struct __client_request_msg, ROBuf, bool> parse_client_request(
     }
     if(result && packet_error == false) {
         msg.m_port = *(uint16_t*)&merge.base()[addr_len + 1 + 4];
+        msg.m_port = k_ntohs(msg.m_port);
         inc += 2;
     }
 __RETURN:
     __logger->debug("parse_client_request() error=%d, return with (addr=%s, port=%d, addr_type=%d, cmd=%d)", 
-            packet_error, msg.m_addr.c_str(), k_ntohs(msg.m_port), msg.m_addr_type, msg.m_command);
+            packet_error, msg.m_addr.c_str(), msg.m_port, msg.m_addr_type, msg.m_command);
     return std::make_tuple(result, msg, merge + inc, packet_error);
 } //}
 

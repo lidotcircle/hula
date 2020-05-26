@@ -63,7 +63,16 @@ void connectEcho(EventEmitter* target, const std::string& ename, void* args) //{
     sockaddr_in addr;
     int len;
     uv_tcp_getpeername(client, (sockaddr*)&addr, &len);
-    Logger::logger->info("new connection from %s:%d", ip4_to_str(k_ntohl(addr.sin_addr.s_addr)), addr.sin_port);
+    Logger::logger->info("new connection from %s:%d", ip4_to_str(addr.sin_addr.s_addr), addr.sin_port);
+} //}
+
+static bool uv_continue = true;
+static void interrupt_handle(int sig) //{
+{
+    if(uv_continue == false) {
+        abort();
+    }
+    uv_continue = false;
 } //}
 
 int main() //{
@@ -72,13 +81,24 @@ int main() //{
     uv_loop_t loop;
     uv_loop_init(&loop);
 
+    signal(SIGINT,  interrupt_handle);
+
     KProxyServer::Server server(&loop, "../tests/server_config.json");
-    server.on("connection", connectEcho, CB_NONE);
     server.listen();
 
-    uv_run(&loop, UV_RUN_DEFAULT);
-    uv_loop_close(&loop);
+    while(uv_continue)
+        uv_run(&loop, UV_RUN_NOWAIT);
 
+    __logger->warn("Exiting ...");
+    server.close();
+
+    while(server.HasConnection())
+        uv_run(&loop, UV_RUN_NOWAIT);
+
+    while(uv_loop_alive(&loop))
+        uv_run(&loop, UV_RUN_ONCE);
+
+    uv_loop_close(&loop);
     return 0;
 } //}
 

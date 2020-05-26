@@ -62,7 +62,7 @@ struct PacketHeader {
 });
 
 
-/** @return <frame, remain, opcode, id> */
+/** @return <noerror, frame, remain, opcode, id> */
 std::tuple<bool, ROBuf, ROBuf, PACKET_OPCODE, ConnectionId> decode_packet(ROBuf remain, ROBuf income);
 std::tuple<bool, std::vector<std::tuple<ROBuf, PACKET_OPCODE, uint8_t>>, ROBuf> decode_all_packet(ROBuf remain, ROBuf income);
 

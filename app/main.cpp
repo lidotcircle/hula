@@ -11,6 +11,8 @@
 #include <iostream>
 #include <iomanip>
 
+#include "../include/config.h"
+
 static bool uv_continue = true;
 
 static void interrupt_handle(int sig) //{
@@ -34,12 +36,15 @@ int main() //{
     server.listen();
 
     while(uv_continue)
-        uv_run(&loop, UV_RUN_ONCE);
+        uv_run(&loop, UV_RUN_NOWAIT);
 
-    std::cout << "Exiting..." << std::endl;
-
+    __logger->warn("Exiting ...");
     server.close();
+
     while (server.IsRunning())
+        uv_run(&loop, UV_RUN_NOWAIT);
+
+    while(uv_loop_alive(&loop))
         uv_run(&loop, UV_RUN_ONCE);
 
     uv_loop_close(&loop);
