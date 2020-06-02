@@ -11,4 +11,9 @@
 // #define __logger logger
  #define __logger Logger::logger
 
+#if defined(WIN32)
 #define FUNCNAME __PRETTY_FUNCTION__
+#else
+#define FUNCNAME __func__
+#endif // defined(WIN32)
+
