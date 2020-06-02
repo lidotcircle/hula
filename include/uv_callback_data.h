@@ -13,8 +13,7 @@ namespace UVC {
  */
 
 struct Base {
-    bool should_run;
-    inline Base(): should_run(true){}
+    inline Base(){}
     inline virtual ~Base(){};
 };
 
@@ -138,8 +137,9 @@ struct ClientConnection$write_to_client_callback$uv_write: public UVCBaseClient 
 namespace UVC {
     
 struct UVCBaseServer: public UVC::Base {
+    bool should_run;
     KProxyServer::ClientConnectionProxy* _proxy;
-    inline UVCBaseServer(KProxyServer::ClientConnectionProxy* _server): Base(), _proxy(_server){}
+    inline UVCBaseServer(KProxyServer::ClientConnectionProxy* _server): should_run(true), Base(), _proxy(_server){}
 };
 
 struct ServerToNetConnection$__connect$uv_getaddrinfo: public UVC::UVCBaseServer {

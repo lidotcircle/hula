@@ -143,7 +143,6 @@ void Server::dispatch_new_connection(uv_tcp_t* connection) //{
 //}
 
 /**                     class ClientConnectionProxy                  *///{
-
 /** constructor */
 ClientConnectionProxy::ClientConnectionProxy(Server* server, uv_tcp_t* connection): m_remains() //{
 {
@@ -326,7 +325,7 @@ void ClientConnectionProxy::dispatch_packet_data(ROBuf buf) //{
 
 /*
  * the request has format like |    address:port   | 
- *                             |      buf.size()   |*/
+ *                             |      buf.size()   | */
 void ClientConnectionProxy::dispatch_new(uint8_t id, ROBuf buf) //{
 {
     __logger->debug("call %s", FUNCNAME);

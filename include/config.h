@@ -8,6 +8,7 @@
 
 #define MAX_LISTEN 500
 
-#define __logger logger
+// #define __logger logger
+ #define __logger Logger::logger
 
 #define FUNCNAME __PRETTY_FUNCTION__

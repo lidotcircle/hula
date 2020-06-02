@@ -15,6 +15,7 @@
 #include "../include/config_file.h"
 #include "../include/dlinkedlist.hpp"
 #include "../include/socks5.h"
+#include "../include/object_manager.h"
 
 
 #define SINGLE_TSL_MAX_CONNECTION (1 << 6)
@@ -44,8 +45,10 @@ class ClientConnection;
 class Socks5Auth: public EventEmitter //{
 {
     public:
+    /*
         using finish_cb = void (*)(int status, Socks5Auth* self_ref, const std::string& addr, 
                 uint16_t port, uv_tcp_t* tcp, void* data);
+                */
         enum SOCKS5_STAGE {
             SOCKS5_ERROR = 0,
             SOCKS5_INIT,
@@ -55,7 +58,10 @@ class Socks5Auth: public EventEmitter //{
         };
 
     private:
+        /*
         finish_cb m_cb;
+        void*     m_data;
+        */
         bool m_client_read_start;
 
         SOCKS5_STAGE  m_state;
@@ -64,7 +70,6 @@ class Socks5Auth: public EventEmitter //{
         ClientConfig* mp_config;
         Server*       mp_server;
         ROBuf         m_remain;
-        void*         m_data;
 
         std::string   m_servername;
         uint16_t      m_port;
@@ -89,7 +94,7 @@ class Socks5Auth: public EventEmitter //{
         void clean_uv_tcp_data();
 
     public:
-        Socks5Auth(Server* server, uv_tcp_t* client, ClientConfig* config, finish_cb cb, void* data);
+        Socks5Auth(Server* server, uv_tcp_t* client, ClientConfig* config/*, finish_cb cb, void* data */);
 
         inline void send_reply(uint8_t reply) {this->__send_reply(reply);}
 
@@ -100,12 +105,14 @@ class Socks5Auth: public EventEmitter //{
 
 /**
  * @class Server a socks5 proxy server */
-class Server: public EventEmitter //{
+class Server: public EventEmitter, public ObjectManager //{
 {
+    /*
     public:
         using M_CB = void (*)(Server*, ConnectionProxy*, 
                               uint8_t id, const std::string& addr, 
                               uint16_t port, Socks5Auth* socks5, uint8_t socks5_reply);
+                              */
 
     private:
         bool exit__ = false;
@@ -124,14 +131,10 @@ class Server: public EventEmitter //{
         friend class ConnectionProxy;
         std::unordered_map<Socks5Auth*, std::tuple<bool, EventEmitter*>> m_auths;
         std::unordered_set<RelayConnection*> m_relay;
-
-    private:
-        std::unordered_set<UVC::UVCBaseClient*> m_callback_list;
-
         std::unordered_set<ConnectionProxy*> m_proxy;
 
-//        ConnectionState m_state; TODO
-
+    private:
+        /** handler of connection event */
         static void on_connection(uv_stream_t* stream, int status);
 
         /** this callback function is used to close Socks5Auth handle, 
@@ -140,10 +143,11 @@ class Server: public EventEmitter //{
          *  1. when (@con == nullptr), which means to make a connection to @addr:@port
          *     and then call the @self_ref->__send_reply(uint8_t) with status
          *  2. when (@con != nullptr && status < 0) means dispose Socks5Auth object and relay object
-         *  3. when (@con != nullptr && status > 0) means dispose object and transfer connection to relay */
+         *  3. when (@con != nullptr && status > 0) means dispose object and transfer connection to relay 
         static void on_authentication(int status, Socks5Auth* self_ref, 
                 const std::string& addr, uint16_t port, 
                 uv_tcp_t* con, void* data);
+                */
 
         static void on_config_load(int error, void* data);
         int __listen();
@@ -152,9 +156,10 @@ class Server: public EventEmitter //{
         void dispatch_bypass(const std::string&, uint16_t, Socks5Auth* socks5);
         void dispatch_proxy (const std::string&, uint16_t, Socks5Auth* socks5);
 
-        SingleServerInfo* select_remote_serever();
-
         void redispatch(uv_tcp_t* client_tcp, Socks5Auth* socks5);
+
+        /** implement strategy for selecting remote server */
+        SingleServerInfo* select_remote_serever();
 
         void try_close();
 
@@ -169,10 +174,14 @@ class Server: public EventEmitter //{
         int listen();
         void close();
 
-        void callback_insert(UVC::UVCBaseClient* ptr);
-        void callback_remove(UVC::UVCBaseClient* ptr);
+        /** delete @relay object and inform this inform to callbacks related with this @relay */
+        void remove_relay(RelayConnection* relay);
+        /** delete @proxy object and inform this inform to callbacks related with this @proxy */
+        void remove_proxy(ConnectionProxy* proxy);
 
-        void close_relay(RelayConnection* relay);
+        void socks5BuildConnection(Socks5Auth* socks5, const std::string& addr, uint16_t port);
+        void socks5Transfer(Socks5Auth* socks5, uv_tcp_t* client_tcp);
+        void socks5Reject(Socks5Auth* socks5, uv_tcp_t* client_tcp);
 
         ~Server();
 
