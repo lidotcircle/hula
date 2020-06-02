@@ -15,6 +15,7 @@
 #include "kpacket.h"
 #include "config_file.h"
 #include "config.h"
+#include "object_manager.h"
 
 #define DEFAULT_BACKLOG 100
 
@@ -93,7 +94,7 @@ class ServerToNetConnection;
  * @event connection @fires when new conection is accepted
  *        (uv_tcp_t* accept_stream, Server* this_server)
  */
-class Server: public EventEmitter //{
+class Server: public EventEmitter, public ObjectManager //{
 {
     public:
         struct connectionArgv: public EventArgs::Base {
@@ -145,62 +146,6 @@ class Server: public EventEmitter //{
 
 
 /**
- * @class ServerToNetConnection Proxy a single tcp connection. When new packet arrives, relay the packet to client */
-class ServerToNetConnection: public EventEmitter //{
-{
-    public:
-        using data_callback = void (*)(ServerToNetConnection* con, uint8_t id, ROBuf buf);
-
-    protected:
-        using WriteCallback = void (*)(bool should_run, int status, ROBuf* buf, void* data);
-
-    private:
-        uv_loop_t* mp_loop;
-
-        uv_tcp_t* mp_tcp;
-        bool m_net_tcp_start_read;
-
-        bool m_inform_client_stop_read = false;
-
-        ClientConnectionProxy* mp_proxy;
-        ConnectionId m_id;
-
-        size_t m_net_to_user_buffer;
-        size_t m_user_to_net_buffer;
-
-        std::string m_addr;
-        uint16_t m_port;
-
-        void __connect();
-        static void tcp2net_getaddrinfo_callback(uv_getaddrinfo_t* req, int status, struct addrinfo* res);
-        void __connect_with_sockaddr(sockaddr* addr);
-        static void tcp2net_connect_callback(uv_connect_t* req, int status);
-        static void tcp2net_alloc_callback  (uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
-        static void tcp2net_read_callback   (uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
-        static void tcp2net_write_callback  (uv_write_t* req, int status); // write buffer to net_tpc_connection
-
-        void __start_net_to_user();
-        void _write_to_user(ROBuf buf);
-        static void _write_to_user_callback(bool should_run, int status, ROBuf* buf, void* data);
-
-
-    public:
-        ServerToNetConnection(ClientConnectionProxy* p, uv_loop_t* loop, ConnectionId id, 
-                              const std::string& addr, uint16_t port);
-
-        ServerToNetConnection(const ServerToNetConnection&) = delete;
-        ServerToNetConnection(ServerToNetConnection&& a) = delete;
-        ServerToNetConnection& operator=(const ServerToNetConnection&) = delete;
-        ServerToNetConnection& operator=(ServerToNetConnection&&) = delete;
-
-        void PushData(ROBuf buf);
-        void close();
-
-        ~ServerToNetConnection();
-}; //}
-
-
-/**
  * @class ClientConnectionProxy Multiplexing a single ssl/tls connection to multiple tcp connection */
 class ClientConnectionProxy: public EventEmitter //{
 {
@@ -218,8 +163,6 @@ class ClientConnectionProxy: public EventEmitter //{
 
         size_t m_user_to_net_buffer = 0;
         size_t m_net_to_user_buffer = 0;
-
-        std::map<UVC::UVCBaseServer*, void*> m_callbacks;
 
         ROBuf m_remains;
 
@@ -272,10 +215,64 @@ class ClientConnectionProxy: public EventEmitter //{
 
         int write(uint8_t id, ROBuf buf, WriteCallback cb, void* data);
 
-        void  callback_insert(UVC::UVCBaseServer* ptr, void* obj);
-        void* callback_remove(UVC::UVCBaseServer* ptr);
-
         inline size_t getConnectionNumbers() {return this->m_map.size();}
+}; //}
+
+
+/**
+ * @class ServerToNetConnection Proxy a single tcp connection. When new packet arrives, relay the packet to client */
+class ServerToNetConnection: public EventEmitter //{
+{
+    public:
+        using data_callback = void (*)(ServerToNetConnection* con, uint8_t id, ROBuf buf);
+
+    protected:
+        using WriteCallback = void (*)(bool should_run, int status, ROBuf* buf, void* data);
+
+    private:
+        uv_loop_t* mp_loop;
+
+        uv_tcp_t* mp_tcp;
+        bool m_net_tcp_start_read;
+
+        bool m_inform_client_stop_read = false;
+
+        ClientConnectionProxy* mp_proxy;
+        Server* mp_server;
+        ConnectionId m_id;
+
+        size_t m_net_to_user_buffer;
+        size_t m_user_to_net_buffer;
+
+        std::string m_addr;
+        uint16_t m_port;
+
+        void __connect();
+        static void tcp2net_getaddrinfo_callback(uv_getaddrinfo_t* req, int status, struct addrinfo* res);
+        void __connect_with_sockaddr(sockaddr* addr);
+        static void tcp2net_connect_callback(uv_connect_t* req, int status);
+        static void tcp2net_alloc_callback  (uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
+        static void tcp2net_read_callback   (uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
+        static void tcp2net_write_callback  (uv_write_t* req, int status); // write buffer to net_tpc_connection
+
+        void __start_net_to_user();
+        void _write_to_user(ROBuf buf);
+        static void _write_to_user_callback(bool should_run, int status, ROBuf* buf, void* data);
+
+
+    public:
+        ServerToNetConnection(Server* server, ClientConnectionProxy* proxy, uv_loop_t* loop, 
+                              ConnectionId id, const std::string& addr, uint16_t port);
+
+        ServerToNetConnection(const ServerToNetConnection&) = delete;
+        ServerToNetConnection(ServerToNetConnection&& a) = delete;
+        ServerToNetConnection& operator=(const ServerToNetConnection&) = delete;
+        ServerToNetConnection& operator=(ServerToNetConnection&&) = delete;
+
+        void PushData(ROBuf buf);
+        void close();
+
+        ~ServerToNetConnection();
 }; //}
 
 }

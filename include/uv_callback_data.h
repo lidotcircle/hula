@@ -59,17 +59,15 @@ struct KProxyClient$Server$uv_listen: public UVCBaseClient {
 struct RelayConnection$connect$uv_getaddrinfo: public UVCBaseClient {
     bool is_uv;
     KProxyClient::RelayConnection* _this;
-    KProxyClient::Socks5Auth* _socks5;
     inline RelayConnection$connect$uv_getaddrinfo(KProxyClient::Server* server, bool is_uv, 
-            KProxyClient::RelayConnection* _this, 
-            KProxyClient::Socks5Auth* socks5): UVCBaseClient(server), is_uv(is_uv), _this(_this), _socks5(socks5){}
+            KProxyClient::RelayConnection* _this): 
+        UVCBaseClient(server), is_uv(is_uv), _this(_this){}
 };
 
 struct RelayConnection$__connect_to$uv_tcp_connect: public UVCBaseClient {
     KProxyClient::RelayConnection* _this;
-    KProxyClient::Socks5Auth* _socks5;
-    inline RelayConnection$__connect_to$uv_tcp_connect(KProxyClient::Server* server, KProxyClient::RelayConnection* _this, 
-            KProxyClient::Socks5Auth* socks5): UVCBaseClient(server), _this(_this), _socks5(socks5){}
+    inline RelayConnection$__connect_to$uv_tcp_connect(KProxyClient::Server* server, KProxyClient::RelayConnection* _this): 
+        UVCBaseClient(server), _this(_this){}
 };
 
 struct RelayConnection$xxxx_read_cb$uv_write: public UVCBaseClient {
@@ -137,9 +135,8 @@ struct ClientConnection$write_to_client_callback$uv_write: public UVCBaseClient 
 namespace UVC {
     
 struct UVCBaseServer: public UVC::Base {
-    bool should_run;
-    KProxyServer::ClientConnectionProxy* _proxy;
-    inline UVCBaseServer(KProxyServer::ClientConnectionProxy* _server): should_run(true), Base(), _proxy(_server){}
+    KProxyServer::Server* _server;
+    inline UVCBaseServer(KProxyServer::Server* _server): Base(), _server(_server){}
 };
 
 struct ServerToNetConnection$__connect$uv_getaddrinfo: public UVC::UVCBaseServer {
@@ -147,7 +144,7 @@ struct ServerToNetConnection$__connect$uv_getaddrinfo: public UVC::UVCBaseServer
     uint16_t _port;
     bool _clean;
 
-    inline ServerToNetConnection$__connect$uv_getaddrinfo(KProxyServer::ClientConnectionProxy* _server,
+    inline ServerToNetConnection$__connect$uv_getaddrinfo(KProxyServer::Server* _server,
             KProxyServer::ServerToNetConnection* _this, uint16_t port, bool clean): 
         UVCBaseServer(_server), _this(_this), _port(port), _clean(clean){}
 };
@@ -155,8 +152,8 @@ struct ServerToNetConnection$__connect$uv_getaddrinfo: public UVC::UVCBaseServer
 struct ServerToNetConnection$__connect_with_sockaddr$uv_tcp_connect: public UVCBaseServer {
     KProxyServer::ServerToNetConnection* _this;
     inline ServerToNetConnection$__connect_with_sockaddr$uv_tcp_connect(
-            KProxyServer::ClientConnectionProxy* proxy,
-            KProxyServer::ServerToNetConnection* _this): UVCBaseServer(proxy), _this(_this){}
+            KProxyServer::Server* server,
+            KProxyServer::ServerToNetConnection* _this): UVCBaseServer(server), _this(_this){}
 };
 
 struct ClientConnectionProxy$_write$uv_write: public UVCBaseServer {
@@ -167,10 +164,11 @@ struct ClientConnectionProxy$_write$uv_write: public UVCBaseServer {
     uv_buf_t* _uv_buf;
 
     ClientConnectionProxy$_write$uv_write(
+            KProxyServer::Server* server, 
             KProxyServer::ClientConnectionProxy* proxy, 
             KProxyServer::ClientConnectionProxy::WriteCallback cb,
             void* data, ROBuf* mem_holder, uv_buf_t* uv_buf): 
-        UVCBaseServer(proxy), _this(proxy), _cb(cb), 
+        UVCBaseServer(server), _this(proxy), _cb(cb), 
         _data(data), _mem_holder(mem_holder), _uv_buf(uv_buf) {}
 };
 
@@ -178,16 +176,16 @@ struct ServerToNetConnection$PushData$uv_write: public UVCBaseServer {
     KProxyServer::ServerToNetConnection* _this;
     ROBuf* _robuf;
     uv_buf_t* _uv_buf;
-    inline ServerToNetConnection$PushData$uv_write(KProxyServer::ClientConnectionProxy* _proxy,
+    inline ServerToNetConnection$PushData$uv_write(KProxyServer::Server* server,
            KProxyServer::ServerToNetConnection* _this, ROBuf* _robuf, uv_buf_t* uv_buf):
-       UVCBaseServer(_proxy), _this(_this), _robuf(_robuf), _uv_buf(uv_buf) {} 
+       UVCBaseServer(server), _this(_this), _robuf(_robuf), _uv_buf(uv_buf) {} 
 };
 
 struct ServerToNetConnection$_write_to_user$write: public UVCBaseServer {
     KProxyServer::ServerToNetConnection* _this;
-    inline ServerToNetConnection$_write_to_user$write(KProxyServer::ClientConnectionProxy* _proxy,
+    inline ServerToNetConnection$_write_to_user$write(KProxyServer::Server* _server,
            KProxyServer::ServerToNetConnection* _this):
-       UVCBaseServer(_proxy), _this(_this){} 
+       UVCBaseServer(_server), _this(_this){} 
 };
 
 } //}

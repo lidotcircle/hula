@@ -16,14 +16,12 @@
 #define CONNECTION_MAX_BUFFER_SIZE (2 * 1024 * 1024) // 2M
 
 template<typename T>
-static void delete_closed_handle(uv_handle_t* h) {
-    delete static_cast<T>(static_cast<void*>(h));
-}
+static void delete_closed_handle(uv_handle_t* h) {delete static_cast<T>(static_cast<void*>(h));}
 
 namespace KProxyServer {
 
 /**                     class Server                  *///{
-
+/** constructor of Server*/
 Server::Server(uv_loop_t* loop, const std::string& config_file): //{
     bind_addr(0),
     bind_port(1080),
@@ -39,6 +37,13 @@ Server::Server(uv_loop_t* loop, const std::string& config_file): //{
     uv_handle_set_data((uv_handle_t*)this->mp_uv_tcp, this);
 } //}
 
+/** functions related with listen */
+int Server::listen() //{ 
+{
+    __logger->debug("call %s", FUNCNAME);
+    this->mp_config->loadFromFile(Server::on_config_load, this);
+    return 0;
+} //}
 void Server::on_config_load(int error, void* data) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -73,6 +78,7 @@ int Server::__listen() //{
     return 0;
 } //}
 
+/** delete ClientConnectionProxy object */
 void Server::remove_proxy(ClientConnectionProxy* p) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -81,13 +87,7 @@ void Server::remove_proxy(ClientConnectionProxy* p) //{
     delete p;
 } //}
 
-int Server::listen() //{ 
-{
-    __logger->debug("call %s", FUNCNAME);
-    this->mp_config->loadFromFile(Server::on_config_load, this);
-    return 0;
-} //}
-
+/** close this object */
 void Server::close() //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -143,11 +143,13 @@ void Server::dispatch_new_connection(uv_tcp_t* connection) //{
 //}
 
 /**                     class ClientConnectionProxy                  *///{
-/** constructor */
+/** constructor of ClientConnectionProxy */
 ClientConnectionProxy::ClientConnectionProxy(Server* server, uv_tcp_t* connection): m_remains() //{
 {
     __logger->debug("call %s", FUNCNAME);
     this->mp_server = server;
+    this->mp_server->register_object(this);
+
     this->mp_connection = connection;
     this->mp_loop = uv_handle_get_loop((uv_handle_t*)this->mp_connection);
 
@@ -159,6 +161,10 @@ ClientConnectionProxy::ClientConnectionProxy(Server* server, uv_tcp_t* connectio
     this->server_tsl_handshake();
 } //}
 
+/** [static] As name suggested
+ * malloc_cb(): callback for allocating memory to uv_read
+ * user_read_cb(): callback when client tcp connection read
+ * user_stream_write_cb(): callback to uv_write() in @ClientConnectionProxy::_write() */
 void ClientConnectionProxy::malloc_cb(uv_handle_t* h, size_t suggested_size, uv_buf_t* out) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -185,13 +191,14 @@ void ClientConnectionProxy::user_stream_write_cb(uv_write_t* req,  int status) /
     __logger->debug("call %s", FUNCNAME);
     UVC::ClientConnectionProxy$_write$uv_write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<UVC::UVCBaseServer*>(uv_req_get_data((uv_req_t*)req)));
-    msg->_this->callback_remove(msg);
+    auto server = msg->_server;
+    auto pp = server->callback_remove(msg);
     auto cb = msg->_cb;
     auto data = msg->_data;
     auto _this = msg->_this;
     auto uv_buf = msg->_uv_buf;
     auto robuf = msg->_mem_holder;
-    bool should_run = msg->should_run;
+    bool should_run = (pp != nullptr);
     delete msg;
     delete uv_buf;
     delete req;
@@ -212,6 +219,7 @@ void ClientConnectionProxy::user_stream_write_cb(uv_write_t* req,  int status) /
     return;
 } //}
 
+/** dispatch data read from user tcp connection base on current state */
 void ClientConnectionProxy::dispatch_new_encrypted_data(ROBuf buf) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -323,7 +331,7 @@ void ClientConnectionProxy::dispatch_packet_data(ROBuf buf) //{
     }
 } //}
 
-/*
+/* dispatch data base on opcode in packet
  * the request has format like |    address:port   | 
  *                             |      buf.size()   | */
 void ClientConnectionProxy::dispatch_new(uint8_t id, ROBuf buf) //{
@@ -332,10 +340,6 @@ void ClientConnectionProxy::dispatch_new(uint8_t id, ROBuf buf) //{
     assert(id < 1 << 6);
     if(this->m_map.find(id) != this->m_map.end()) {
         logger->warn("ClientConnectionProxy::dispatch_new(): bad connection id");
-        std::cout << (int)id << std::endl;
-        for(auto& x: this->m_map)
-            std::cout << (int)x.first << " ";
-        std::cout << std::endl;
         this->close();
         return;
     }
@@ -355,7 +359,7 @@ void ClientConnectionProxy::dispatch_new(uint8_t id, ROBuf buf) //{
     addr[buf.size() - 2] = '\0';
 
     this->m_wait_connect.insert(id);
-    auto newcon = new ServerToNetConnection(this, this->mp_loop, id, std::string(addr), port);
+    auto newcon = new ServerToNetConnection(this->mp_server, this, this->mp_loop, id, std::string(addr), port);
     this->m_map[id] = newcon;
 
     free(addr);
@@ -383,6 +387,7 @@ void ClientConnectionProxy::dispatch_close(uint8_t id, ROBuf buf) //{
     s->close();
 } //}
 
+/** tsl handshake routine */
 void ClientConnectionProxy::server_tsl_handshake() //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -395,6 +400,7 @@ void ClientConnectionProxy::server_tsl_handshake() //{
     this->m_connection_read = true;
     this->user_authenticate(); // TODO
 } //}
+/** user authentication routine  */
 void ClientConnectionProxy::user_authenticate() //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -408,6 +414,7 @@ void ClientConnectionProxy::start_relay() //{
     return;
 } //}
 
+/** wrapper of uv_write() */
 int ClientConnectionProxy::_write(ROBuf buf, WriteCallback cb, void* data) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -420,14 +427,15 @@ int ClientConnectionProxy::_write(ROBuf buf, WriteCallback cb, void* data) //{
     ROBuf* mem_holder = new ROBuf(buf);
 
     uv_write_t* req = new uv_write_t();
-    auto ptr = new UVC::ClientConnectionProxy$_write$uv_write(this, cb, data, mem_holder, uv_buf);
+    auto ptr = new UVC::ClientConnectionProxy$_write$uv_write(this->mp_server, this, cb, data, mem_holder, uv_buf);
     uv_req_set_data((uv_req_t*)req, ptr);
-    this->callback_insert(ptr, this);
+    this->mp_server->callback_insert(ptr, this);
 
     this->m_net_to_user_buffer += buf.size();
     return uv_write(req, (uv_stream_t*)this->mp_connection, uv_buf, 1, ClientConnectionProxy::user_stream_write_cb);
 } //}
 
+/** send a packet to close a connection */
 int ClientConnectionProxy::close_connection(uint8_t id) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -439,6 +447,7 @@ int ClientConnectionProxy::close_connection(uint8_t id) //{
     this->m_map.erase(this->m_map.find(id));
     return ret;
 } //}
+/** send a packet to inform state of new connection, accept new connection */
 int ClientConnectionProxy::accept_connection(uint8_t id) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -448,6 +457,7 @@ int ClientConnectionProxy::accept_connection(uint8_t id) //{
     auto b = encode_packet(PACKET_OPCODE::PACKET_OP_CONNECT, id, ROBuf(&reason, 1));
     return this->_write(b, nullptr, nullptr);
 } //}
+/** send a packet to inform state of new connection, reject new connection by #reason */
 int ClientConnectionProxy::reject_connection(uint8_t id, NEW_CONNECTION_REPLY reason) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -457,6 +467,7 @@ int ClientConnectionProxy::reject_connection(uint8_t id, NEW_CONNECTION_REPLY re
     return this->_write(b, nullptr, nullptr);
 } //}
 
+/** delete a conneciton */
 void ClientConnectionProxy::remove_connection(uint8_t id, ServerToNetConnection* con) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -464,27 +475,16 @@ void ClientConnectionProxy::remove_connection(uint8_t id, ServerToNetConnection*
     assert(this->m_map[id] == con);
     this->m_map.erase(this->m_map.find(id));
     delete con;
-
-    for(auto& x: this->m_callbacks) {
-        if(x.second == con)
-            x.second = nullptr;
-    }
 } //}
 
-static void __close(void* data) {static_cast<ClientConnectionProxy*>(data)->close();}
-static int close_ticks = 0;
-#define PER_INFO_BY_CLOSE_TICK 1000
+/** close this object */
 void ClientConnectionProxy::close() //{
 {
-    if((close_ticks++ % PER_INFO_BY_CLOSE_TICK) == 0)
-        __logger->debug("call %s", FUNCNAME);
-
+    assert(this->m_state != __State::CLOSED);
+    this->m_state = __State::CLOSING;
     auto m = this->m_map;
     for(auto& x: m)
         x.second->close();
-
-    for(auto& x: this->m_callbacks)
-        x.first->should_run =false;
 
     if(this->mp_connection) {
         if(this->m_connection_read)
@@ -494,43 +494,30 @@ void ClientConnectionProxy::close() //{
         this->mp_connection = nullptr;
     }
 
-    if(this->m_callbacks.size() != 0)
-        UVU::setTimeout(this->mp_loop, 500, __close, this);
-    else
-        this->mp_server->remove_proxy(this);
-    return;
+    this->mp_server->callback_remove_owner(this);
+    this->m_state = __State::CLOSED;
+    this->mp_server->remove_proxy(this);
 } //}
 
+/** wrapper of _write() */
 int ClientConnectionProxy::write(uint8_t id, ROBuf buf, WriteCallback cb, void* data) //{
 {
     __logger->debug("call %s", FUNCNAME);
     auto m = encode_packet(PACKET_OPCODE::PACKET_OP_REG, id, buf);
     return this->_write(m, cb, data);
 } //}
-
-void ClientConnectionProxy::callback_insert(UVC::UVCBaseServer* ptr, void* obj) //{
-{
-    __logger->debug("call %s", FUNCNAME);
-    assert(this->m_callbacks.find(ptr) == this->m_callbacks.end());
-    this->m_callbacks[ptr] = obj;
-} //}
-void* ClientConnectionProxy::callback_remove(UVC::UVCBaseServer* ptr) //{
-{
-    __logger->debug("call %s", FUNCNAME);
-    assert(this->m_callbacks.find(ptr) != this->m_callbacks.end());
-    auto ret = this->m_callbacks[ptr];
-    this->m_callbacks.erase(this->m_callbacks.find(ptr));
-    return ret;
-} //}
-
 //}
 
-/**                     class ServerToNetConnection            */ //{
-ServerToNetConnection::ServerToNetConnection(ClientConnectionProxy* p, uv_loop_t* loop, ConnectionId id, 
-                              const std::string& addr, uint16_t port) //{
+/**                     class ServerToNetConnection              */ //{
+ServerToNetConnection::ServerToNetConnection(Server* server, ClientConnectionProxy* proxy, 
+                                             uv_loop_t* loop, ConnectionId id, 
+                                             const std::string& addr, uint16_t port) //{
 {
     __logger->debug("call %s: [%s:%d]", FUNCNAME, addr.c_str(), port);
-    this->mp_proxy = p;
+    this->mp_server = server;
+    this->mp_server->register_object(this);
+
+    this->mp_proxy = proxy;
     this->m_id = id;
 
     this->mp_loop = loop;
@@ -548,6 +535,7 @@ ServerToNetConnection::ServerToNetConnection(ClientConnectionProxy* p, uv_loop_t
     this->__connect();
 } //}
 
+/** connect to server throught internet */
 void ServerToNetConnection::__connect() //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -566,9 +554,9 @@ void ServerToNetConnection::__connect() //{
         info.ai_addr = (sockaddr*)&addr;
 
         uv_getaddrinfo_t req;
-        auto ptr = new UVC::ServerToNetConnection$__connect$uv_getaddrinfo(this->mp_proxy, this, this->m_port, false);
+        auto ptr = new UVC::ServerToNetConnection$__connect$uv_getaddrinfo(this->mp_server, this, this->m_port, false);
         uv_req_set_data((uv_req_t*)&req, ptr);
-        this->mp_proxy->callback_insert(ptr, this);
+        this->mp_server->callback_insert(ptr, this);
 
         ServerToNetConnection::tcp2net_getaddrinfo_callback(&req, 0, &info);
     } else {
@@ -579,15 +567,16 @@ void ServerToNetConnection::__connect() //{
         hints.ai_flags = 0;
 
         uv_getaddrinfo_t* p_req = new uv_getaddrinfo_t();
-        auto ptr = new UVC::ServerToNetConnection$__connect$uv_getaddrinfo(this->mp_proxy, this, this->m_port, true);
+        auto ptr = new UVC::ServerToNetConnection$__connect$uv_getaddrinfo(this->mp_server, this, this->m_port, true);
         uv_req_set_data((uv_req_t*)p_req, ptr);
-        this->mp_proxy->callback_insert(ptr, this);
+        this->mp_server->callback_insert(ptr, this);
 
         uv_getaddrinfo(this->mp_loop, p_req, 
                 ServerToNetConnection::tcp2net_getaddrinfo_callback,
                 this->m_addr.c_str(), "80", &hints);
     }
 } //}
+/** [static] callback for uv_getaddrinfo() in @__connect() */
 void ServerToNetConnection::tcp2net_getaddrinfo_callback(uv_getaddrinfo_t* req, int status, struct addrinfo* res) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -598,14 +587,14 @@ void ServerToNetConnection::tcp2net_getaddrinfo_callback(uv_getaddrinfo_t* req, 
         dynamic_cast<decltype(msg)>(static_cast<UVC::UVCBaseServer*>(uv_req_get_data((uv_req_t*)req)));
     assert(msg);
 
-    ClientConnectionProxy* _proxy = msg->_proxy;
+    Server* _server = msg->_server;
+    auto pp = _server->callback_remove(msg);
     ServerToNetConnection* _this = msg->_this;
     uint16_t port = msg->_port;
     bool clean = msg->_clean;
-    bool should_run = msg->should_run;
+    bool should_run = (pp != nullptr);
     delete msg;
     if(clean) delete req;
-    auto pp = _proxy->callback_remove(msg);
     if(pp == nullptr) should_run = false;
 
     if(!should_run) {
@@ -641,6 +630,7 @@ void ServerToNetConnection::tcp2net_getaddrinfo_callback(uv_getaddrinfo_t* req, 
     if(clean) uv_freeaddrinfo(res);
 } //}
 
+/** connect to server with #addr */
 void ServerToNetConnection::__connect_with_sockaddr(sockaddr* addr) //{
 {
     __logger->debug("call %s: [address=%s, port=%d]", FUNCNAME, 
@@ -649,12 +639,13 @@ void ServerToNetConnection::__connect_with_sockaddr(sockaddr* addr) //{
     assert(this->mp_tcp != nullptr);
 
     uv_connect_t* req = new uv_connect_t();
-    auto ptr = new UVC::ServerToNetConnection$__connect_with_sockaddr$uv_tcp_connect(this->mp_proxy, this);
-    this->mp_proxy->callback_insert(ptr, this);
+    auto ptr = new UVC::ServerToNetConnection$__connect_with_sockaddr$uv_tcp_connect(this->mp_server, this);
+    this->mp_server->callback_insert(ptr, this);
     uv_req_set_data((uv_req_t*) req, ptr);
 
     uv_tcp_connect(req, this->mp_tcp, addr, ServerToNetConnection::tcp2net_connect_callback);
 } //}
+/** [static] callback for uv_tcp_connect() in @__connect_with_sockaddr() */
 void ServerToNetConnection::tcp2net_connect_callback(uv_connect_t* req, int status) //{ static
 {
     __logger->debug("call %s", FUNCNAME);
@@ -662,9 +653,9 @@ void ServerToNetConnection::tcp2net_connect_callback(uv_connect_t* req, int stat
         dynamic_cast<decltype(msg)>(static_cast<UVC::UVCBaseServer*>(uv_req_get_data((uv_req_t*)req)));
 
     ServerToNetConnection* _this = msg->_this;
-    ClientConnectionProxy* _proxy = msg->_proxy;
-    bool should_run = msg->should_run;
-    auto pp =_proxy->callback_remove(msg);
+    Server* _server = msg->_server;
+    auto pp = _server->callback_remove(msg);
+    bool should_run = (pp != nullptr);
     if(pp == nullptr) should_run = false;
     delete msg;
     delete req;
@@ -680,6 +671,7 @@ void ServerToNetConnection::tcp2net_connect_callback(uv_connect_t* req, int stat
     _this->__start_net_to_user();
 } //}
 
+/** [static] As name suggested */
 void ServerToNetConnection::tcp2net_alloc_callback(uv_handle_t* req, size_t suggested_size, uv_buf_t* buf) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -704,6 +696,7 @@ void ServerToNetConnection::tcp2net_read_callback(uv_stream_t* stream, ssize_t n
     return;
 } //}
 
+/** start relay from net to user */
 void ServerToNetConnection::__start_net_to_user() //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -714,13 +707,14 @@ void ServerToNetConnection::__start_net_to_user() //{
     this->m_net_tcp_start_read = true;
 } //}
 
+/** write data to user by pack as a packet */
 void ServerToNetConnection::_write_to_user(ROBuf buf) //{
 {
     __logger->debug("call %s", FUNCNAME);
     assert(this->mp_tcp != nullptr);
     this->m_net_to_user_buffer += buf.size();
-    auto ptr = new UVC::ServerToNetConnection$_write_to_user$write(this->mp_proxy, this);
-    this->mp_proxy->callback_insert(ptr, this);
+    auto ptr = new UVC::ServerToNetConnection$_write_to_user$write(this->mp_server, this);
+    this->mp_server->callback_insert(ptr, this);
     this->mp_proxy->write(this->m_id, buf, ServerToNetConnection::_write_to_user_callback, ptr);
 
     if(this->m_net_to_user_buffer > PROXY_MAX_BUFFER_SIZE) {
@@ -728,6 +722,7 @@ void ServerToNetConnection::_write_to_user(ROBuf buf) //{
         this->m_net_tcp_start_read = false;
     }
 } //}
+/** [static] callback for ClientConnecitonProxy::write() in @_write_to_user() */
 void ServerToNetConnection::_write_to_user_callback(bool should_run, int status, ROBuf* buf, void* data) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -737,15 +732,15 @@ void ServerToNetConnection::_write_to_user_callback(bool should_run, int status,
     UVC::ServerToNetConnection$_write_to_user$write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<UVC::UVCBaseServer*>(data));
     assert(msg);
-    auto proxy = msg->_proxy;
+    auto server = msg->_server;
+    auto pp = server->callback_remove(msg);
     auto _this = msg->_this;
     delete msg;
 
-    auto pp = proxy->callback_remove(msg);
     if(pp == nullptr) should_run = false;
-    assert(pp == _this);
 
     if(!should_run) return;
+    assert(pp == _this);
 
     _this->m_net_to_user_buffer -= buf_size;
 
@@ -758,6 +753,7 @@ void ServerToNetConnection::_write_to_user_callback(bool should_run, int status,
         _this->__start_net_to_user();
 } //}
 
+/** push data from user to net */
 void ServerToNetConnection::PushData(ROBuf buf) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -766,8 +762,8 @@ void ServerToNetConnection::PushData(ROBuf buf) //{
     bufx->base = buf.__base();
     bufx->len = buf.size();
     uv_write_t* req = new uv_write_t();
-    auto ptr = new UVC::ServerToNetConnection$PushData$uv_write(this->mp_proxy, this, new ROBuf(buf), bufx);
-    this->mp_proxy->callback_insert(ptr, this);
+    auto ptr = new UVC::ServerToNetConnection$PushData$uv_write(this->mp_server, this, new ROBuf(buf), bufx);
+    this->mp_server->callback_insert(ptr, this);
     uv_req_set_data((uv_req_t*)req, ptr);
 
     uv_write(req, (uv_stream_t*)this->mp_tcp, bufx, 1, ServerToNetConnection::tcp2net_write_callback);
@@ -778,6 +774,7 @@ void ServerToNetConnection::PushData(ROBuf buf) //{
         return;
     }
 } //}
+/** [static] callback for uv_write() in @PushData() */
 void ServerToNetConnection::tcp2net_write_callback(uv_write_t* req, int status) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -786,15 +783,15 @@ void ServerToNetConnection::tcp2net_write_callback(uv_write_t* req, int status) 
     auto _this = msg->_this;
     auto rbuf = msg->_robuf;
     auto uv_buf = msg->_uv_buf;
-    auto proxy = msg->_proxy;
-    bool should_run = msg->should_run;
+    auto server = msg->_server;
+    auto pp = server->callback_remove(msg);
+    bool should_run = (pp != nullptr);
     size_t buf_size = uv_buf->len;
     delete msg;
     delete req;
     delete uv_buf;
     delete rbuf;
 
-    auto pp = proxy->callback_remove(msg);
     if(pp == nullptr) should_run = false;
 
     if(!should_run) return;
@@ -813,6 +810,7 @@ void ServerToNetConnection::tcp2net_write_callback(uv_write_t* req, int status) 
     }
 } //}
 
+/** close this object */
 void ServerToNetConnection::close() //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -822,6 +820,7 @@ void ServerToNetConnection::close() //{
         uv_close((uv_handle_t*)this->mp_tcp, delete_closed_handle<decltype(this->mp_tcp)>);
         this->mp_tcp = nullptr;
     }
+    this->mp_server->callback_remove_owner(this);
     this->mp_proxy->remove_connection(this->m_id, this);
 } //}
 

@@ -107,13 +107,6 @@ class Socks5Auth: public EventEmitter //{
  * @class Server a socks5 proxy server */
 class Server: public EventEmitter, public ObjectManager //{
 {
-    /*
-    public:
-        using M_CB = void (*)(Server*, ConnectionProxy*, 
-                              uint8_t id, const std::string& addr, 
-                              uint16_t port, Socks5Auth* socks5, uint8_t socks5_reply);
-                              */
-
     private:
         bool exit__ = false;
         bool run___ = false;
@@ -136,18 +129,6 @@ class Server: public EventEmitter, public ObjectManager //{
     private:
         /** handler of connection event */
         static void on_connection(uv_stream_t* stream, int status);
-
-        /** this callback function is used to close Socks5Auth handle, 
-         *  build a connection the endpoint is specified by @addr:@port and 
-         *  transfer connection to relay service. 
-         *  1. when (@con == nullptr), which means to make a connection to @addr:@port
-         *     and then call the @self_ref->__send_reply(uint8_t) with status
-         *  2. when (@con != nullptr && status < 0) means dispose Socks5Auth object and relay object
-         *  3. when (@con != nullptr && status > 0) means dispose object and transfer connection to relay 
-        static void on_authentication(int status, Socks5Auth* self_ref, 
-                const std::string& addr, uint16_t port, 
-                uv_tcp_t* con, void* data);
-                */
 
         static void on_config_load(int error, void* data);
         int __listen();
@@ -182,6 +163,7 @@ class Server: public EventEmitter, public ObjectManager //{
         void socks5BuildConnection(Socks5Auth* socks5, const std::string& addr, uint16_t port);
         void socks5Transfer(Socks5Auth* socks5, uv_tcp_t* client_tcp);
         void socks5Reject(Socks5Auth* socks5, uv_tcp_t* client_tcp);
+        void socks5Remove(Socks5Auth* socks5);
 
         ~Server();
 
@@ -356,9 +338,8 @@ class ConnectionProxy: public EventEmitter //{
         /** remove a ClientConnection object, and release the id associated with the object
          * @param {uint8_t id} this id should exists, otherwise assert(false);
          * @param {ClientConnection* obj} pointer to the object
-         * @param {bool remove} whether delete the object, which may be clean by other function. CAREFUL
          */
-        void remove_connection(uint8_t id, ClientConnection* obj, bool remove);
+        void remove_connection(uint8_t id, ClientConnection* obj);
 
         /** connect to KProxyServer::Server endpoint
          * @param {ConnectCallback cb} when connecting is end either success or fail, #cb will be called with 
@@ -399,6 +380,7 @@ class RelayConnection: public EventEmitter //{
         size_t m_out_buffer;
 
         Server* m_kserver;
+        Socks5Auth* mp_socks5;
         bool m_error;
 
         static void getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct addrinfo* res);
@@ -410,15 +392,17 @@ class RelayConnection: public EventEmitter //{
         static void server_write_cb(uv_write_t* req, int status);
         static void client_write_cb(uv_write_t* req, int status);
 
-        void __connect_to(const sockaddr* addr, Socks5Auth* socks5);
+        void __connect_to(const sockaddr* addr);
         void __start_relay();
 
         void __relay_client_to_server();
         void __relay_server_to_client();
 
     public:
-        RelayConnection(Server* kserver, uv_loop_t* loop, uv_tcp_t* tcp_client, const std::string& server, uint16_t port);
-        void connect(Socks5Auth* socks5);
+        RelayConnection(Server* kserver, uv_loop_t* loop, 
+                        Socks5Auth* socks5, uv_tcp_t* tcp_client, 
+                        const std::string& server, uint16_t port);
+        void connect();
         void run(uv_tcp_t* client_tcp);
         void close();
 

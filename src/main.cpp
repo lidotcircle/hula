@@ -32,6 +32,8 @@ int main() //{
     uv_loop_init(&loop);
 
     signal(SIGINT,  interrupt_handle);
+    struct sigaction mm = {SIG_IGN};
+    sigaction(SIGPIPE, &mm, nullptr);
 
     KProxyServer::Server server(&loop, "../tests/server_config.json");
     server.listen();
