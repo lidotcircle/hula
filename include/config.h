@@ -12,8 +12,8 @@
  #define __logger Logger::logger
 
 #if defined(_WIN32) || defined(_WIN64)
-#define FUNCNAME __PRETTY_FUNCTION__
-#else
 #define FUNCNAME __func__
+#else
+#define FUNCNAME __PRETTY_FUNCTION__
 #endif // defined(_WIN32) || defined(_WIN64)
 
