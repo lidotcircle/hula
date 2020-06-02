@@ -421,9 +421,11 @@ void Server::socks5Reject(Socks5Auth* socks5, uv_tcp_t* client_tcp) //{
         RelayConnection*  cr = dynamic_cast<RelayConnection*>(std::get<1>(mm));
         if(std::get<0>(mm)) { // bypass
             assert(cr || cc == nullptr);
+            cr->SetSocks5NULL();
             cr->close();
         } else { // proxy
             assert(cc || cr == nullptr);
+            cc->SetSocks5NULL();
             cc->close(false);
         }
         this->try_close();
@@ -491,13 +493,14 @@ int Server::__listen() //{
 void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
 {
     __logger->debug("call %s", FUNCNAME);
-//    this->dispatch_bypass(addr, port, socks5);
-    this->dispatch_proxy(addr, port, socks5);
+    this->dispatch_bypass(addr, port, socks5);
+//    this->dispatch_proxy(addr, port, socks5);
 } //}
 void Server::dispatch_bypass(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
 {
     __logger->debug("call %s", FUNCNAME);
     RelayConnection* relay = new RelayConnection(this, this->mp_uv_loop, socks5, nullptr, addr, port);
+    this->m_relay.insert(relay);
     this->m_auths[socks5] = std::make_tuple(true, relay);
     relay->connect();
 } //}
@@ -537,7 +540,6 @@ void Server::redispatch(uv_tcp_t* client_tcp, Socks5Auth* socks5) //{
     RelayConnection*  cr = dynamic_cast<RelayConnection*> (std::get<1>(ff->second));
     if(std::get<0>(ff->second)) {
         assert(cr);
-        this->m_relay.insert(cr);
         cr->run(client_tcp);
     } else {
         assert(cc);
@@ -784,6 +786,7 @@ void ClientConnection::run(uv_tcp_t* client_tcp) //{
     assert(this->m_state == CONNECTING);
     this->m_state = RUNNING;
 
+    assert(this->m_socks5 != nullptr);
     this->m_socks5 = nullptr;
     this->mp_tcp_client = client_tcp;
     uv_handle_set_data((uv_handle_t*)this->mp_tcp_client, this);
@@ -1570,7 +1573,7 @@ RelayConnection::RelayConnection(Server* kserver, uv_loop_t* loop,
                                  Socks5Auth* socks5, uv_tcp_t* tcp_client, 
                                  const std::string& server, uint16_t port) //{
 {
-    __logger->debug("call %s: relay connection to %s:%d", FUNCNAME, server.c_str(), k_ntohs(port));
+    __logger->debug("call %s: relay connection to %s:%d", FUNCNAME, server.c_str(), port);
     assert(tcp_client == nullptr);
     this->m_kserver = kserver;
     this->m_kserver->register_object(this);
@@ -1588,7 +1591,7 @@ RelayConnection::RelayConnection(Server* kserver, uv_loop_t* loop,
     this->m_server = server;
     this->m_port = port;
 
-    this->m_error = false;
+    this->m_exited = false;
 
     this->m_client_start_read = false;
     this->m_server_start_read = false;
@@ -1675,7 +1678,7 @@ void RelayConnection::getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct a
         return _this->mp_socks5->send_reply(SOCKS5_REPLY_ADDRESSS_TYPE_NOT_SUPPORTED);
     }
     m = (struct sockaddr_in*)a->ai_addr; // FIXME
-    m->sin_port = _this->m_port;
+    m->sin_port = k_htons(_this->m_port);
     _this->__connect_to((sockaddr*)m);
     if(clean) uv_freeaddrinfo(res);
 } //}
@@ -1688,42 +1691,43 @@ void RelayConnection::run(uv_tcp_t* client_tcp) //{
     this->mp_socks5 = nullptr;
     this->mp_tcp_client = client_tcp;
     uv_handle_set_data((uv_handle_t*)this->mp_tcp_client, this);
-    if(this->mp_tcp_server != nullptr)
-        this->__start_relay();
-    else
-        this->close();
+    assert(this->mp_tcp_server != nullptr);
+    this->__start_relay();
 } //}
 
 /** close this object */
 void RelayConnection::close() //{
 {
     __logger->debug("call %s = (this=0x%lx)", FUNCNAME, (long)this);
-    this->m_error = true;
-    if(this->m_server_start_read) {
-        uv_read_stop((uv_stream_t*)this->mp_tcp_server);
-        this->m_server_start_read = false;
-    }
+    assert(this->m_exited == false);
+    this->m_exited = true;
 
     if(this->mp_socks5 != nullptr) {
+        this->m_kserver->socks5Remove(this->mp_socks5);
         this->mp_socks5->close();
         this->mp_socks5 = nullptr;
     }
 
+    if(this->m_server_start_read) {
+        uv_read_stop((uv_stream_t*)this->mp_tcp_server);
+        this->m_server_start_read = false;
+    }
     if(this->m_client_start_read) {
         uv_read_stop((uv_stream_t*)this->mp_tcp_client);
         this->m_client_start_read = false;
     }
 
-    __logger->debug("0x%lx -- buf1: %d, buf2: %d", (long)this, this->m_in_buffer, this->m_out_buffer);
-    if(this->m_in_buffer == 0 && this->m_out_buffer == 0) {
-        if(this->mp_tcp_server != nullptr) {
-            uv_close((uv_handle_t*)this->mp_tcp_server, delete_closed_handle<decltype(this->mp_tcp_server)>);
-            this->mp_tcp_server = nullptr;
-        }
+    if(this->mp_tcp_server != nullptr) {
+        uv_close((uv_handle_t*)this->mp_tcp_server, delete_closed_handle<decltype(this->mp_tcp_server)>);
+        this->mp_tcp_server = nullptr;
+    }
+    if(this->mp_tcp_client != nullptr) {
         uv_close((uv_handle_t*)this->mp_tcp_client, delete_closed_handle<decltype(this->mp_tcp_client)>);
         this->mp_tcp_client = nullptr;
-        return this->m_kserver->remove_relay(this);
     }
+
+    this->m_kserver->callback_remove_owner(this);
+    return this->m_kserver->remove_relay(this);
 } //}
 
 /** this function will call uv_tcp_connect() try to connect with #addr */
@@ -1759,7 +1763,7 @@ void RelayConnection::connect_server_cb(uv_connect_t* req, int status) //{
     if(!should_run) return;
     assert(pp == _this);
 
-    if(status != 0) {
+    if(status < 0) {
         __logger->debug("%s: fail", FUNCNAME);
         uv_close((uv_handle_t*) _this->mp_tcp_server, delete_closed_handle<decltype(_this->mp_tcp_server)>);
         _this->mp_tcp_server = nullptr;
@@ -1805,7 +1809,7 @@ void RelayConnection::client_read_cb(uv_stream_t* stream, ssize_t nread, const u
         free(buf->base);
         return;
     }
-    RelayConnection* _this = (RelayConnection*)uv_handle_get_data((uv_handle_t*)stream);
+    RelayConnection* _this = static_cast<decltype(_this)>(uv_handle_get_data((uv_handle_t*)stream));
     if(nread < 0) {
         _this->close();
         free(buf->base);
@@ -1833,7 +1837,7 @@ void RelayConnection::server_read_cb(uv_stream_t* stream, ssize_t nread, const u
         free(buf->base);
         return;
     }
-    RelayConnection* _this = (RelayConnection*)uv_handle_get_data((uv_handle_t*)stream);
+    RelayConnection* _this = static_cast<decltype(_this)>(uv_handle_get_data((uv_handle_t*)stream));
     if(nread < 0) {
         _this->close();
         free(buf->base);
@@ -1868,15 +1872,15 @@ void RelayConnection::server_write_cb(uv_write_t* req, int status) //{
     delete x;
     delete req;
 
-    _this->m_out_buffer -= buf->len;
     free(buf->base);
+    int buf_size = buf->len;
     delete buf;
 
     if(!should_run) return;
     assert(pp == _this);
+    _this->m_out_buffer -= buf_size;
 
-    if(status != 0 || _this->m_error) {
-        _this->m_error = true;
+    if(status != 0) {
         _this->close();
         return;
     }
@@ -1896,15 +1900,15 @@ void RelayConnection::client_write_cb(uv_write_t* req, int status) //{
     delete x;
     delete req;
 
-    _this->m_in_buffer -= buf->len;
     free(buf->base);
+    int buf_size = buf->len;
     delete buf;
 
     if(!should_run) return;
     assert(pp == _this);
+    _this->m_in_buffer -= buf_size;
 
-    if(status != 0 || _this->m_error) {
-        _this->m_error = true;
+    if(status != 0) {
         _this->close();
         return;
     }

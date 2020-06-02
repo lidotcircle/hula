@@ -230,6 +230,8 @@ class ClientConnection: public EventEmitter //{
         void reject();
         void accept();
 
+        inline void SetSocks5NULL() {assert(this->m_socks5 != nullptr); this->m_socks5 = nullptr;}
+
         inline bool IsRun() {return this->m_state == __State::RUNNING;}
 }; //}
 
@@ -381,7 +383,7 @@ class RelayConnection: public EventEmitter //{
 
         Server* m_kserver;
         Socks5Auth* mp_socks5;
-        bool m_error;
+        bool m_exited;
 
         static void getaddrinfo_cb(uv_getaddrinfo_t* req, int status, struct addrinfo* res);
         static void connect_server_cb(uv_connect_t* req, int status);
@@ -405,6 +407,7 @@ class RelayConnection: public EventEmitter //{
         void connect();
         void run(uv_tcp_t* client_tcp);
         void close();
+        inline void SetSocks5NULL() {assert(this->mp_socks5 != nullptr); this->mp_socks5 = nullptr;}
 
         ~RelayConnection();
 }; //}
