@@ -16,6 +16,8 @@ X509* mem2cert(void* m, size_t len);
 RSA*  mem2rsa (void* m, size_t len);;
 
 
+uint64_t k_htonll(uint64_t);
+uint64_t k_ntohll(uint64_t);
 uint32_t k_htonl(uint32_t);
 uint32_t k_ntohl(uint32_t);
 uint16_t k_htons(uint16_t);
