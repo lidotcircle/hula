@@ -16,12 +16,28 @@ X509* mem2cert(void* m, size_t len);
 RSA*  mem2rsa (void* m, size_t len);;
 
 
-uint64_t k_htonll(uint64_t);
-uint64_t k_ntohll(uint64_t);
 uint32_t k_htonl(uint32_t);
 uint32_t k_ntohl(uint32_t);
 uint16_t k_htons(uint16_t);
 uint16_t k_ntohs(uint16_t);
+
+template<typename T>
+T changeByteOrder(T integer) //{
+{
+    static_assert(std::is_integral<T>(), "need integer type");
+    uint8_t *a, *b;
+    for(int i=0; i<(sizeof(T) / 2); i++) {
+        a = static_cast<uint8_t*>(static_cast<void*>(static_cast<char*>(static_cast<void*>(&integer)) + i));
+        b = static_cast<uint8_t*>(static_cast<void*>(static_cast<char*>(static_cast<void*>(&integer)) + sizeof(T) - i - 1));
+        uint8_t t = *a;
+        *a = *b;
+        *b = t;
+    }
+    return integer;
+} //}
+
+constexpr auto k_htonll = changeByteOrder<uint64_t>;
+constexpr auto k_ntohll = changeByteOrder<uint64_t>;
 
 char* ip4_to_str(uint32_t ip4);
 bool str_to_ip4(const char*, uint32_t* out);

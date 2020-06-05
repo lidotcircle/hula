@@ -25,7 +25,7 @@ ROBuf::ROBuf(size_t size): len(size), offset(0) //{
 ROBuf::ROBuf(const ROBuf& origin, size_t len, int offset) //{
 {
     this->offset = offset + origin.offset;
-    assert(this->offset > 0);
+    assert(this->offset >= 0);
     this->len = len;
     this->shared = origin.shared;
     this->ref();
@@ -136,13 +136,13 @@ std::ostream& operator<<(std::ostream& o, const ROBuf& b) //{
     size_t i;
     uint8_t m, n;
     const char* base = b.base();
-    o << '\'';
+    o << std::string(1, '\'');
     for(i=0; i<b.size(); i++) {
-        m = (base[i] & 0xF0);
-        n = (base[i] & 0x0F) >> 4;
-        o << __hex_code[m] << __hex_code[n];
+        m = (base[i] & 0xF0) >> 4;
+        n = (base[i] & 0x0F);
+        o << std::string("\\x") << std::string(1, __hex_code[m]) << std::string(1, __hex_code[n]);
     }
-    o << '\'';
+    o << std::string(1, '\'');
     return o;
 } //}
 

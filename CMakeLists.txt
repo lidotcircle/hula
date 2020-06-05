@@ -23,6 +23,8 @@ set(kproxy_lib_src
     lib/socks5.cpp
     lib/libuv_utils.cpp
     lib/object_manager.cpp
+    lib/websocket.cpp
+    lib/websocket_libuv.cpp
     )
 
 include_directories("${CMAKE_CURRENT_LIST_DIR}/include")
