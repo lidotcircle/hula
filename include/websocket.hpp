@@ -12,6 +12,7 @@
 #include "robuf.h"
 #include "kpacket.h"
 #include "utils.h"
+#include "tcpabstraction.h"
 
 #define __MIN2(x, y) (x < y ? x : y)
 #define __MAX2(x, y) (x > y ? x : y)
@@ -72,22 +73,6 @@ struct WSHeaderPartial { // FIXME ??? bit order is reversed
         uint8_t second_byte;
     };
 });
-
-template<typename O>
-class TCPAbstractConnection //{
-{
-    public:
-        /** #status<0 means error */
-        using WriteCallback = void (*)(O* obj, ROBuf buf, int status);
-        using ReadCallback = void(*)(O* obj, ROBuf buf, int status);
-
-    protected:
-        virtual void _write(ROBuf buf, WriteCallback cb) = 0;
-
-        virtual void read_callback(ROBuf buf, int status) = 0;
-
-        inline virtual ~TCPAbstractConnection() {};
-}; //}
 
 // WS Event ARGS //{
 class WebSocketCommon;

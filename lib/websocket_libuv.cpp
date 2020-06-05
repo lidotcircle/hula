@@ -1,12 +1,6 @@
 #include "../include/websocket_libuv.h"
 #include "../include/libuv_utils.h"
 
-static void uv_malloc_cb(uv_handle_t*, size_t suggested_size, uv_buf_t* buf) //{
-{
-    buf->base = (char*)malloc(suggested_size);
-    buf->len  = suggested_size;
-} //}
-
 
 //             << class UVWebsocketCommon >>           //{
 UVWebsocketCommon::UVWebsocketCommon(uv_tcp_t* tcp_connection, bool masked, bool save_fragment):
@@ -17,7 +11,6 @@ UVWebsocketCommon::UVWebsocketCommon(uv_tcp_t* tcp_connection, bool masked, bool
 } //}
 void UVWebsocketCommon::start_read() //{
 {
-    std::cout << "start read" << std::endl;
     assert(this->m_connection != nullptr);
     uv_read_start((uv_stream_t*)this->m_connection, uv_malloc_cb, UVWebsocketCommon::uv_read_callback);
 } //}
@@ -27,7 +20,6 @@ void UVWebsocketCommon::uv_read_callback(uv_stream_t* stream, ssize_t nread, con
     UVWebsocketCommon* _this = static_cast<decltype(_this)>(uv_handle_get_data((uv_handle_t*) stream));
     bool is_client = (dynamic_cast<UVWebsocketClient*>(_this) != nullptr);
     ROBuf rbuf(buf->base, nread, 0, free);
-    std::cout << "read callback called...." << (is_client ? "client" : "server") << std::endl;
     if(nread <= 0) {
         _this->read_callback(rbuf, -1);
         return;
