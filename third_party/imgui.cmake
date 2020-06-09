@@ -5,6 +5,8 @@ set(GL3W_DIR "${CMAKE_CURRENT_LIST_DIR}/imgui/examples/libs/gl3w")
 include_directories(${GL3W_DIR})
 file(GLOB GL3W_SRC "${GL3W_DIR}/GL/*.c")
 
+include_directories(${CMAKE_CURRENT_LIST_DIR}/imgui)
+
 file(GLOB IMGUI_SRC "${CMAKE_CURRENT_LIST_DIR}/imgui/*.cpp")
 set(IMGUI_IMPL_SRC 
     ${CMAKE_CURRENT_LIST_DIR}/imgui/examples/imgui_impl_glfw.cpp

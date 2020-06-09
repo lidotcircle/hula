@@ -27,14 +27,14 @@ void UVWebsocketCommon::uv_read_callback(uv_stream_t* stream, ssize_t nread, con
     _this->read_callback(rbuf, 0);
     return;
 } //}
-void UVWebsocketCommon::_write(ROBuf buf, WriteCallback cb) //{
+void UVWebsocketCommon::_write(ROBuf buf, WriteCallback cb, void* data) //{
 {
     uv_write_t* req = new uv_write_t();
     uv_buf_t* uv_buf = new uv_buf_t();
     uv_buf->base = buf.__base();
     uv_buf->len = buf.size();
     ROBuf* memory_holder = new ROBuf(buf);
-    auto ptr = new __write_state(this, memory_holder, uv_buf, cb);
+    auto ptr = new __write_state(this, memory_holder, uv_buf, cb, data);
     this->insert_callback(ptr);
     uv_req_set_data((uv_req_t*)req, ptr);
     uv_write(req, (uv_stream_t*)this->m_connection, uv_buf, 1, UVWebsocketCommon::uv_write_callback);
@@ -50,13 +50,18 @@ void UVWebsocketCommon::uv_write_callback(uv_write_t* req, int status) //{
     ROBuf buf(*state->_holder);
     delete state->_holder;
     UVWebsocketCommon* _this = state->_this;
+    void* data = state->_data;
     delete state;
     if(!should_run) {
-        cb(nullptr, buf, status);
+        cb(nullptr, buf, status, data);
         return;
     }
     _this->remove_callback(state);
-    cb(_this, buf, status);
+    cb(_this, buf, status, data);
+} //}
+void UVWebsocketCommon::stop_read() //{
+{
+    uv_read_stop((uv_stream_t*)this->m_connection);
 } //}
 uv_tcp_t* UVWebsocketCommon::transfer() //{
 {

@@ -194,13 +194,13 @@ WebSocketCommon::WebSocketCommon(bool masked, bool save_fragment) //{
 int WebSocketCommon::write_wrapper(ROBuf buf) //{
 {
     this->m_write_buffer_size += buf.size();
-    this->_write(buf, write_callback);
+    this->_write(buf, write_callback, nullptr);
     if(this->m_write_buffer_size > WS_MAX_WRITE_BUFFER_SIZE)
         return (this->m_write_buffer_size - WS_MAX_WRITE_BUFFER_SIZE);
     else
         return 0;
 } //}
-void WebSocketCommon::write_callback(WebSocketCommon* obj, ROBuf buf, int status) //{
+void WebSocketCommon::write_callback(WebSocketCommon* obj, ROBuf buf, int status, void* data) //{
 {
     if(obj == nullptr) return;
     obj->m_write_buffer_size -= buf.size();

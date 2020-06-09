@@ -186,7 +186,7 @@ class WebSocketCommon: public EventEmitter, public TCPAbstractConnection<WebSock
         static ROBuf formFrameHeader(bool fin, WebsocketOPCode opcode, bool mask, ROBuf message,
                                      bool rsv1 = false, bool rsv2 = false, bool rsv3 = false);
 
-        static void write_callback(WebSocketCommon* obj, ROBuf buf, int status);
+        static void write_callback(WebSocketCommon* obj, ROBuf buf, int status, void* data);
         int  write_wrapper(ROBuf buf);
 
     protected:

@@ -25,6 +25,8 @@ set(kproxy_lib_src
     lib/object_manager.cpp
     lib/websocket.cpp
     lib/websocket_libuv.cpp
+    lib/tcpabstraction.cpp
+    lib/http.cpp
     )
 
 include_directories("${CMAKE_CURRENT_LIST_DIR}/include")
@@ -48,15 +50,20 @@ add_subdirectory(./third_party/libuv)
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 add_subdirectory(./third_party/json)
 
+include(${CMAKE_CURRENT_LIST_DIR}/third_party/http-parser.cmake)
+# include(${CMAKE_CURRENT_LIST_DIR}/third_party/imgui.cmake)
+
 # library #{
 add_library(${kproxy_lib} STATIC ${kproxy_lib_src})
 
 add_dependencies(${kproxy_lib} uv_a)
 add_dependencies(${kproxy_lib} nlohmann_json)
+add_dependencies(${kproxy_lib} ${HTTP_PARSER_LIB})
 target_link_libraries(${kproxy_lib} uv_a)
 target_link_libraries(${kproxy_lib} nlohmann_json)
 target_link_libraries(${kproxy_lib} ${OPENSSL_CRYPTO_LIBRARY})
 target_link_libraries(${kproxy_lib} ${OPENSSL_SSL_LIBRARY})
+target_link_libraries(${kproxy_lib} ${HTTP_PARSER_LIB})
 #}
 
 # server #{

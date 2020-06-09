@@ -19,3 +19,27 @@ class ObjectManager {
         inline size_t CallbackLength() {return this->m_callbacks.size();}
 };
 
+class CallbackManager;
+class CallbackPointer {
+    private:
+        bool can_run;
+        friend class CallbackManager;
+
+    public:
+        inline CallbackPointer(): can_run(true) {}
+        inline virtual ~CallbackPointer() {};
+        inline bool CanRun() {return this->can_run;}
+};
+
+class CallbackManager {
+    private:
+        std::set<CallbackPointer*> m_list;
+        bool m_invalidate;
+        
+    public:
+        CallbackManager();
+        void add_callback(CallbackPointer* ptr);
+        void remove_callback(CallbackPointer* ptr);
+        void invalidate_callbacks();
+};
+
