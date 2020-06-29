@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #include "../include/utils.h"
+#include "./utils_hideuv.h"
 
 /** global logger */
 Logger::Logger* logger = new Logger::Logger("kproxy", "./kproxy.log", true);
@@ -131,4 +132,6 @@ uint16_t k_ntohs(uint16_t v) //{
         return v;
     }
 } //}
+
+int ip4_addr(const char* ip, int port, struct sockaddr_in* addr) {return __ip4_addr(ip, port, addr);}
 

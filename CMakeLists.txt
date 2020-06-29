@@ -14,7 +14,6 @@ set(kproxy_lib kpx)
 set(kproxy_lib_src 
     lib/kpacket.cpp
     lib/kclient.cpp
-    lib/kserver.cpp
     lib/logger.cpp
     lib/readonly_buf.cpp
     lib/utils.cpp
@@ -27,6 +26,12 @@ set(kproxy_lib_src
     lib/websocket_libuv.cpp
     lib/tcpabstraction.cpp
     lib/http.cpp
+
+    lib/kserver.cpp
+    lib/kserver_libuv.cpp
+    lib/kserver_server.cpp
+    lib/kserver_server2net.cpp
+    lib/kserver_multiplexing.cpp
     )
 
 include_directories("${CMAKE_CURRENT_LIST_DIR}/include")

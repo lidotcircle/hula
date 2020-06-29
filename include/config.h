@@ -10,6 +10,8 @@
 
 #define MAX_LISTEN 500
 
+#define SINGLE_PROXY_MAX_CONNECTION (1 << 6)
+
 #include "logger.h"
 // #define __logger logger
  #define __logger Logger::logger

@@ -40,5 +40,6 @@ constexpr auto k_htonll = changeByteOrder<uint64_t>;
 constexpr auto k_ntohll = changeByteOrder<uint64_t>;
 
 char* ip4_to_str(uint32_t ip4);
-bool str_to_ip4(const char*, uint32_t* out);
+bool  str_to_ip4(const char*, uint32_t* out);
+int   ip4_addr(const char* ip, int port, struct sockaddr_in* addr);
 
