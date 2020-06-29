@@ -49,11 +49,17 @@ void Http::start_request() //{
     this->stop_read();
     assert(this->m_current_request == nullptr);
     assert(this->m_state == HttpState::MESSAGE_COMPLETE);
+    assert(this->m_upgrade == false);
+    if(this->m_parser.http_major != 1 || this->m_parser.http_minor != 1) {
+        this->emit("error", new HttpArg::ErrorArgs("expect HTTP/1.1"));
+        return;
+    }
     this->m_current_request = new HttpRequest(this, this->m_default_response_header, 
             std::move(this->m_request_header),
             std::move(this->m_method),
             std::move(this->m_url),
             std::move(this->m_req_data));
+    this->m_upgrade = (this->m_parser.upgrade == 1);
     if(this->m_upgrade) {
         this->emit("upgrade", new HttpArg::RequestArgs(this->m_current_request));
     } else {
@@ -71,7 +77,7 @@ int Http::http_on_message_begin(http_parser* parser) //{
 {
     __logger->debug("call %s", FUNCNAME);
     Http* _this = static_cast<decltype(_this)>(parser->data);
-    assert(_this->m_state == HttpState::FINISH_PREV);
+    assert(_this->m_state == HttpState::FINISH_PREV || _this->m_state == HttpState::MESSAGE_COMPLETE);
     _this->m_state = HttpState::MESSAGE_BEGIN;
     return 0;
 } //}
@@ -88,7 +94,6 @@ int Http::http_on_url(http_parser* parser, const char* data, size_t len) //{
     std::string str(data, data + len);
     _this->m_url = str;
     _this->m_method = http_method_str((enum http_method)parser->method);
-    if(parser->upgrade) _this->m_upgrade = true;
     return 0;
 } //}
 int Http::http_on_status(http_parser* parser, const char* data, size_t len) //{
@@ -202,6 +207,7 @@ HttpRequest::HttpRequest(Http* http, const std::unordered_map<std::string, std::
 {
     this->m_status = 0;
     this->m_chunk = false;
+    this->m_end = false;
     for(auto& hh: default_header) this->setHeader(hh.first, hh.second);
 } //}
 
@@ -247,12 +253,16 @@ void HttpRequest::writeHeader() //{
     char* fff = (char*)malloc(str.str().size());
     std::memcpy(fff, str.str().c_str(), str.str().size());
     ROBuf buf(fff, str.str().size(), 0, free);
+    auto chunk = this->m_chunk;
+    this->m_chunk = false;
     this->write(buf, nullptr);
+    this->m_chunk = chunk;
 } //}
 int  HttpRequest::write(ROBuf buf, WriteCallback cb) //{
 {
+    assert(this->m_end == false);
     assert(buf.size() > 0);
-    if(this->m_writeHeader == false)
+    if(!this->m_writeHeader)
         this->writeHeader();
     if(this->m_chunk) {
         char size_str[20];
@@ -295,6 +305,8 @@ void HttpRequest::response_write_callback(EventEmitter* obj, ROBuf buf, int stat
 } //}
 void HttpRequest::end() //{
 {
+    assert(this->m_end == false);
+    this->m_end = true;
     if(this->m_writeHeader == false)
         this->writeHeader();
     this->m_http->FinishRequest(this);
@@ -305,3 +317,80 @@ HttpRequest::~HttpRequest() //{
 } //}
 //}
 
+__URL__ parse_url(const std::string& str) //{
+{
+    __URL__ ret;
+    http_parser_url url;
+    http_parser_parse_url(str.c_str(), str.size(), 0, &url);
+    if(url.field_set & (1 << http_parser_url_fields::UF_USERINFO)) {
+        const char* s = str.c_str() + url.field_data[http_parser_url_fields::UF_USERINFO].off;
+        size_t len = url.field_data[http_parser_url_fields::UF_USERINFO].len;
+        ret.m_userinfo = std::string(s, s + len);
+    }
+    if(url.field_set & (1 << http_parser_url_fields::UF_HOST)) {
+        const char* s = str.c_str() + url.field_data[http_parser_url_fields::UF_HOST].off;
+        size_t len = url.field_data[http_parser_url_fields::UF_HOST].len;
+        ret.m_host = std::string(s, s + len);
+    }
+    if(url.field_set & (1 << http_parser_url_fields::UF_PORT)) {
+        const char* s = str.c_str() + url.field_data[http_parser_url_fields::UF_PORT].off;
+        size_t len = url.field_data[http_parser_url_fields::UF_PORT].len;
+        ret.m_port = std::string(s, s + len);
+    }
+    if(url.field_set & (1 << http_parser_url_fields::UF_SCHEMA)) {
+        const char* s = str.c_str() + url.field_data[http_parser_url_fields::UF_SCHEMA].off;
+        size_t len = url.field_data[http_parser_url_fields::UF_SCHEMA].len;
+        ret.m_schema = std::string(s, s + len);
+    }
+    if(url.field_set & (1 << http_parser_url_fields::UF_PATH)) {
+        const char* s = str.c_str() + url.field_data[http_parser_url_fields::UF_PATH].off;
+        size_t len = url.field_data[http_parser_url_fields::UF_PATH].len;
+        ret.m_path = std::string(s, s + len);
+    }
+    if(url.field_set & (1 << http_parser_url_fields::UF_QUERY)) {
+        const char* s = str.c_str() + url.field_data[http_parser_url_fields::UF_QUERY].off;
+        size_t len = url.field_data[http_parser_url_fields::UF_QUERY].len;
+        ret.m_query = std::string(s, s + len);
+    }
+    if(url.field_set & (1 << http_parser_url_fields::UF_FRAGMENT)) {
+        const char* s = str.c_str() + url.field_data[http_parser_url_fields::UF_FRAGMENT].off;
+        size_t len = url.field_data[http_parser_url_fields::UF_FRAGMENT].len;
+        ret.m_fragment = std::string(s, s + len);
+    }
+    return ret;
+} //}
+std::string url_encode(const std::string& value) //{
+{
+    std::ostringstream escaped;
+    escaped.fill('0');
+    escaped << std::hex;
+
+    for (std::string::const_iterator i = value.begin(), n = value.end(); i != n; ++i) {
+        std::string::value_type c = (*i);
+
+        // Keep alphanumeric and other accepted characters intact
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+            escaped << c;
+            continue;
+        }
+
+        // Any other characters are percent-encoded
+        escaped << std::uppercase;
+        escaped << '%' << std::setw(2) << int((unsigned char) c);
+        escaped << std::nouppercase;
+    }
+
+    return escaped.str();
+} //}
+std::string url_decode(const std::string& value) //{
+{
+    std::ostringstream buf;
+    bool percent = false;
+    for(int i=0;i<value.size();i++) {
+        if(value[i] == '%') {
+            percent = true;
+            continue;
+        }
+    }
+    return buf.str();
+} //}

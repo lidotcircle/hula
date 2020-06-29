@@ -28,14 +28,36 @@ void test_http_parser() {
     int n = http_parser_execute(&parser, &setting, nnn, strlen(nnn));
 }
 
+void writecb(HttpRequest* req, int status) {
+    if(req == nullptr) return;
+    if(status != 0) {
+        std::cout << "write fail" << std::endl;
+        req->end();
+        return;
+    }
+    return;
+}
 void on_request(EventEmitter* target, const std::string& event, EventArgs::Base* argv) {
     Http* request = dynamic_cast<decltype(request)>(target);
     HttpArg::RequestArgs* reqarg = dynamic_cast<decltype(reqarg)>(argv);
     assert(request);
     assert(reqarg);
     auto req = reqarg->m_request;
-    req->write(ROBuf((char*)"hello", 5), nullptr);
+    req->setChunk();
+    req->write(ROBuf((char*)"hello\n\n", 7), writecb);
+    req->write(ROBuf((char*)"hello\n\n", 7), writecb);
     req->end();
+}
+
+void on_upgrade(EventEmitter* target, const std::string& event, EventArgs::Base* argv) {
+    std::cout << "upgrade" << std::endl;
+    Http* request = dynamic_cast<decltype(request)>(target);
+    HttpArg::RequestArgs* reqarg = dynamic_cast<decltype(reqarg)>(argv);
+    assert(request);
+    assert(reqarg);
+    auto req = reqarg->m_request;
+    req->write(ROBuf((char*)"hello\n\n", 7), writecb);
+    req->write(ROBuf((char*)"hello\n\n", 7), writecb);
 }
 
 int main() {
@@ -45,12 +67,20 @@ int main() {
 //    return 0;
     HttpMemory hhh;
     hhh.on("request", on_request);
-    hhh << "GE" << "T / HTTP/1.1\r\n" << 
+    hhh.on("upgrade", on_upgrade);
+
+    hhh << "GET" << " / HTTP/1.1\r\n" << 
         "H" << "ost:" <<  "www" << ".example.com\r\n" <<
         "Connecti" << "on" << ": Kee" << "p-Alive\r\n" <<
         "Accept-Enco" << "ding" << ":" << " gzip\r\n" <<
         "Content-Length" << ": " << "12\r\n" <<
         "\r\n" <<
         "hello world!";
+
+    hhh << "GET /index.html HTTP/1.1\r\n"
+    "Host: www.example.com\r\n"
+    "Connection: upgrade\r\n"
+    "Upgrade: example/1, foo/2f\r\n" << std::endl;
+
     return 0;
 }

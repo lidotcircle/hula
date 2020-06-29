@@ -104,6 +104,7 @@ UVTCPAbstractConnection::~UVTCPAbstractConnection() //{
 //             << class MemoryTCPAbstractConnection >>           //{
 MemoryTCPAbstractConnection::MemoryTCPAbstractConnection(): m_buffer() //{
 {
+    this->m_start_read = false;
     this->start_read();
 } //}
 void MemoryTCPAbstractConnection::_write(ROBuf buf, WriteCallback cb, void* data) //{

@@ -44,6 +44,7 @@ class HttpRequest: virtual public CallbackManager, public EventEmitter //{
         std::string m_statusText;
 
         bool m_chunk;
+        bool m_end;
 
         bool m_writeHeader;
 
@@ -125,11 +126,12 @@ class Http: virtual public TCPAbstractConnectionEventBase, virtual public EventE
 
         HttpState m_state;
         std::string m_method;
-        bool m_upgrade;
         std::string m_url;
         std::string m_prev_field;
         ROBuf m_req_data;
+
         bool m_chunk;
+        bool m_upgrade;
 
         void read_callback(ROBuf buf, int status);
 
@@ -156,4 +158,15 @@ class Http: virtual public TCPAbstractConnectionEventBase, virtual public EventE
     public:
         Http(const std::unordered_map<std::string, std::string>& default_response_header);
 }; //}
+
+struct __URL__ {
+    std::string m_schema;
+    std::string m_userinfo;
+    std::string m_host;
+    std::string m_port;
+    std::string m_path;
+    std::string m_query;
+    std::string m_fragment;
+};
+__URL__ parse_url(const std::string& str);
 
