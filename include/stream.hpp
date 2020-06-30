@@ -18,11 +18,20 @@ class EBStreamAbstraction: virtual public EventEmitter //{
 
 
     protected:
+        enum CONNECTION_STATE { 
+            UNINITIAL = 0, INITIAL, CONNECTING,
+            CONNECT, GIVEUP, CLOSED,
+            LISTENNING
+        };
+        CONNECTION_STATE m_state;
+
         virtual void _write(ROBuf buf, WriteCallback cb, void* data) = 0;
 
         virtual void read_callback(ROBuf buf, int status) = 0;
         virtual void on_connection(void* connection) = 0;
 
+
+    public:
         virtual bool bind(struct sockaddr* addr) = 0;
         virtual bool listen() = 0;
 
@@ -32,13 +41,6 @@ class EBStreamAbstraction: virtual public EventEmitter //{
         virtual void start_read() = 0;
         virtual bool in_read() = 0;
 
-        enum CONNECTION_STATE { 
-            UNINITIAL = 0, INITIAL, CONNECTING,
-            CONNECT, GIVEUP, CLOSED,
-            LISTENNING
-        };
-        CONNECTION_STATE m_state;
-
         virtual void getaddrinfo (const char* hostname, GetAddrInfoCallback cb, void* data) = 0;
         virtual void freeaddrinfo(struct addrinfo* addr) = 0;
 
@@ -46,7 +48,6 @@ class EBStreamAbstraction: virtual public EventEmitter //{
         virtual void  releaseUnderlyStream(void*) = 0;
         virtual bool  accept(void* listen, void* stream) = 0;
 
-    public:
         inline virtual ~EBStreamAbstraction() {};
 
         virtual void* transfer() = 0;

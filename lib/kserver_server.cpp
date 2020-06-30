@@ -62,7 +62,7 @@ int Server::trylisten() //{
         logger->error("bind error %s:%d", ip4_to_str(network_order_addr), this->bind_port);
         return -1;
     }
-    if(!EBStreamAbstraction::listen()) {
+    if(!this->listen()) {
         logger->error("listen error %s:%d", ip4_to_str(network_order_addr), this->bind_port);
         return -1;
     }

@@ -532,7 +532,7 @@ int ServerConfig::loadFromFile(LoadCallback cb, void* data) //{
     uv_fs_req_cleanup(&req);
     if(fd < 0) {
         this->m_error = "fail to open file";
-        cb(errno, data);
+        if(cb != nullptr) cb(errno, data);
         return -1;
     }
 
@@ -541,7 +541,7 @@ int ServerConfig::loadFromFile(LoadCallback cb, void* data) //{
         this->m_error = "fail to stat config file";
         uv_fs_close(nullptr, &req, fd, nullptr);
         uv_fs_req_cleanup(&req);
-        cb(errno, data);
+        if(cb != nullptr) cb(errno, data);
         return -1;
     }
 
@@ -554,7 +554,16 @@ int ServerConfig::loadFromFile(LoadCallback cb, void* data) //{
     uv_fs_t* read_req = new uv_fs_t();
     uv_req_set_data((uv_req_t*)read_req, 
             new std::tuple<ServerConfig*, uv_file, uv_buf_t*, LoadCallback, void*>(this, fd, buf, cb, data));
-    return uv_fs_read(this->mp_loop, read_req, fd, buf, 1, 0, ServerConfig::read_file_callback);
+    if(cb != nullptr) {
+        return uv_fs_read(this->mp_loop, read_req, fd, buf, 1, 0, ServerConfig::read_file_callback);
+    } else {
+        int ret = uv_fs_read(this->mp_loop, read_req, fd, buf, 1, 0, nullptr);
+        ServerConfig::read_file_callback(read_req);
+        if(this->m_error.size() == 0)
+            return ret;
+        else
+            return -1;
+    }
 } //}
 
 // static

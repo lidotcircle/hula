@@ -85,6 +85,7 @@
 NS_PROXY_SERVER_START
 
 /* forward declaration */
+class Server;
 class ClientConnectionProxy;
 class ServerToNetConnection;
 

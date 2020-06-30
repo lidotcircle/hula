@@ -12,26 +12,35 @@ set(kproxy_client kproxy)
 
 set(kproxy_lib kpx)
 set(kproxy_lib_src 
-    lib/kpacket.cpp
-    lib/kclient.cpp
-    lib/logger.cpp
-    lib/readonly_buf.cpp
-    lib/utils.cpp
-    lib/events.cpp
-    lib/config_file.cpp
-    lib/socks5.cpp
-    lib/libuv_utils.cpp
-    lib/object_manager.cpp
-    lib/websocket.cpp
-    lib/websocket_libuv.cpp
-    lib/tcpabstraction.cpp
-    lib/http.cpp
-
     lib/kserver.cpp
     lib/kserver_libuv.cpp
     lib/kserver_server.cpp
     lib/kserver_server2net.cpp
     lib/kserver_multiplexing.cpp
+
+    lib/stream_libuv.cpp
+    lib/stream_memory.cpp
+
+    lib/kpacket.cpp
+    lib/kclient.cpp
+
+    lib/logger.cpp
+    lib/readonly_buf.cpp
+
+    lib/utils.cpp
+    lib/utils_hideuv.cpp
+    lib/libuv_utils.cpp
+
+    lib/ObjectFactory.cpp
+
+    lib/events.cpp
+    lib/config_file.cpp
+    lib/socks5.cpp
+    lib/object_manager.cpp
+    lib/tcpabstraction.cpp
+    lib/websocket.cpp
+    lib/websocket_libuv.cpp
+    lib/http.cpp
     )
 
 include_directories("${CMAKE_CURRENT_LIST_DIR}/include")

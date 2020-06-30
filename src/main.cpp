@@ -8,8 +8,10 @@
 
 #include <iostream>
 #include <iomanip>
+#include <memory>
 
 #include "../include/libuv_utils.h"
+#include "../include/kserver_libuv.h"
 
 static bool uv_continue = true;
 static void timer_handle(uv_timer_t* timer) //{
@@ -35,7 +37,9 @@ int main() //{
     struct sigaction mm = {SIG_IGN};
     sigaction(SIGPIPE, &mm, nullptr);
 
-    KProxyServer::Server server(&loop, "../tests/server_config.json");
+    std::shared_ptr<uv_tcp_t> tcp(new uv_tcp_t());
+    uv_tcp_init(&loop, tcp.get());
+    KProxyServer::UVServer server(tcp.get(), std::shared_ptr<ServerConfig>(new ServerConfig(&loop, "../tests/server_config.json")));
     server.listen();
 
     while(uv_continue) {

@@ -188,7 +188,7 @@ void  EBStreamUV::releaseUnderlyStream(void* ptr) //{
     uv_tcp_t* tcp = static_cast<decltype(tcp)>(ptr);
     uv_close((uv_handle_t*)tcp, delete_closed_handle<decltype(tcp)>);
 } //}
-bool  accept(void* listen, void* stream) //{
+bool  EBStreamUV::accept(void* listen, void* stream) //{
 {
     return uv_accept(static_cast<uv_stream_t*>(listen), static_cast<uv_stream_t*>(stream)) < 0 ?
         false :
