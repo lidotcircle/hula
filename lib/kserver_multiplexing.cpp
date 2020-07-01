@@ -222,6 +222,10 @@ void ClientConnectionProxy::read_callback(ROBuf buf, int status) //{
     }
     this->dispatch_new_data(buf);
 } //}
+void ClientConnectionProxy::end_signal() //{
+{
+    this->close();
+} //}
 
 /** send a packet to close a connection */
 int ClientConnectionProxy::close_connection(uint8_t id) //{

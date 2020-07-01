@@ -36,6 +36,7 @@ class ServerToNetConnection: public ToNetAbstraction, public CallbackManager //{
 
     protected:
         void read_callback(ROBuf buf, int status) override;
+        void end_signal() override;
 
 
     public:

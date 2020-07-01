@@ -193,6 +193,10 @@ void ServerToNetConnection::read_callback(ROBuf buf, int status) //{
     else
         this->_write_to_user(buf);
 } //}
+void ServerToNetConnection::end_signal() //{
+{
+    this->close();
+} //}
 
 /** push data from user to net */
 void ServerToNetConnection::PushData(ROBuf buf) //{

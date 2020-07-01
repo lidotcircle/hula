@@ -5,7 +5,7 @@
 #include <uv.h>
 
 
-class EBStreamUV: virtual public EBStreamAbstraction
+class EBStreamUV: virtual public EBStreamAbstraction //{
 {
     private:
         uv_tcp_t* mp_tcp;
@@ -34,6 +34,8 @@ class EBStreamUV: virtual public EBStreamAbstraction
         bool in_read() override;
 
         void getaddrinfo (const char* hostname, GetAddrInfoCallback cb, void* data) override;
+        void getaddrinfoipv4 (const char* hostname, GetAddrInfoIPv4Callback cb, void* data) override;
+        void getaddrinfoipv6 (const char* hostname, GetAddrInfoIPv6Callback cb, void* data) override;
 
         void* newUnderlyStream() override;
         void  releaseUnderlyStream(void*) override;
@@ -42,7 +44,19 @@ class EBStreamUV: virtual public EBStreamAbstraction
         EBStreamUV(uv_tcp_t* tcp);
         ~EBStreamUV();
 
+        void shutdown(ShutdownCallback cb, void* data) override;
+
         void* transfer() override;
         void  regain(void*) override;
-};
+
+        bool  hasStreamObject() override;
+}; //}
+
+
+class EBStreamObjectUV: public EBStreamUV, public EBStreamObject //{
+{
+    public:
+        inline EBStreamObjectUV(uv_tcp_t* connection, size_t max): 
+            EBStreamUV(connection), EBStreamObject(max) {}
+}; //}
 

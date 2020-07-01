@@ -3,6 +3,7 @@
 #include "stream_libuv_cb_data.h"
 
 #include <assert.h>
+#include <string.h>
 
 #define DEFAULT_BACKLOG 100
 
@@ -122,8 +123,9 @@ void EBStreamUV::uv_stream_read_callback(uv_stream_t* stream, ssize_t nread, con
     EBStreamUV* _this = static_cast<decltype(_this)>(uv_handle_get_data((uv_handle_t*)stream));
 
     if(nread <= 0) {
-        _this->read_callback(ROBuf(), -1);
         free(buf->base);
+        if(nread < 0) _this->read_callback(ROBuf(), -1);
+        else          _this->end_signal();
         return;
     }
 
@@ -177,6 +179,81 @@ void EBStreamUV::__freeaddrinfo(struct addrinfo* addr) //{
     uv_freeaddrinfo(addr);
 } //}
 
+/** dns utils */
+static void getaddrinfo_callback_for_getaddrinfoipv4(struct addrinfo* res, void(*__freeaddrinfo)(struct addrinfo*), int status, void* data) //{
+{
+    struct addrinfo *a;
+    struct sockaddr_in* m;
+
+    std::pair<EBStreamAbstraction::GetAddrInfoIPv4Callback, void*>* msg = 
+        static_cast<decltype(msg)>(data);
+    auto _cb   = msg->first;
+    auto _data = msg->second;
+    delete msg;
+
+    if(status < 0) {
+        __freeaddrinfo(res);
+        _cb(0, -1, _data);
+        return;
+    }
+
+    for(a = res; a != nullptr; a = a->ai_next) {
+        if(sizeof(struct sockaddr_in) != a->ai_addrlen) {
+            continue;
+        } else break;
+    }
+    if(a == nullptr) {
+        __freeaddrinfo(res);
+        _cb(0, -1, _data);
+        return;
+    }
+    m = (struct sockaddr_in*)a->ai_addr;
+    uint32_t addr = m->sin_addr.s_addr;
+    __freeaddrinfo(res);
+    _cb(addr, 0, _data);
+} //}
+void EBStreamUV::getaddrinfoipv4 (const char* hostname, GetAddrInfoIPv4Callback cb, void* data) //{
+{
+    this->getaddrinfo(hostname, getaddrinfo_callback_for_getaddrinfoipv4, new std::pair<GetAddrInfoIPv4Callback, void*>(cb, data));
+} //}
+static void getaddrinfo_callback_for_getaddrinfoipv6(struct addrinfo* res, void(*__freeaddrinfo)(struct addrinfo*), int status, void* data) //{
+{
+    struct addrinfo *a;
+    struct sockaddr_in6* m;
+
+    std::pair<EBStreamAbstraction::GetAddrInfoIPv6Callback, void*>* msg = 
+        static_cast<decltype(msg)>(data);
+    auto _cb   = msg->first;
+    auto _data = msg->second;
+    delete msg;
+
+    if(status < 0) {
+        __freeaddrinfo(res);
+        _cb(nullptr, -1, _data);
+        return;
+    }
+
+    for(a = res; a != nullptr; a = a->ai_next) {
+        if(sizeof(struct sockaddr_in6) != a->ai_addrlen) {
+            continue;
+        } else break;
+    }
+    if(a == nullptr) {
+        __freeaddrinfo(res);
+        _cb(0, -1, _data);
+        return;
+    }
+    m = (struct sockaddr_in6*)a->ai_addr;
+    uint8_t addr[16];
+    memcpy(&addr, &m->sin6_addr, sizeof(addr));
+    __freeaddrinfo(res);
+    _cb(addr, 0, _data);
+} //}
+void EBStreamUV::getaddrinfoipv6 (const char* hostname, GetAddrInfoIPv6Callback cb, void* data) //{
+{
+    this->getaddrinfo(hostname, getaddrinfo_callback_for_getaddrinfoipv6, new std::pair<GetAddrInfoIPv6Callback, void*>(cb, data));
+} //}
+
 void* EBStreamUV::newUnderlyStream() //{
 {
     assert(this->mp_tcp != nullptr);
@@ -212,6 +289,35 @@ EBStreamUV::~EBStreamUV() //{
         uv_close((uv_handle_t*)(this->mp_tcp), delete_closed_handle<decltype(this->mp_tcp)>);
         this->mp_tcp = nullptr;
     }
+} //}
+
+struct EBStreamUV$shutdown$uv_shutdown {
+    EBStreamUV::ShutdownCallback _cb;
+    void* _data;
+    inline EBStreamUV$shutdown$uv_shutdown(EBStreamUV::ShutdownCallback cb, void* data): 
+        _cb(cb), _data(data) {}
+};
+static void shutdown_callback(uv_shutdown_t* req, int status) //{
+{
+    EBStreamUV$shutdown$uv_shutdown* msg = 
+        static_cast<decltype(msg)>(uv_req_get_data((uv_req_t*)req));
+    delete req;
+    auto cb = msg->_cb;
+    auto data = msg->_data;
+    delete msg;
+    cb(status, data);
+} //}
+void EBStreamUV::shutdown(ShutdownCallback cb, void* data) //{
+{
+    uv_shutdown_t* req = new uv_shutdown_t();
+    auto ptr = new EBStreamUV$shutdown$uv_shutdown(cb, data);
+    uv_req_set_data((uv_req_t*)req, ptr);
+    uv_shutdown(req, (uv_stream_t*)this->mp_tcp, shutdown_callback);
+} //}
+
+bool  EBStreamUV::hasStreamObject() //{
+{
+    return this->mp_tcp != nullptr;
 } //}
 
 void* EBStreamUV::transfer() //{

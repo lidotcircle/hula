@@ -20,8 +20,14 @@ set(kproxy_lib_src
     lib/stream_libuv.cpp
     lib/stream_memory.cpp
 
-    lib/kpacket.cpp
     lib/kclient.cpp
+    lib/kclient_relay.cpp
+    lib/kclient_server.cpp
+    lib/kclient_socks5.cpp
+    lib/kclient_clientproxy.cpp
+    lib/kclient_multiplexer.cpp
+
+    lib/kpacket.cpp
 
     lib/logger.cpp
     lib/readonly_buf.cpp

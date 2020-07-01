@@ -3,6 +3,7 @@
 #include "events.h"
 #include "robuf.h"
 #include "config.h"
+#include "object_manager.h"
 
 #include <assert.h>
 #define CALL_PURE_VIRTUAL_FUNCTION() assert(false && "call pure virtual function")
@@ -18,7 +19,10 @@ class EBStreamAbstraction: virtual public EventEmitter //{
         using WriteCallback = void (*)(ROBuf buf, int status, void* data);
         using ReadCallback = void(*)(ROBuf buf, int status);
         using GetAddrInfoCallback = void(*)(struct addrinfo* addr, void(*free)(struct addrinfo*), int status, void* data);
+        using GetAddrInfoIPv4Callback = void(*)(uint32_t ipv4, int status, void* data);
+        using GetAddrInfoIPv6Callback = void(*)(uint8_t  ipv6[16], int status, void* data);
         using ConnectCallback = void(*)(int status, void* data);
+        using ShutdownCallback = void(*)(int status, void* data);
 
 
     protected:
@@ -32,6 +36,7 @@ class EBStreamAbstraction: virtual public EventEmitter //{
         virtual void _write(ROBuf buf, WriteCallback cb, void* data) = 0;
 
         inline virtual void read_callback(ROBuf buf, int status) {CALL_PURE_VIRTUAL_FUNCTION();};
+        inline virtual void end_signal() {CALL_PURE_VIRTUAL_FUNCTION();};
         inline virtual void on_connection(void* connection) {CALL_PURE_VIRTUAL_FUNCTION();};
 
 
@@ -46,6 +51,8 @@ class EBStreamAbstraction: virtual public EventEmitter //{
         virtual bool in_read() = 0;
 
         virtual void getaddrinfo (const char* hostname, GetAddrInfoCallback cb, void* data) = 0;
+        virtual void getaddrinfoipv4 (const char* hostname, GetAddrInfoIPv4Callback cb, void* data) = 0;
+        virtual void getaddrinfoipv6 (const char* hostname, GetAddrInfoIPv6Callback cb, void* data) = 0;
 
         virtual void* newUnderlyStream() = 0;
         virtual void  releaseUnderlyStream(void*) = 0;
@@ -53,7 +60,69 @@ class EBStreamAbstraction: virtual public EventEmitter //{
 
         inline virtual ~EBStreamAbstraction() {};
 
+        virtual void shutdown(ShutdownCallback cb, void* data) = 0;
+
         virtual void* transfer() = 0;
         virtual void  regain(void*) = 0;
+
+        virtual bool  hasStreamObject() = 0;
+}; //}
+
+/**
+ * @event drain
+ * @event data
+ * @event connect
+ * @event end
+ * @event error
+ * @event close
+ */
+class EBStreamObject: virtual protected EBStreamAbstraction, protected CallbackManager, virtual public EventEmitter //{
+{
+    public:
+        using WriteCallback       = EBStreamAbstraction::WriteCallback;
+        using ConnectCallback     = EBStreamAbstraction::ConnectCallback;
+        using GetAddrInfoCallback = EBStreamAbstraction::GetAddrInfoCallback;
+        struct DataArgs: public EventArgs::Base {
+            ROBuf _buf;
+            inline DataArgs(ROBuf buf): _buf(buf) {}
+        };
+        struct ErrorArgs: public EventArgs::Base {
+            std::string _msg;
+            inline ErrorArgs(const std::string& err): _msg(err) {}
+        };
+        struct DrainArgs: public EventArgs::Base {};
+        struct CloseArgs: public EventArgs::Base {};
+        struct EndArgs: public EventArgs::Base {};
+        struct ConnectArgs: public EventArgs::Base {};
+
+
+    private:
+        size_t m_max_write_buffer_size;
+        size_t m_writed_size;
+
+        bool m_end;
+        bool m_closed;
+
+        static void write_callback(ROBuf, int status, void* data);
+        static void connect_callback(int status, void* data);
+
+        static void getdns_withipv4_for_connectWith_address(uint32_t addr, int status, void* data);
+
+    protected:
+        void read_callback(ROBuf buf, int status) override;
+        void end_signal() override;
+
+
+    public:
+        EBStreamObject(size_t max_write_buffer_size);
+
+        int  write(ROBuf);
+        int  connectWith_sockaddr(sockaddr*);
+        int  connectWith_address (const std::string& addr, uint16_t port);
+        void getDNS(const std::string& addr, GetAddrInfoCallback cb, void* data);
+        void startRead();
+        void stopRead();
+        void end();
+        void close();
 }; //}
 
