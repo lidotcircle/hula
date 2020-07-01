@@ -4,13 +4,14 @@
 #include "stream.hpp"
 
 #include <memory>
+#include <unordered_set>
 
 NS_PROXY_SERVER_START
 
 class ConnectionProxyAbstraction: virtual public EBStreamAbstraction {
     public:
         virtual void close() = 0;
-        virtual void start() = 0;
+        inline virtual void start() {CALL_PURE_VIRTUAL_FUNCTION();};
 };
 
 /**

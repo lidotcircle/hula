@@ -9,6 +9,7 @@ NS_PROXY_SERVER_START
 class ToNetAbstraction: virtual public EBStreamAbstraction {
     public:
         virtual void close() = 0;
+        virtual void connect_to() = 0;
         virtual void PushData(ROBuf buf) = 0;
 };
 
@@ -29,7 +30,7 @@ class ClientConnectionProxy: public ConnectionProxyAbstraction, private Callback
 
         ROBuf m_remains;
 
-        static void write_to_user_stream_cb(EventEmitter* obj, ROBuf buf, int status, void* data);
+        static void write_to_user_stream_cb(ROBuf buf, int status, void* data);
 
         bool in_authentication;
         void dispatch_new_data(ROBuf buf);
@@ -40,7 +41,7 @@ class ClientConnectionProxy: public ConnectionProxyAbstraction, private Callback
         void dispatch_new  (uint8_t id, ROBuf buf);  // OPCODE PACKET_OP_NEW
         void dispatch_close(uint8_t id, ROBuf buf);  // OPCODE PACKET_OP_CLOSE
 
-        int _write(ROBuf buf, WriteCallback cb, void* data);
+        int __write(ROBuf buf, WriteCallback cb, void* data);
 
 
     protected:
@@ -49,6 +50,7 @@ class ClientConnectionProxy: public ConnectionProxyAbstraction, private Callback
 
     public:
         ClientConnectionProxy(Server* server);
+        void start() override;
 
         ClientConnectionProxy(const ClientConnectionProxy&) = delete;
         ClientConnectionProxy(ClientConnectionProxy&& a) = delete;

@@ -587,7 +587,7 @@ void ServerConfig::read_file_callback(uv_fs_t* req) //{
         _this->m_state = CONFIG_ERROR;
         _this->m_error = "fail to open file";
         Logger::logger->debug("%s", uv_buf->base); // TODO
-        cb(open_status, data);
+        if(cb != nullptr) cb(open_status, data);
 
         free(uv_buf->base);
         delete uv_buf;
@@ -604,7 +604,7 @@ void ServerConfig::read_file_callback(uv_fs_t* req) //{
     } catch (nlohmann::detail::parse_error err) {
         _this->m_error = err.what();
         free(uv_buf->base);
-        cb(1, data);
+        if(cb != nullptr) cb(1, data);
         uv_fs_close(nullptr, req, file_fd, nullptr);
         uv_fs_req_cleanup(req);
         delete req;
@@ -625,7 +625,7 @@ void ServerConfig::read_file_callback(uv_fs_t* req) //{
         return;
     }
     _this->m_state = CONFIG_SYNC;
-    cb(0, data);
+    if(cb != nullptr) cb(0, data);
     return;
 } //}
 

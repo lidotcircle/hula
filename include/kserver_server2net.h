@@ -24,10 +24,10 @@ class ServerToNetConnection: public ToNetAbstraction, public CallbackManager //{
         uint16_t    m_port;
 
         void __connect();
-        static void tcp2net_getaddrinfo_callback(EventEmitter* obj, struct addrinfo* res, int status, void* data);
+        static void tcp2net_getaddrinfo_callback(struct addrinfo* res, void(*freeaddrinfo)(struct addrinfo*), int status, void* data);
         void __connect_with_sockaddr(sockaddr* addr);
-        static void tcp2net_connect_callback(EventEmitter* obj, int status, void* data);
-        static void tcp2net_write_callback  (EventEmitter* _this, ROBuf buf, int status, void* data);
+        static void tcp2net_connect_callback(int status, void* data);
+        static void tcp2net_write_callback  (ROBuf buf, int status, void* data);
 
         void __start_net_to_user();
         void _write_to_user(ROBuf buf);
@@ -49,6 +49,7 @@ class ServerToNetConnection: public ToNetAbstraction, public CallbackManager //{
 
         void PushData(ROBuf buf) override;
         void close() override;
+        void connect_to() override;
 
         ~ServerToNetConnection();
 }; //}

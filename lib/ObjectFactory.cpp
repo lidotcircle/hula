@@ -3,14 +3,14 @@
 
 
 namespace Factory {
-    KProxyServer::Server* createServer(std::shared_ptr<ServerConfig> config) {
-        return nullptr;
+    KProxyServer::Server* createServer(std::shared_ptr<ServerConfig> config, void* connection) {
+        return new KProxyServer::UVServer((uv_tcp_t*)connection, config);
     }
     KProxyServer::ConnectionProxyAbstraction* createConnectionProxy(KProxyServer::Server* server, void* connection) {
-        return nullptr;
+        return new KProxyServer::UVMultiplexing((uv_tcp_t*)connection, server);
     }
-    KProxyServer::ToNetAbstraction* ToNetAbstraction(KProxyServer::ConnectionProxyAbstraction* proxy, void* connection, uint8_t id, const std::string& addr, uint16_t port) {
-        return nullptr;
+    KProxyServer::ToNetAbstraction* createToNet(KProxyServer::ClientConnectionProxy* proxy, void* connection, uint8_t id, const std::string& addr, uint16_t port) {
+        return new KProxyServer::UVToNet((uv_tcp_t*)connection, proxy, id, addr, port);
     }
 };
 

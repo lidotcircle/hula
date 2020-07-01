@@ -53,6 +53,15 @@ void test_server_config(uv_loop_t* loop) //{
     config->loadFromFile(load_cb_server, config);
 } //}
 
+void test_server_config2(uv_loop_t* loop) //{
+{
+    ServerConfig* config = new ServerConfig(loop, "../tests/server_config.json");
+    config->loadFromFile(nullptr, nullptr);
+
+    assert(config->validateUser("admin", "password"));
+    assert(!config->validateUser("xadmin", "password"));
+} //}
+
 int main() //{
 {
     Logger::logger_init_stdout();
@@ -61,6 +70,7 @@ int main() //{
 
     test_client_config(&loop);
     test_server_config(&loop);
+    test_server_config2(&loop);
 
     uv_run(&loop, UV_RUN_DEFAULT);
     uv_loop_close(&loop);

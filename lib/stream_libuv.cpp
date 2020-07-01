@@ -18,6 +18,7 @@ static void delete_closed_handle(uv_handle_t* h) {delete static_cast<T>(static_c
 
 void EBStreamUV::_write(ROBuf buf, WriteCallback cb, void* data) //{
 {
+    assert(cb != nullptr);
     uv_buf_t* uv_buf = new uv_buf_t();
     uv_buf->base = buf.__base();
     uv_buf->len  = buf.size();
@@ -45,7 +46,7 @@ void EBStreamUV::uv_write_callback(uv_write_t* req, int status) //{
     delete uv_buf;
     delete msg;
 
-    cb(_this, buf, status, data);
+    cb(buf, status, data);
 } //}
 
 bool EBStreamUV::bind(struct sockaddr* addr) //{
@@ -99,7 +100,7 @@ void EBStreamUV::uv_connect_callback(uv_connect_t* req, int status) //{
     auto _data = msg->_data;
     delete msg;
 
-    _cb(_this, status, _data);
+    _cb(status, _data);
 } //}
 
 /** wrapper of uv_read_start() and uv_read_stop() */
@@ -126,7 +127,7 @@ void EBStreamUV::uv_stream_read_callback(uv_stream_t* stream, ssize_t nread, con
         return;
     }
 
-    ROBuf rbuf(buf->base, nread, 0);
+    ROBuf rbuf(buf->base, nread, 0, free);
     _this->read_callback(rbuf, 0);
 } //}
 
@@ -167,10 +168,11 @@ void EBStreamUV::uv_getaddrinfo_callback(uv_getaddrinfo_t* req, int status, stru
     auto _data = msg->_data;
     delete msg;
 
-    _cb(_this, res, status, _data);
+    _cb(res, EBStreamUV::__freeaddrinfo, status, _data);
     return;
 } //}
-void EBStreamUV::freeaddrinfo(struct addrinfo* addr) //{
+/** [static] */
+void EBStreamUV::__freeaddrinfo(struct addrinfo* addr) //{
 {
     uv_freeaddrinfo(addr);
 } //}

@@ -9,7 +9,7 @@
         {
             "server_name": "beybey",
             "address": "www.example.com",
-            "port": 8800,
+            "port": 1080,
             "certificate": "fake certificate",
             "cipher": "chacha20",
             "username": "admin",

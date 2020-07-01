@@ -22,8 +22,6 @@ ServerToNetConnection::ServerToNetConnection(ClientConnectionProxy* proxy, Conne
     this->m_user_to_net_buffer = 0;
 
     this->m_net_tcp_start_read = false;
-
-    this->__connect();
 } //}
 
 /** connect to server throught internet */
@@ -47,7 +45,7 @@ void ServerToNetConnection::__connect() //{
         auto ptr = new CBD::ServerToNetConnection$__connect$getaddrinfo(this, false, this->m_port);
         this->add_callback(ptr);
 
-        ServerToNetConnection::tcp2net_getaddrinfo_callback(this, &info, 0, ptr);
+        ServerToNetConnection::tcp2net_getaddrinfo_callback(&info, nullptr, 0, ptr);
     } else {
         auto ptr = new CBD::ServerToNetConnection$__connect$getaddrinfo(this, true, this->m_port);
         this->add_callback(ptr);
@@ -55,8 +53,9 @@ void ServerToNetConnection::__connect() //{
         this->getaddrinfo(this->m_addr.c_str(), ServerToNetConnection::tcp2net_getaddrinfo_callback, ptr);
     }
 } //}
+void ServerToNetConnection::connect_to() {this->__connect();}
 /** [static] callback for uv_getaddrinfo() in @__connect() */
-void ServerToNetConnection::tcp2net_getaddrinfo_callback(EventEmitter* obj, struct addrinfo* res, int status, void* data) //{
+void ServerToNetConnection::tcp2net_getaddrinfo_callback(struct addrinfo* res, void(*freeaddrinfo)(struct addrinfo*), int status, void* data) //{
 {
     __logger->debug("call %s", FUNCNAME);
     struct addrinfo *a;
@@ -72,7 +71,7 @@ void ServerToNetConnection::tcp2net_getaddrinfo_callback(EventEmitter* obj, stru
     delete msg;
 
     if(!run) {
-        if(clean) _this->freeaddrinfo(res);
+        if(clean) freeaddrinfo(res);
         return;
     }
     _this->remove_callback(msg);
@@ -80,7 +79,7 @@ void ServerToNetConnection::tcp2net_getaddrinfo_callback(EventEmitter* obj, stru
     if(status < 0) {
         __logger->warn("%s: get dns fail with %d", FUNCNAME, status);
         _this->mp_proxy->reject_connection(_this->m_id, NEW_CONNECTION_REPLY::GET_DNS_FAIL);
-        if(clean) _this->freeaddrinfo(res);
+        if(clean) freeaddrinfo(res);
         return;
     }
 
@@ -92,7 +91,7 @@ void ServerToNetConnection::tcp2net_getaddrinfo_callback(EventEmitter* obj, stru
     }
     if(a == nullptr) {
         __logger->warn("%s: query dns fail because of without a valid ipv4 address", FUNCNAME);
-        if(clean) _this->freeaddrinfo(res);
+        if(clean) freeaddrinfo(res);
         _this->mp_proxy->reject_connection(_this->m_id, NEW_CONNECTION_REPLY::GET_DNS_FAIL);
         return;
     }
@@ -100,7 +99,7 @@ void ServerToNetConnection::tcp2net_getaddrinfo_callback(EventEmitter* obj, stru
     __logger->info("%s: %s", FUNCNAME, ip4_to_str(m->sin_addr.s_addr));
     m->sin_port = k_htons(port);
     _this->__connect_with_sockaddr((sockaddr*)m);
-    if(clean) _this->freeaddrinfo(res);
+    if(clean) freeaddrinfo(res);
 } //}
 
 /** connect to server with #addr */
@@ -110,22 +109,22 @@ void ServerToNetConnection::__connect_with_sockaddr(sockaddr* addr) //{
             ip4_to_str(((sockaddr_in*)addr)->sin_addr.s_addr), 
             k_ntohs(((sockaddr_in*)addr)->sin_port));
 
-    auto ptr = new CBD::ServerToNetConnection$__connect_with_sockaddr$connect();
+    auto ptr = new CBD::ServerToNetConnection$__connect_with_sockaddr$connect(this);
     this->add_callback(ptr);
     this->connect(addr, ServerToNetConnection::tcp2net_connect_callback, ptr);
 } //}
 /** [static] callback for uv_tcp_connect() in @__connect_with_sockaddr() */
-void ServerToNetConnection::tcp2net_connect_callback(EventEmitter* obj, int status, void* data) //{ static
+void ServerToNetConnection::tcp2net_connect_callback(int status, void* data) //{ static
 {
     __logger->debug("call %s", FUNCNAME);
     CBD::ServerToNetConnection$__connect_with_sockaddr$connect* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CBD::SBase*>(data));
 
     bool run = msg->CanRun();
+    ServerToNetConnection* _this = msg->_this;
     delete msg;
     if(!run) return;
 
-    ServerToNetConnection* _this = dynamic_cast<ServerToNetConnection*>(obj);
     assert(_this);
     _this->remove_callback(msg);
 
@@ -200,7 +199,7 @@ void ServerToNetConnection::PushData(ROBuf buf) //{
 {
     __logger->debug("call %s", FUNCNAME);
     this->m_user_to_net_buffer += buf.size();
-    auto ptr = new CBD::ServerToNetConnection$PushData$write();
+    auto ptr = new CBD::ServerToNetConnection$PushData$write(this);
     this->add_callback(ptr);
 
     this->_write(buf, ServerToNetConnection::tcp2net_write_callback, ptr);
@@ -212,13 +211,13 @@ void ServerToNetConnection::PushData(ROBuf buf) //{
     }
 } //}
 /** [static] callback for _write() in @PushData() */
-void ServerToNetConnection::tcp2net_write_callback(EventEmitter* obj, ROBuf buf, int status, void* data) //{
+void ServerToNetConnection::tcp2net_write_callback(ROBuf buf, int status, void* data) //{
 {
     __logger->debug("call %s", FUNCNAME);
     CBD::ServerToNetConnection$PushData$write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CBD::SBase*>(data));
     assert(msg);
-    ServerToNetConnection* _this = dynamic_cast<decltype(_this)>(obj);
+    ServerToNetConnection* _this = msg->_this;
     bool run = msg->CanRun();
     delete msg;
 

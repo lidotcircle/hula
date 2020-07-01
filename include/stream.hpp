@@ -2,6 +2,10 @@
 
 #include "events.h"
 #include "robuf.h"
+#include "config.h"
+
+#include <assert.h>
+#define CALL_PURE_VIRTUAL_FUNCTION() assert(false && "call pure virtual function")
 
 /* forward declaration */
 struct addrinfo;
@@ -11,10 +15,10 @@ class EBStreamAbstraction: virtual public EventEmitter //{
 {
     public:
         /** #status < 0 means error */
-        using WriteCallback = void (*)(EventEmitter* obj, ROBuf buf, int status, void* data);
-        using ReadCallback = void(*)(EventEmitter* obj, ROBuf buf, int status);
-        using GetAddrInfoCallback = void(*)(EventEmitter* obj, struct addrinfo* addr, int status, void* data);
-        using ConnectCallback = void(*)(EventEmitter* obj, int status, void* data);
+        using WriteCallback = void (*)(ROBuf buf, int status, void* data);
+        using ReadCallback = void(*)(ROBuf buf, int status);
+        using GetAddrInfoCallback = void(*)(struct addrinfo* addr, void(*free)(struct addrinfo*), int status, void* data);
+        using ConnectCallback = void(*)(int status, void* data);
 
 
     protected:
@@ -27,8 +31,8 @@ class EBStreamAbstraction: virtual public EventEmitter //{
 
         virtual void _write(ROBuf buf, WriteCallback cb, void* data) = 0;
 
-        virtual void read_callback(ROBuf buf, int status) = 0;
-        virtual void on_connection(void* connection) = 0;
+        inline virtual void read_callback(ROBuf buf, int status) {CALL_PURE_VIRTUAL_FUNCTION();};
+        inline virtual void on_connection(void* connection) {CALL_PURE_VIRTUAL_FUNCTION();};
 
 
     public:
@@ -42,7 +46,6 @@ class EBStreamAbstraction: virtual public EventEmitter //{
         virtual bool in_read() = 0;
 
         virtual void getaddrinfo (const char* hostname, GetAddrInfoCallback cb, void* data) = 0;
-        virtual void freeaddrinfo(struct addrinfo* addr) = 0;
 
         virtual void* newUnderlyStream() = 0;
         virtual void  releaseUnderlyStream(void*) = 0;

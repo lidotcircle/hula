@@ -15,11 +15,11 @@ ClientConnectionProxy::ClientConnectionProxy(Server* server): m_remains() //{
 } //}
 
 /** [static] As name suggested
- *  callback to EBStreamAbstraction::_write(...) in @ClientConnectionProxy::_write(...) */
-void ClientConnectionProxy::write_to_user_stream_cb(EventEmitter* obj, ROBuf buf, int status, void* ptr)//{
+ *  callback to EBStreamAbstraction::_write(...) in @ClientConnectionProxy::__write(...) */
+void ClientConnectionProxy::write_to_user_stream_cb(ROBuf buf, int status, void* ptr)//{
 {
     __logger->debug("call %s", FUNCNAME);
-    CBD::ClientConnectionProxy$_write$_write* msg = 
+    CBD::ClientConnectionProxy$__write$_write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CBD::SBase*>(ptr));
     assert(msg);
     auto _this = msg->_this;
@@ -74,10 +74,10 @@ void ClientConnectionProxy::dispatch_authentication_data(ROBuf buf) //{
     if(authenticate_pass) {
         __logger->info("Authentication success");
         this->m_remains = this->m_remains + (username_len + password_len + 2);
-        this->_write(ROBuf((char*)"\xff\x00", 2), nullptr, nullptr);
+        this->__write(ROBuf((char*)"\xff\x00", 2), nullptr, nullptr);
     } else {
         __logger->warn("Authentication fail");
-        this->_write(ROBuf((char*)"\x00\x00", 2), nullptr, nullptr);
+        this->__write(ROBuf((char*)"\x00\x00", 2), nullptr, nullptr);
         this->close();
     }
 } //}
@@ -156,8 +156,9 @@ void ClientConnectionProxy::dispatch_new(uint8_t id, ROBuf buf) //{
     addr[buf.size() - 2] = '\0';
 
     this->m_wait_connect.insert(id);
-    auto newcon = Factory::ToNetAbstraction(this, this->newUnderlyStream(), id, std::string(addr), port);
+    auto newcon = Factory::createToNet(this, this->newUnderlyStream(), id, std::string(addr), port);
     this->m_map[id] = newcon;
+    newcon->connect_to();
 
     free(addr);
 
@@ -184,20 +185,31 @@ void ClientConnectionProxy::dispatch_close(uint8_t id, ROBuf buf) //{
     s->close();
 } //}
 
+void ClientConnectionProxy::start() //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    this->start_relay();
+} //}
 /** user authentication routine  */
 void ClientConnectionProxy::start_relay() //{
 {
     __logger->debug("call %s", FUNCNAME);
+    this->start_read();
     return;
 } //}
 
-/** wrapper of uv_write() */
-int ClientConnectionProxy::_write(ROBuf buf, WriteCallback cb, void* data) //{
+static void dummy_write_callback(ROBuf buf, void* data, int status, bool run) {return;}
+/** wrapper of EBStreamAbstraction::_write() */
+int ClientConnectionProxy::__write(ROBuf buf, WriteCallback cb, void* data) //{
 {
     __logger->debug("call %s", FUNCNAME);
-    auto ptr = new CBD::ClientConnectionProxy$_write$_write(this, cb, data);
+    if(cb == nullptr) {
+        assert(data == nullptr);
+        cb = dummy_write_callback;
+    }
+    auto ptr = new CBD::ClientConnectionProxy$__write$_write(this, cb, data);
     this->add_callback(ptr);
-    this->EBStreamAbstraction::_write(buf, ClientConnectionProxy::write_to_user_stream_cb, ptr);
+    this->_write(buf, ClientConnectionProxy::write_to_user_stream_cb, ptr);
     return 0;
 } //}
 
@@ -219,7 +231,7 @@ int ClientConnectionProxy::close_connection(uint8_t id) //{
     assert(this->m_map.find(id) != this->m_map.end());
     char reason[] = "close";
     auto b = encode_packet(PACKET_OPCODE::PACKET_OP_CLOSE, id, ROBuf(reason, strlen(reason)));
-    int ret = this->_write(b, nullptr, nullptr);
+    int ret = this->__write(b, nullptr, nullptr);
     this->m_map.erase(this->m_map.find(id));
     return ret;
 } //}
@@ -231,7 +243,7 @@ int ClientConnectionProxy::accept_connection(uint8_t id) //{
     assert(this->m_map.find(id) != this->m_map.end());
     char reason = NEW_CONNECTION_REPLY::SUCCESS;
     auto b = encode_packet(PACKET_OPCODE::PACKET_OP_CONNECT, id, ROBuf(&reason, 1));
-    return this->_write(b, nullptr, nullptr);
+    return this->__write(b, nullptr, nullptr);
 } //}
 /** send a packet to inform state of new connection, reject new connection by #reason */
 int ClientConnectionProxy::reject_connection(uint8_t id, NEW_CONNECTION_REPLY reason) //{
@@ -240,7 +252,7 @@ int ClientConnectionProxy::reject_connection(uint8_t id, NEW_CONNECTION_REPLY re
     assert(id < SINGLE_PROXY_MAX_CONNECTION);
     assert(this->m_map.find(id) != this->m_map.end());
     auto b = encode_packet(PACKET_OPCODE::PACKET_OP_REJECT, id, ROBuf(&reason, 1));
-    return this->_write(b, nullptr, nullptr);
+    return this->__write(b, nullptr, nullptr);
 } //}
 
 /** delete a conneciton */
@@ -263,12 +275,12 @@ void ClientConnectionProxy::close() //{
     this->mp_server->remove_proxy(this);
 } //}
 
-/** wrapper of _write() FIXME */
+/** wrapper of __write() FIXME */
 int ClientConnectionProxy::write(uint8_t id, ROBuf buf, WriteCallback cb, void* data) //{
 {
     __logger->debug("call %s", FUNCNAME);
     auto m = encode_packet(PACKET_OPCODE::PACKET_OP_REG, id, buf);
-    return this->_write(m, cb, data);
+    return this->__write(m, cb, data);
 } //}
 
 NS_PROXY_SERVER_END

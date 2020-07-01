@@ -23,7 +23,6 @@ class EBMemStream: virtual public EBStreamAbstraction
         bool in_read() override;
 
         void getaddrinfo (const char* hostname, GetAddrInfoCallback cb, void* data) override;
-        void freeaddrinfo(struct addrinfo* addr) override;
 
         void* newUnderlyStream() override;
         void  releaseUnderlyStream(void*) override;

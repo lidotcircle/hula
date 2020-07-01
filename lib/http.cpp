@@ -311,10 +311,7 @@ void HttpRequest::end() //{
         this->writeHeader();
     this->m_http->FinishRequest(this);
 } //}
-HttpRequest::~HttpRequest() //{
-{
-    this->invalidate_callbacks();
-} //}
+HttpRequest::~HttpRequest() {}
 //}
 
 __URL__ parse_url(const std::string& str) //{

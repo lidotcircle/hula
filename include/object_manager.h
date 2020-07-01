@@ -35,11 +35,12 @@ class CallbackManager {
     private:
         std::set<CallbackPointer*> m_list;
         bool m_invalidate;
+        void invalidate_callbacks();
         
     public:
         CallbackManager();
         void add_callback(CallbackPointer* ptr);
         void remove_callback(CallbackPointer* ptr);
-        void invalidate_callbacks();
+        ~CallbackManager();
 };
 

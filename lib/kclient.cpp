@@ -493,8 +493,8 @@ int Server::__listen() //{
 void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
 {
     __logger->debug("call %s", FUNCNAME);
-    this->dispatch_bypass(addr, port, socks5);
-//    this->dispatch_proxy(addr, port, socks5);
+//    this->dispatch_bypass(addr, port, socks5);
+    this->dispatch_proxy(addr, port, socks5);
 } //}
 void Server::dispatch_bypass(const std::string& addr, uint16_t port, Socks5Auth* socks5) //{
 {
@@ -1054,7 +1054,7 @@ void ConnectionProxy::connect_to_with_sockaddr(sockaddr* sock) //{
     uv_req_set_data((uv_req_t*)req, ptr);
     this->mp_server->callback_insert(ptr, this);
 
-    assert(this->m_state == __State::STATE_GETDNS);
+    assert(this->m_state == __State::STATE_GETDNS); // FIXME fail
     this->m_state = __State::STATE_CONNECTING;
 
     uv_tcp_connect(req, this->mp_connection, sock, ConnectionProxy::connect_remote_tcp_connect_cb);

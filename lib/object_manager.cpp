@@ -58,3 +58,6 @@ void CallbackManager::invalidate_callbacks() {
         cbd->can_run = false;
 }
 
+CallbackManager::~CallbackManager() {
+    this->invalidate_callbacks();
+}

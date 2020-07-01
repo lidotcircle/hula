@@ -10,6 +10,7 @@ class EBStreamUV: virtual public EBStreamAbstraction
     private:
         uv_tcp_t* mp_tcp;
         bool m_stream_read;
+        static void __freeaddrinfo(struct addrinfo*);
 
 
     protected:
@@ -33,7 +34,6 @@ class EBStreamUV: virtual public EBStreamAbstraction
         bool in_read() override;
 
         void getaddrinfo (const char* hostname, GetAddrInfoCallback cb, void* data) override;
-        void freeaddrinfo(struct addrinfo* addr) override;
 
         void* newUnderlyStream() override;
         void  releaseUnderlyStream(void*) override;

@@ -24,6 +24,7 @@ void Server::on_connection(void* connection) //{
 
     ConnectionProxyAbstraction* newproxy = Factory::createConnectionProxy(this, connection);
     this->m_connection_list.insert(newproxy);
+    newproxy->start();
     return;
 } //}
 
