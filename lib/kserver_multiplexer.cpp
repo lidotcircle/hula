@@ -1,5 +1,5 @@
 #include "../include/kserver.h"
-#include "../include/kserver_multiplexing.h"
+#include "../include/kserver_multiplexer.h"
 #include "../include/callback_data.h"
 #include "../include/ObjectFactory.hpp"
 #include "../include/config.h"
@@ -102,10 +102,10 @@ void ClientConnectionProxy::dispatch_packet_data(ROBuf buf) //{
         std::tie(a, b, id) = z;
 
         switch(b) {
-            case PACKET_OP_NEW:
+            case PACKET_OP_CREATE_CONNECTION:
                 this->dispatch_new(id, a);
                 break;
-            case PACKET_OP_REG:
+            case PACKET_OP_WRITE:
                 if(this->m_map.find(id) != this->m_map.end()) {
                     this->dispatch_reg(id, a);
                 } else {
@@ -113,7 +113,7 @@ void ClientConnectionProxy::dispatch_packet_data(ROBuf buf) //{
                     __logger->warn("ClientConnectionProxy: unexpected id REG");
                 }
                 break;
-            case PACKET_OP_CLOSE:
+            case PACKET_OP_CLOSE_CONNECTION:
                 if(this->m_map.find(id) != this->m_map.end())
                     this->dispatch_close(id, a);
                 else
@@ -234,7 +234,7 @@ int ClientConnectionProxy::close_connection(uint8_t id) //{
     assert(id < SINGLE_PROXY_MAX_CONNECTION);
     assert(this->m_map.find(id) != this->m_map.end());
     char reason[] = "close";
-    auto b = encode_packet(PACKET_OPCODE::PACKET_OP_CLOSE, id, ROBuf(reason, strlen(reason)));
+    auto b = encode_packet(PACKET_OPCODE::PACKET_OP_CLOSE_CONNECTION, id, ROBuf(reason, strlen(reason)));
     int ret = this->__write(b, nullptr, nullptr);
     this->m_map.erase(this->m_map.find(id));
     return ret;
@@ -246,7 +246,7 @@ int ClientConnectionProxy::accept_connection(uint8_t id) //{
     assert(id < SINGLE_PROXY_MAX_CONNECTION);
     assert(this->m_map.find(id) != this->m_map.end());
     char reason = NEW_CONNECTION_REPLY::SUCCESS;
-    auto b = encode_packet(PACKET_OPCODE::PACKET_OP_CONNECT, id, ROBuf(&reason, 1));
+    auto b = encode_packet(PACKET_OPCODE::PACKET_OP_ACCEPT_CONNECTION, id, ROBuf(&reason, 1));
     return this->__write(b, nullptr, nullptr);
 } //}
 /** send a packet to inform state of new connection, reject new connection by #reason */
@@ -255,7 +255,7 @@ int ClientConnectionProxy::reject_connection(uint8_t id, NEW_CONNECTION_REPLY re
     __logger->debug("call %s", FUNCNAME);
     assert(id < SINGLE_PROXY_MAX_CONNECTION);
     assert(this->m_map.find(id) != this->m_map.end());
-    auto b = encode_packet(PACKET_OPCODE::PACKET_OP_REJECT, id, ROBuf(&reason, 1));
+    auto b = encode_packet(PACKET_OPCODE::PACKET_OP_REJECT_CONNECTION, id, ROBuf(&reason, 1));
     return this->__write(b, nullptr, nullptr);
 } //}
 
@@ -283,7 +283,7 @@ void ClientConnectionProxy::close() //{
 int ClientConnectionProxy::write(uint8_t id, ROBuf buf, WriteCallback cb, void* data) //{
 {
     __logger->debug("call %s", FUNCNAME);
-    auto m = encode_packet(PACKET_OPCODE::PACKET_OP_REG, id, buf);
+    auto m = encode_packet(PACKET_OPCODE::PACKET_OP_WRITE, id, buf);
     return this->__write(m, cb, data);
 } //}
 

@@ -24,3 +24,6 @@
 #define FUNCNAME __PRETTY_FUNCTION__
 #endif // defined(_WIN32) || defined(_WIN64)
 
+#define NEW_CONNECTION_TIMEOUT 8000
+
+

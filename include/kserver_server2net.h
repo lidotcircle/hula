@@ -1,6 +1,6 @@
 #pragma once
 
-#include "kserver_multiplexing.h"
+#include "kserver_multiplexer.h"
 #include "object_manager.h"
 
 NS_PROXY_SERVER_START

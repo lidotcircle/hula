@@ -8,47 +8,51 @@ NS_PROXY_CLIENT_START
  * @class represent a socks5 connection */
 class ClientConnection: public ClientProxyAbstraction //{
 {
-    public:
-        struct __proxyWriteInfo {ClientConnection* _this; bool exited;};
-
     private:
-        ConnectionProxy* mp_proxy;
+        ProxyMultiplexerAbstraction* mp_proxy;
 
         bool m_client_start_read;
+        bool m_server_start_read;
 
         Server* mp_kserver;
         uint8_t m_id;
 
         Socks5ServerAbstraction* m_socks5;
 
-        std::string m_server;
+        std::string m_addr;
         uint16_t    m_port;
 
-        enum __State {
-            INITIAL = 0,
-            CONNECTING,
-            RUNNING,
-            ERROR
-        };
-        __State m_state;
-//        std::unordered_set<__proxyWriteInfo*> m_proxy_write_callbacks;
+        bool m_closed;
 
-        size_t      m_in_buffer_size;
-        size_t      m_out_buffer_size;
+        size_t m_write_to_client_buffer;
+        size_t m_write_to_server_buffer;
+
+        bool m_client_end;
+        bool m_server_end;
 
         void __start_relay();
-        static void ProxyWriteCallback(bool should_run, int status, ROBuf* buf, void* data);
+        void __relay_client_to_server();
+        void __relay_server_to_client();
+        void __stop_relay_client_to_server();
+        void __stop_relay_server_to_client();
 
-        static void write_to_client_callback(uv_write_t* req, int status);
+        static void write_to_client_callback(ROBuf buf, int status, void* data);
+        static void multiplexer_connect_callback(int status, void* data);
 
-        static void connect_callback(bool should_run, int status, void* data);
-        void __connect(Socks5ServerAbstraction* socks5);
+        void __connect();
+
 
     protected:
         void read_callback(ROBuf buf, int status) override;
+        void end_signal() override;
+
+        void sendServerEnd() override;
+        void startServerRead() override;
+        void stopServerRead() override;
+
 
     public:
-        ClientConnection(Server* kserver, ConnectionProxy* mproxy, 
+        ClientConnection(Server* kserver, ProxyMultiplexerAbstraction* mproxy, 
                          const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5);
 
         ClientConnection(const ClientConnection&) = delete;
@@ -56,17 +60,16 @@ class ClientConnection: public ClientProxyAbstraction //{
         ClientConnection& operator=(ClientConnection&) = delete;
         ClientConnection& operator=(ClientConnection&&) = delete;
 
-        void run(Socks5ServerAbstraction* socks5);
-        void PushData(ROBuf buf);
-        void connect(Socks5ServerAbstraction* socks5);
         void close() override;
+        void connectToAddr() override;
+        void run(Socks5ServerAbstraction*) override;
+        void getStream(void*) override;
 
-        void reject();
-        void accept();
+        void pushData(ROBuf buf) override;
+        void serverEnd() override;
 
-//        inline void SetSocks5NULL() {assert(this->m_socks5 != nullptr); this->m_socks5 = nullptr;}
-
-        inline bool IsRun() {return this->m_state == __State::RUNNING;}
+        void connectSuccess() override;
+        void connectFail(ConnectResult) override;
 }; //}
 
 NS_PROXY_CLIENT_END

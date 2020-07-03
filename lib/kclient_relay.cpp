@@ -29,6 +29,9 @@ RelayConnection::RelayConnection(Server* kserver, Socks5ServerAbstraction* socks
     this->mp_client_manager = nullptr;
     this->mp_server_manager = Factory::createStreamObject(RELAY_MAX_BUFFER_SIZE, server_connection);
 
+    this->m_client_end = false;
+    this->m_server_end = false;
+
     this->m_client_drain_listener_reg = nullptr;
     this->m_server_drain_listener_reg = nullptr;
 }
@@ -121,16 +124,28 @@ void RelayConnection::client_end_listener(EVENTARGS) //{
     DOIT("end", EndArgs);
     delete args;
 
-    _this->mp_server_manager->end();
-    _this->close();
+    if(_this->m_client_end) {
+        _this->close();
+    } else {
+        _this->mp_server_manager->end();
+        _this->m_client_end = true;
+        if(_this->m_server_end)
+            _this->close();
+    }
 } //}
 void RelayConnection::server_end_listener(EVENTARGS) //{
 {
     DOIT("end", EndArgs);
     delete args;
 
-    _this->mp_client_manager->end();
-    _this->close();
+    if(_this->m_server_end) {
+        _this->close();
+    } else {
+        _this->mp_client_manager->end();
+        _this->m_server_end = true;
+        if(_this->m_client_end)
+            _this->close();
+    }
 } //}
 
 void RelayConnection::client_error_listener(EVENTARGS) //{

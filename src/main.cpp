@@ -44,6 +44,7 @@ int main() //{
     auto config = std::shared_ptr<ServerConfig>(new ServerConfig(&loop, "../tests/server_config.json"));
     config->loadFromFile(nullptr, nullptr);
     KProxyServer::UVServer server(tcp, config);
+
     server.trylisten();
 
     while(uv_continue) {

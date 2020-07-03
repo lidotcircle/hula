@@ -15,12 +15,12 @@ set(kproxy_lib_src
     lib/kserver_libuv.cpp
     lib/kserver_server.cpp
     lib/kserver_server2net.cpp
-    lib/kserver_multiplexing.cpp
+    lib/kserver_multiplexer.cpp
 
+    lib/stream.cpp
     lib/stream_libuv.cpp
     lib/stream_memory.cpp
 
-    lib/kclient.cpp
     lib/kclient_relay.cpp
     lib/kclient_server.cpp
     lib/kclient_socks5.cpp

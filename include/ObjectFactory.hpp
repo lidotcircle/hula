@@ -23,13 +23,13 @@ namespace Factory {
 
     namespace KProxyClient {
         using namespace ::KProxyClient;
-        Server*                      createServer(std::shared_ptr<ServerConfig> config, void* connection);
-        Socks5ServerAbstraction*     createSocks5Server(Server* server, void* connection);
+        Server*                      createServer(std::shared_ptr<ClientConfig> config, void* connection);
+        Socks5ServerAbstraction*     createSocks5Server(Server* server, std::shared_ptr<ClientConfig> config, void* connection);
         RelayAbstraction*            createRelay(Server* server, Socks5ServerAbstraction* socks5,
                                                  const std::string& addr, uint16_t port, void* connection);
-        ClientProxyAbstraction*      createProxy(ProxyMultiplexerAbstraction* mgr, const std::string& addr, uint16_t port, 
-                                                 void* connection);
-        ProxyMultiplexerAbstraction* createMultiplexer(SingleServerInfo* config, void* connection);
+        ClientProxyAbstraction*      createProxy(Server* server, ProxyMultiplexerAbstraction* mgr, 
+                                                 const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5);
+        ProxyMultiplexerAbstraction* createMultiplexer(Server* server, SingleServerInfo* config, void* connection);
     };
 };
 

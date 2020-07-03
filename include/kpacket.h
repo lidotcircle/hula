@@ -13,7 +13,7 @@
  *       -------------------------------------------------------------------------
  *       |  OPCODE  |     ID     |    LENGTH    | [ EXTEND LENGTH | ]  Payload   |
  *       -------------------------------------------------------------------------
- *       |   2      |     6      |    8         | [   16/32  ]    | LENGTH bytes |
+ *       |   8      |     8      |    8         | [   16/32  ]    | LENGTH bytes |
  *       -------------------------------------------------------------------------
  *       LENGTH = 0xFE, EXTEND LENGTH is 16 bits
  *       LENGTH = 0xFF, EXTEND LENGTH is 32 bits
@@ -29,11 +29,19 @@
 
 
 enum PACKET_OPCODE: uint8_t {
-    PACKET_OP_REG = 0,
-    PACKET_OP_NEW,
-    PACKET_OP_CONNECT,
-    PACKET_OP_REJECT,
-    PACKET_OP_CLOSE,
+    PACKET_OP_WRITE = 0,          // c s
+
+    PACKET_OP_CREATE_CONNECTION,  // c
+    PACKET_OP_ACCEPT_CONNECTION,  //   s
+    PACKET_OP_REJECT_CONNECTION,  //   s
+
+    PACKET_OP_CLOSE_CONNECTION,   // c s
+
+    PACKET_OP_END_CONNECTION,     // c s
+
+    PACKET_OP_START_READ,         // c s
+    PACKET_OP_STOP_READ,          // c s
+
     PACKET_OP_RESERVED
 };
 

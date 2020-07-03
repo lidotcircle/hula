@@ -28,7 +28,7 @@ void Server::on_connection(void* connection) //{
         return;
     }
 
-    Socks5ServerAbstraction* auth = Factory::KProxyClient::createSocks5Server(this, connection);
+    Socks5ServerAbstraction* auth = Factory::KProxyClient::createSocks5Server(this, this->m_config, connection);
     this->m_auths[auth] = nullptr; 
     auth->start();
 } //}
@@ -66,11 +66,11 @@ void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5Server
             return;
         }
         void* newcon = this->newUnderlyStream();
-        pp = Factory::KProxyClient::createMultiplexer(c, newcon);
+        pp = Factory::KProxyClient::createMultiplexer(this, c, newcon);
         this->m_proxy.insert(pp);
     }
 
-    ClientProxyAbstraction* con = Factory::KProxyClient::createProxy(pp, addr, port, socks5);
+    ClientProxyAbstraction* con = Factory::KProxyClient::createProxy(this, pp, addr, port, socks5);
     this->m_auths[socks5] = con;
     con->connectToAddr();
 } //}

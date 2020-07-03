@@ -22,6 +22,7 @@ class RelayConnection: public RelayAbstraction //{
         bool m_closed;
 
         EBStreamObject *mp_client_manager, *mp_server_manager;
+        bool m_client_end, m_server_end;
 
         void *m_client_drain_listener_reg, *m_server_drain_listener_reg;
 

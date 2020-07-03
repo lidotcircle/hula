@@ -2,7 +2,7 @@
 
 #include "kserver.h"
 #include "kserver_server.h"
-#include "kserver_multiplexing.h"
+#include "kserver_multiplexer.h"
 #include "kserver_server2net.h"
 
 #include "stream.hpp"
@@ -17,9 +17,9 @@ class UVServer:       virtual public EBStreamUV, public Server {
             EBStreamUV(connection), Server(config) {}
 };
 
-class UVMultiplexing: virtual public EBStreamUV, public ClientConnectionProxy {
+class UVMultiplexer: virtual public EBStreamUV, public ClientConnectionProxy {
     public:
-        inline UVMultiplexing(uv_tcp_t* connection, Server* server):
+        inline UVMultiplexer(uv_tcp_t* connection, Server* server):
             EBStreamUV(connection), ClientConnectionProxy(server) {}
 };
 
