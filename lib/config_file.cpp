@@ -133,7 +133,7 @@ int ClientConfig::loadFromFile(LoadCallback cb, void* data) //{
     */
 } //}
 
-// static
+/** [static] */
 void ClientConfig::read_file_callback(uv_fs_t* req) //{
 {
     assert(uv_fs_get_type(req) == uv_fs_type::UV_FS_READ);
@@ -191,7 +191,7 @@ void ClientConfig::read_file_callback(uv_fs_t* req) //{
         return;
     }
     _this->m_state = CONFIG_SYNC;
-    cb(0, data);
+    if(cb != nullptr) cb(0, data);
     return;
 } //}
 void ClientConfig::close_file_callback(uv_fs_t* req) //{
