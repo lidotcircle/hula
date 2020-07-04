@@ -56,6 +56,7 @@ class EBStreamUV: virtual public EBStreamAbstraction, protected CallbackManager 
         void* transfer() override;
         void  regain(void*) override;
 
+        void  release() override;
         bool  hasStreamObject() override;
 
         void timeout(TimeoutCallback cb, void* data, int time) override;

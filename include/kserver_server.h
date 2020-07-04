@@ -22,7 +22,7 @@ class ConnectionProxyAbstraction: virtual public EBStreamAbstraction {
  * @event connection @fires when new conection is accepted
  *        (uv_tcp_t* accept_stream, Server* this_server)
  */
-class Server: virtual public EBStreamAbstraction //{
+class Server: virtual protected EBStreamAbstraction //{
 {
     private:
         uint32_t bind_addr;

@@ -71,6 +71,7 @@ class EBStreamAbstraction: virtual public EventEmitter //{
         virtual void* transfer() = 0;
         virtual void  regain(void*) = 0;
 
+        virtual void  release() = 0;
         virtual bool  hasStreamObject() = 0;
 
         virtual void timeout(TimeoutCallback cb, void* data, int time_ms) = 0;
@@ -111,10 +112,10 @@ class EBStreamObject: virtual protected EBStreamAbstraction, protected CallbackM
         bool m_end;
         bool m_closed;
 
+        void* m_store_ptr;
+
         static void write_callback(ROBuf, int status, void* data);
         static void connect_callback(int status, void* data);
-
-        static void getdns_withipv4_for_connectWith_address(uint32_t addr, int status, void* data);
 
     protected:
         void read_callback(ROBuf buf, int status) override;
@@ -132,5 +133,8 @@ class EBStreamObject: virtual protected EBStreamAbstraction, protected CallbackM
         void stopRead();
         void end();
         void close();
+
+        void  storePtr(void* ptr);
+        void* fetchPtr();
 }; //}
 

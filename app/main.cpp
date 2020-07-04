@@ -18,15 +18,28 @@ static bool uv_timer_set = false;
 static uv_loop_t* uv_loop_global = nullptr;
 static KProxyClient::Server* g_server = nullptr;
 
+static int handle_count = 0;
+
 static void timer_handle(uv_timer_t* timer) //{
 {
     uv_timer_stop(timer);
     uv_close((uv_handle_t*)timer, UVU::delete_closed_handle<decltype(timer)>);
     uv_timer_set = false;
 } //}
+static void walk_callback(uv_handle_t* h, void* data) //{
+{
+    ++handle_count;
+    std::cout << "handle: " << handle_count << std::endl;
+} //}
+static void walk_loop(uv_loop_t* loop) //{
+{
+    handle_count = 0;
+    uv_walk(loop, walk_callback, nullptr);
+} //}
 static void interrupt_handle(int sig) //{
 {
     if(uv_continue == false) {
+        walk_loop(uv_loop_global);
         abort();
     }
     __logger->warn("Exiting ...");
@@ -51,6 +64,7 @@ int main() //{
     auto config = std::shared_ptr<ClientConfig>(new UVClientConfig(&loop, "../tests/client_config.json"));
     config->loadFromFile(nullptr, nullptr);
     KProxyClient::UVServer server(config, tcp);
+    config.reset();
 
     server.trylisten();
     g_server = &server;
@@ -66,8 +80,6 @@ int main() //{
     }
 
     while(uv_loop_alive(&loop)) uv_run(&loop, UV_RUN_ONCE);
-
-    delete tcp;
 
     uv_loop_close(&loop);
     return 0;

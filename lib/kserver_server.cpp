@@ -44,10 +44,12 @@ void Server::read_callback(ROBuf buf, int status) //{
 } //}
 
 /** constructor of Server*/
-Server::Server(std::shared_ptr<ServerConfig> config): bind_addr(0), bind_port(1080), m_connection_list() //{
+Server::Server(std::shared_ptr<ServerConfig> config): m_connection_list() //{
 {
     __logger->debug("call %s", FUNCNAME);
     this->m_config = config;
+    this->bind_addr = config->BindAddr();
+    this->bind_port = config->BindPort();
 } //}
 
 /** functions related with listen */
@@ -78,6 +80,9 @@ void Server::close() //{
     auto connection_list_copy = this->m_connection_list;
     for(auto&x: connection_list_copy)
         x->close();
+
+    this->release();
+    this->m_config.reset();
     return;
 } //}
 

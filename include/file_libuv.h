@@ -48,9 +48,10 @@ class UVFile: virtual public FileAbstraction, protected CallbackManager //{
         bool reopen(const std::string& filename, int flag = 0, int mode = 0, OpenCallback cb = nullptr, void* data = nullptr) override;
         const std::string& filename() override;
 
-        bool     opened() override;
-        bool     error() override;
-        uint16_t mode() override;
+        bool opened() override;
+        bool error()  override;
+        int  flags()  override;
+        int  mode()   override;
 
         ~UVFile();
 }; //}

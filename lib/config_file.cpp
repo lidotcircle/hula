@@ -266,6 +266,12 @@ void ConfigFile::write_callback(ROBuf buf, int status, void* data) //{
     }
 } //}
 
+bool ConfigFile::setNewFile(const std::string& filename) //{
+{
+    this->clearError();
+    return this->reopen(filename, this->flags(), this->mode(), nullptr, nullptr);
+} //}
+
 void ConfigFile::setError(const std::string& error) {this->m_error.push(error);}
 void ConfigFile::clearError() {this->m_error = std::stack<std::string>();}
 

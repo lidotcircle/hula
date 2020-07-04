@@ -28,6 +28,8 @@ RelayConnection::RelayConnection(Server* kserver, Socks5ServerAbstraction* socks
 
     this->mp_client_manager = nullptr;
     this->mp_server_manager = Factory::createStreamObject(RELAY_MAX_BUFFER_SIZE, server_connection);
+    this->mp_server_manager->storePtr(this);
+    assert(server_connection != nullptr);
 
     this->m_client_end = false;
     this->m_server_end = false;
@@ -72,7 +74,8 @@ void RelayConnection::register_client_listener() //{
 } //}
 
 #define EVENTARGS EventEmitter*obj, const std::string& event, EventArgs::Base* aaa
-#define DOIT(ename, dt) RelayConnection* _this  = dynamic_cast<decltype(_this)>(obj); assert(_this); \
+#define DOIT(ename, dt) EBStreamObject* _streamobj = dynamic_cast<decltype(_streamobj)>(obj); assert(_streamobj); \
+                        RelayConnection* _this     = static_cast<decltype(_this)>(_streamobj->fetchPtr()); assert(_this); \
                         EBStreamObject::dt *args   = dynamic_cast<decltype(args)>(aaa);  assert(args); \
                         assert(event == ename);
 void RelayConnection::client_data_listener(EVENTARGS) //{
@@ -153,6 +156,8 @@ void RelayConnection::client_error_listener(EVENTARGS) //{
     DOIT("error", ErrorArgs);
     delete args;
 
+    assert(_this->mp_socks5 == nullptr);
+
     _this->close();
 } //}
 void RelayConnection::server_error_listener(EVENTARGS) //{
@@ -186,6 +191,7 @@ void RelayConnection::getStream(void* connection) //{
 {
     assert(this->mp_client_manager == nullptr);
     this->mp_client_manager = Factory::createStreamObject(RELAY_MAX_BUFFER_SIZE, connection);
+    this->mp_client_manager->storePtr(this);
 } //}
 /** transfer tcp connection from Socks5Auth object to this object */
 void RelayConnection::run(Socks5ServerAbstraction* socks5) //{
@@ -232,7 +238,7 @@ void RelayConnection::close() //{
     delete this->mp_server_manager;
     if(this->mp_client_manager != nullptr) delete this->mp_client_manager;
 
-    this->m_kserver->remove_relay(this);
+    this->m_kserver->remove_socks5_handler(this);
 } //}
 
 RelayConnection::~RelayConnection() {}

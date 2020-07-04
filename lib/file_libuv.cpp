@@ -540,6 +540,8 @@ void UVFile::truncate_callback(uv_fs_t* p_req) //{
 
 bool UVFile::reopen(const std::string& filename, int flag, int mode, OpenCallback cb, void* data) //{
 {
+    if(this->opened() && !this->m_close_error) // FIXME nonblock
+        this->close(nullptr, nullptr);
     this->m_filename = filename;
     this->m_fd = -1;
     this->m_pos = 0;
@@ -547,13 +549,14 @@ bool UVFile::reopen(const std::string& filename, int flag, int mode, OpenCallbac
     this->m_close_error = false;
     this->m_flags = 0;
     this->m_mode = 0;
-    return this->open(flag, mode, cb, data);
+    return this->open(flag | O_CREAT, mode, cb, data);
 } //}
 const std::string& UVFile::filename() {return this->m_filename;}
 
-bool UVFile::opened()   {return this->m_fd > 0;}
-bool UVFile::error()    {return this->m_error;}
-uint16_t UVFile::mode() {return this->m_mode;}
+bool UVFile::opened() {return this->m_fd > 0;}
+bool UVFile::error()  {return this->m_error;}
+int  UVFile::mode()   {return this->m_mode;}
+int  UVFile::flags()  {return this->m_flags;}
 
 static void clean_close_callback(uv_fs_t* req) {freereq(req);}
 UVFile::~UVFile() //{

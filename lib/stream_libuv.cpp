@@ -382,12 +382,8 @@ EBStreamUV::EBStreamUV(uv_tcp_t* tcp) //{
 } //}
 EBStreamUV::~EBStreamUV() //{
 {
-    if(this->mp_tcp != nullptr) {
-        if(this->in_read())
-            this->stop_read();
-        uv_close((uv_handle_t*)(this->mp_tcp), delete_closed_handle<decltype(this->mp_tcp)>);
-        this->mp_tcp = nullptr;
-    }
+    if(this->mp_tcp != nullptr)
+        this->release();
 } //}
 
 struct EBStreamUV$shutdown$uv_shutdown {
@@ -417,6 +413,13 @@ void EBStreamUV::shutdown(ShutdownCallback cb, void* data) //{
 bool  EBStreamUV::hasStreamObject() //{
 {
     return this->mp_tcp != nullptr;
+} //}
+void EBStreamUV::release() //{
+{
+    assert(this->mp_tcp != nullptr);
+    if(this->in_read()) this->stop_read();
+    uv_close((uv_handle_t*)this->mp_tcp, delete_closed_handle<decltype(this->mp_tcp)>);
+    this->mp_tcp = nullptr;
 } //}
 
 void* EBStreamUV::transfer() //{

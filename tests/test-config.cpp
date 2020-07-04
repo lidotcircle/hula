@@ -38,6 +38,8 @@ void load_cb(int error, void* data) //{
 
     config->Users()["test"] = "test_password";
 
+    assert(config->setNewFile("./hello.json"));
+
     config->writeToFile(write_cb, config);
 } //}
 

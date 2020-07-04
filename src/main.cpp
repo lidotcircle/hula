@@ -44,6 +44,7 @@ int main() //{
     auto config = std::shared_ptr<ServerConfig>(new UVServerConfig(&loop, "../tests/server_config.json"));
     config->loadFromFile(nullptr, nullptr);
     KProxyServer::UVServer server(tcp, config);
+    config.reset();
 
     server.trylisten();
 
@@ -59,13 +60,9 @@ int main() //{
 
     __logger->warn("Exiting ...");
     server.close();
-    server.transfer();
-    uv_close((uv_handle_t*)tcp, nullptr);
 
     while(uv_loop_alive(&loop))
         uv_run(&loop, UV_RUN_ONCE);
-
-    delete tcp;
 
     uv_loop_close(&loop);
     return 0;

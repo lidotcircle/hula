@@ -4,12 +4,14 @@
 #include "config_file.h"
 #include "kclient.h"
 
+#include "duplex_map.hpp"
+
 NS_PROXY_CLIENT_START
 
 
 /**
  * @class Server a socks5 proxy server */
-class Server: virtual public EBStreamAbstraction //{
+class Server: virtual protected EBStreamAbstraction //{
 {
     private:
         bool m_closed;
@@ -19,8 +21,9 @@ class Server: virtual public EBStreamAbstraction //{
 
         std::shared_ptr<ClientConfig> m_config;
 
-        std::unordered_map<Socks5ServerAbstraction*, Socks5RequestProxy*> m_auths;
-        std::unordered_set<RelayAbstraction*> m_relay;
+        DuplexMap<Socks5ServerAbstraction*, Socks5RequestProxy*> m_auths;
+        std::unordered_set<Socks5ServerAbstraction*> m_socks5;
+        std::unordered_set<Socks5RequestProxy*> m_socks5_handler;
         std::unordered_set<ProxyMultiplexerAbstraction*> m_proxy;
 
 
@@ -49,7 +52,7 @@ class Server: virtual public EBStreamAbstraction //{
 
         /** delete object which allocated by this object */
         void remove_socks5(Socks5ServerAbstraction* socks5);
-        void remove_relay(RelayAbstraction* relay);
+        void remove_socks5_handler(Socks5RequestProxy* handler);
         void remove_proxy(ProxyMultiplexerAbstraction* proxy);
 
         void dispatchSocks5(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5);

@@ -111,4 +111,5 @@ void  EBMemStream::reply(ROBuf buf) {this->read_callback(buf, 0);}
 ROBuf EBMemStream::buffer()         {return this->m_write_buffer;}
 
 bool EBMemStream::hasStreamObject() {return true;}
+void EBMemStream::release() {}
 

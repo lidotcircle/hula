@@ -57,9 +57,10 @@ class FileAbstraction //{
 
         virtual bool truncate(size_t size, TruncateCallback cb, void* data) = 0;
 
-        virtual bool     opened() = 0;
-        virtual bool     error() = 0;
-        virtual uint16_t mode() = 0;
+        virtual bool opened() = 0;
+        virtual bool error() = 0;
+        virtual int  flags() = 0;
+        virtual int  mode() = 0;
 
         virtual inline ~FileAbstraction() {};
 }; //}

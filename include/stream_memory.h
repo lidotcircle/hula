@@ -45,5 +45,6 @@ class EBMemStream: virtual public EBStreamAbstraction
         ROBuf buffer();
 
         bool hasStreamObject() override;
+        void release() override;
 };
 

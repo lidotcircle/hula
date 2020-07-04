@@ -45,7 +45,7 @@ void Socks5Auth::close_this_with_error() //{
     this->shutdown(dummy_shutdown_callback, nullptr);
     auto maybe_proxy = this->mp_server->getSock5ProxyObject(this);
     this->close();
-    if(maybe_proxy != nullptr) delete maybe_proxy;
+    if(maybe_proxy != nullptr) maybe_proxy->close();
 } //}
 
 /** implement pure virtual method */
@@ -81,8 +81,9 @@ void Socks5Auth::dispatch_data(ROBuf buf) //{
                 }
                 socks5_authentication_method method = SOCKS5_AUTH_NO_ACCEPTABLE;
                 for(auto& i: msg.m_methods) {
-                    if(method == SOCKS5_AUTH_NO_ACCEPTABLE && i == SOCKS5_AUTH_NO_REQUIRED && 
-                       this->m_config->Policy().m_method == SOCKS5_NO_REQUIRED)
+                    if(method == SOCKS5_AUTH_NO_ACCEPTABLE && 
+                            i == SOCKS5_AUTH_NO_REQUIRED && // FIXME
+                            this->m_config->Policy().m_method == SOCKS5_NO_REQUIRED)
                         method = (socks5_authentication_method)i;
                     if(i == SOCKS5_AUTH_USERNAME_PASSWORD) 
                         method = (socks5_authentication_method)i;
@@ -257,6 +258,7 @@ void Socks5Auth::write_callback_reply(ROBuf buf, int status, void* data) //{
     delete msg;
 
     if(!run) return;
+    _this->remove_callback(msg);
 
     if(status < 0 || _this->m_remain.size() != 0 || reply != SOCKS5_REPLY_SUCCEEDED)
         _this->close_this_with_error();

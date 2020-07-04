@@ -1,12 +1,15 @@
 #pragma once
 
+#include <assert.h>
+
+
 template<typename T>
 struct DLinkedList {
     DLinkedList* next;
     DLinkedList* prev;
     T value;
 
-    DLinkedList(const T& value): value(value) {}
+    DLinkedList(const T& value): value(value), next(nullptr), prev(nullptr) {}
 };
 
 template<typename T>
@@ -53,6 +56,22 @@ void DLinkedList_delete(DLinkedList<T>** cbl) //{
     return;
 } //}
 template<typename T>
+void DLinkedList_delete_all(DLinkedList<T>** cbl) //{
+{
+    DLinkedList<T>* c = *cbl;
+    if(c == nullptr) return;
+    while(c->prev != nullptr)
+        c = c->prev;
+
+    while(c != nullptr) {
+        auto t = c;
+        c = c->next;
+        delete t;
+    }
+
+    *cbl = nullptr;
+} //}
+template<typename T>
 void DLinkedList_head(DLinkedList<T>** cbl) //{
 {
     DLinkedList<T>* c = *cbl;
@@ -87,7 +106,7 @@ template<typename T>
 DLinkedList<T>* DLinkedList_insert_to_tail(DLinkedList<T>** cbl, T value) //{
 {
     DLinkedList_tail(cbl);
-    DLinkedList<T>* new_entry = new DLinkedList<T>();
+    DLinkedList<T>* new_entry = new DLinkedList<T>(value);
     
     DLinkedList<T>* old_tail = *cbl;
     *cbl = new_entry;

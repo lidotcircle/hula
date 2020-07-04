@@ -29,7 +29,7 @@ void Server::on_connection(void* connection) //{
     }
 
     Socks5ServerAbstraction* auth = Factory::KProxyClient::createSocks5Server(this, this->m_config, connection);
-    this->m_auths[auth] = nullptr; 
+    this->m_socks5.insert(auth);
     auth->start();
 } //}
 
@@ -37,15 +37,15 @@ void Server::on_connection(void* connection) //{
 void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
     __logger->debug("call %s", FUNCNAME);
-//    this->dispatch_bypass(addr, port, socks5);
-    this->dispatch_proxy(addr, port, socks5);
+    this->dispatch_bypass(addr, port, socks5);
+//    this->dispatch_proxy(addr, port, socks5);
 } //}
 void Server::dispatch_bypass(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
     __logger->debug("call %s", FUNCNAME);
-    RelayAbstraction* relay = Factory::KProxyClient::createRelay(this, socks5, addr, port, nullptr);
-    this->m_relay.insert(relay);
-    this->m_auths[socks5] = relay;
+    RelayAbstraction* relay = Factory::KProxyClient::createRelay(this, socks5, addr, port, this->newUnderlyStream());
+    this->m_socks5_handler.insert(relay);
+    this->m_auths[socks5] = relay; // FIXME
     relay->connectToAddr();
 } //}
 void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
@@ -72,6 +72,7 @@ void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5Server
 
     ClientProxyAbstraction* con = Factory::KProxyClient::createProxy(this, pp, addr, port, socks5);
     this->m_auths[socks5] = con;
+    this->m_socks5_handler.insert(con);
     con->connectToAddr();
 } //}
 
@@ -87,7 +88,7 @@ void Server::socks5Transfer(Socks5ServerAbstraction* socks5) //{
     auto ff = this->m_auths.find(socks5);
     assert(ff != this->m_auths.end());
 
-    RelayAbstraction*  cr      = dynamic_cast<decltype(cr)> (ff->second);
+    RelayAbstraction*  cr      = dynamic_cast<decltype(cr)>(ff->second);
     ClientProxyAbstraction* cc = dynamic_cast<decltype(cc)>(ff->second);
     if(cr != nullptr)
         cr->run(socks5);
@@ -108,20 +109,22 @@ SingleServerInfo* Server::select_remote_serever() //{
     return nullptr;
 } //}
 
-/** deallocate Socks5ServerAbstraction, RelayAbstraction and ProxyMultiplexerAbstraction */
+/** deallocate Socks5ServerAbstraction, Socks5RequestProxy* and ProxyMultiplexerAbstraction */
 void Server::remove_socks5(Socks5ServerAbstraction* socks5) //{
 {
     __logger->debug("call %s", FUNCNAME);
-    assert(this->m_auths.find(socks5) != this->m_auths.end());
-    this->m_auths.erase(this->m_auths.find(socks5));
+    assert(this->m_socks5.find(socks5) != this->m_socks5.end());
+    this->m_socks5.erase(this->m_socks5.find(socks5));
     delete socks5;
 } //}
-void Server::remove_relay(RelayAbstraction* relay) //{
+void Server::remove_socks5_handler(Socks5RequestProxy* handler) //{
 {
     __logger->debug("call %s", FUNCNAME);
-    assert(this->m_relay.find(relay) != this->m_relay.end());
-    this->m_relay.erase(this->m_relay.find(relay));
-    delete relay;
+    assert(this->m_socks5_handler.find(handler) != this->m_socks5_handler.end());
+    this->m_socks5_handler.erase(this->m_socks5_handler.find(handler));
+    if(this->m_auths.find(handler) != this->m_auths.end())
+        this->m_auths.erase(this->m_auths.find(handler)); // FIXME
+    delete handler;
 } //}
 void Server::remove_proxy(ProxyMultiplexerAbstraction* proxy) //{
 {
@@ -153,8 +156,11 @@ int Server::trylisten() //{
 
 Socks5RequestProxy* Server::getSock5ProxyObject(Socks5ServerAbstraction* socks5) //{
 {
-    assert(this->m_auths.find(socks5) != this->m_auths.end());
-    return this->m_auths[socks5];
+    assert(this->m_socks5.find(socks5) != this->m_socks5.end());
+    if (this->m_auths.find(socks5) != this->m_auths.end())
+        return this->m_auths[socks5];
+    else
+        return nullptr;
 } //}
 
 /** close */
@@ -164,7 +170,7 @@ void Server::close() //{
     assert(this->m_closed == false);
     this->m_closed = true;
 
-    auto copy_relay = this->m_relay;
+    auto copy_relay = this->m_socks5_handler;
     for(auto& relay: copy_relay)
         relay->close();
 
@@ -176,6 +182,8 @@ void Server::close() //{
     for(auto& auth: copy_auth)
         auth.first->close();
 
+    this->release();
+    this->m_config.reset();
     return;
 } //}
 

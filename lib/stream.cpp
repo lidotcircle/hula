@@ -1,7 +1,6 @@
 #include "../include/stream.hpp"
 #include "../include/utils.h"
 
-#include <uv.h>
 
 void EBStreamObject::read_callback(ROBuf buf, int status) //{
 {
@@ -16,7 +15,14 @@ void EBStreamObject::end_signal() //{
     this->emit("end", new EndArgs());
 } //}
 
-EBStreamObject::EBStreamObject(size_t m): m_max_write_buffer_size(m), m_writed_size(0), m_closed(false), m_end(false) {}
+EBStreamObject::EBStreamObject(size_t m) //{
+{
+    this->m_max_write_buffer_size = m;
+    this->m_writed_size = 0;
+    this->m_closed = false;
+    this->m_end = false;
+    this->m_store_ptr = nullptr;
+} //}
 
 struct EBStreamObject$write$_write: public CallbackPointer {
     EBStreamObject* _this;
@@ -41,6 +47,7 @@ void EBStreamObject::write_callback(ROBuf buf, int status, void* data) //{
     auto run   = msg->CanRun();
     delete msg;
     if(!run) return;
+    _this->remove_callback(msg);
 
     if(status < 0) {
         _this->emit("error", new ErrorArgs("write error"));
@@ -66,6 +73,13 @@ int EBStreamObject::connectWith_sockaddr(sockaddr* addr) //{
     this->add_callback(ptr);
     return this->connect(addr, connect_callback, ptr);
 } //}
+int EBStreamObject::connectWith_address(const std::string& addr, uint16_t port) //{
+{
+    assert(this->m_end == false && this->m_closed == false);
+    auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
+    this->add_callback(ptr);
+    return this->connect(addr, port, connect_callback, ptr);
+} //}
 /** [static] */
 void EBStreamObject::connect_callback(int status, void* data) //{
 {
@@ -76,7 +90,8 @@ void EBStreamObject::connect_callback(int status, void* data) //{
     auto run   = msg->CanRun();
     delete msg;
 
-    if(!run) return;
+    if(!run) return; // FIXME invalid read
+    _this->remove_callback(msg);
 
     if(status < 0) {
         _this->emit("error", new ErrorArgs("connect error"));
@@ -84,46 +99,6 @@ void EBStreamObject::connect_callback(int status, void* data) //{
     }
 
     _this->emit("connect", new ConnectArgs());
-} //}
-
-struct EBStreamObject$connectWith_address$getDNS: public CallbackPointer {
-    uint16_t _port;
-    EBStreamObject* _this;
-    EBStreamObject$connectWith_address$getDNS(EBStreamObject* _this, uint16_t port): _this(_this), _port(port) {}
-};
-int EBStreamObject::connectWith_address(const std::string& addr, uint16_t port) //{
-{
-    assert(this->m_end == false && this->m_closed == false);
-    auto ptr = new EBStreamObject$connectWith_address$getDNS(this, port);
-    this->add_callback(ptr);
-    this->getaddrinfoipv4(addr.c_str(), getdns_withipv4_for_connectWith_address, ptr);
-    return this->connectWith_sockaddr(nullptr);
-} //}
-/** [static] */
-void EBStreamObject::getdns_withipv4_for_connectWith_address(uint32_t addr, int status, void* data) //{
-{
-   EBStreamObject$connectWith_address$getDNS* msg = 
-        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
-    assert(msg);
-    auto _this = msg->_this;
-    auto port  = msg->_port;
-    auto run   = msg->CanRun();
-    delete msg;
-
-    if(!run) return;
-    _this->remove_callback(msg);
-
-    if(status < 0) {
-        _this->emit("error", new ErrorArgs("get dns fail"));
-        return;
-    }
-
-    struct sockaddr_in saddr;
-    saddr.sin_family = AF_INET;
-    saddr.sin_port = k_htons(port);
-    saddr.sin_addr.s_addr = addr;
-
-    _this->connectWith_sockaddr((sockaddr*)&saddr);
 } //}
 
 void EBStreamObject::getDNS(const std::string& addr, GetAddrInfoCallback cb, void* data) //{
@@ -148,4 +123,7 @@ void EBStreamObject::close() //{
     this->m_closed = true;
     this->emit("close", new CloseArgs());
 } //}
+
+void  EBStreamObject::storePtr(void* ptr) {this->m_store_ptr = ptr;}
+void* EBStreamObject::fetchPtr() {return this->m_store_ptr;}
 

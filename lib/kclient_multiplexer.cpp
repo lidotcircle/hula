@@ -391,7 +391,7 @@ void ConnectionProxy::remove_clientConnection(uint8_t id, ClientProxyAbstraction
     if(this->m_wait_new_connection.find(id) != this->m_wait_new_connection.end()) {
         this->m_wait_new_connection.erase(this->m_wait_new_connection.find(id));
     }
-    delete obj;
+    this->mp_server->remove_socks5_handler(obj);
 } //}
 
 /** function for flow control */
