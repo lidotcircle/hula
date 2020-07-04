@@ -55,6 +55,7 @@ UVFile::UVFile(uv_loop_t* loop, const std::string& filename): m_filename(filenam
     this->m_mode = 0;
     this->m_fd = -1;
     this->m_error = false;
+    this->m_close_error = false;
 
     this->m_pos = 0;
 } //}
@@ -226,25 +227,7 @@ void UVFile::read_callback(uv_fs_t* p_req) //{
 
 ROBuf UVFile::read(size_t n, ReadCallback cb, void *data) //{
 {
-    if(n >= 0) return this->__read(n, cb, data);
-    if(cb == nullptr) {
-        assert(data == nullptr);
-        auto stat = this->stat(nullptr, nullptr);
-        if(!stat) return ROBuf();
-
-        if(stat->st_size == this->m_pos) {return ROBuf();}
-        if(stat->st_size <  this->m_pos) {
-            this->m_error = true;
-            return ROBuf();
-        }
-        return this->__read(stat->st_size - this->m_pos, nullptr, nullptr);
-    }
-
-    auto ptr = new uvfile_state(this, reinterpret_cast<void*>(cb), data);
-    this->add_callback(ptr);
-    this->stat(stat_callback_for_readall, ptr);
-
-    return ROBuf();
+    return this->__read(n, cb, data);
 } //}
 /** [static] */
 void UVFile::stat_callback_for_readall(std::shared_ptr<Stat> stat, int status, void* data) //{
@@ -276,6 +259,27 @@ void UVFile::stat_callback_for_readall(std::shared_ptr<Stat> stat, int status, v
     }
     _this->__read(stat->st_size - _this->m_pos, _cb, _data);
 } //}
+ROBuf UVFile::readremain(ReadCallback cb, void* data) //{
+{
+    if(cb == nullptr) {
+        assert(data == nullptr);
+        auto stat = this->stat(nullptr, nullptr);
+        if(!stat) return ROBuf();
+
+        if(stat->st_size == this->m_pos) {return ROBuf();}
+        if(stat->st_size <  this->m_pos) {
+            this->m_error = true;
+            return ROBuf();
+        }
+        return this->__read(stat->st_size - this->m_pos, nullptr, nullptr);
+    }
+
+    auto ptr = new uvfile_state(this, reinterpret_cast<void*>(cb), data);
+    this->add_callback(ptr);
+    this->stat(stat_callback_for_readall, ptr);
+
+    return ROBuf();
+} //}
 
 std::shared_ptr<Stat> UVFile::stat(StatCallback cb, void* data) //{
 {
@@ -286,11 +290,16 @@ std::shared_ptr<Stat> UVFile::stat(StatCallback cb, void* data) //{
 
     if(cb == nullptr) {
         assert(data == nullptr);
+        std::shared_ptr<Stat> stat(nullptr);
         auto rv = uv_fs_fstat(this->mp_loop, req, this->m_fd, nullptr);
-        if(rv < 0)
+        if(rv < 0) {
             this->m_error = true;
+        } else {
+            stat = std::make_shared<Stat>();
+            uv_stat_to_stat(uv_fs_get_statbuf(req), stat.get());
+        }
         freereq(req);
-        return std::shared_ptr<Stat>(nullptr);
+        return stat;
     }
 
     auto ptr = new uvfile_state(this, (void*)cb, data);
@@ -546,9 +555,12 @@ bool UVFile::opened()   {return this->m_fd > 0;}
 bool UVFile::error()    {return this->m_error;}
 uint16_t UVFile::mode() {return this->m_mode;}
 
-static void dummy_close_callback(int status, void*) {}
+static void clean_close_callback(uv_fs_t* req) {freereq(req);}
 UVFile::~UVFile() //{
 {
-    if(this->opened()) this->close(dummy_close_callback, nullptr);
+    if(this->m_fd > 0 && !this->m_close_error) {
+        uv_fs_t* req = new uv_fs_t();
+        uv_fs_close(this->mp_loop, req, this->m_fd, clean_close_callback);
+    }
 } //}
 

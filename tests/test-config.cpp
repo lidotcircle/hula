@@ -60,6 +60,8 @@ void test_server_config2(uv_loop_t* loop) //{
 
     assert(config->validateUser("admin", "password"));
     assert(!config->validateUser("xadmin", "password"));
+
+    delete config;
 } //}
 
 int main() //{

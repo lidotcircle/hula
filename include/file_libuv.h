@@ -37,6 +37,7 @@ class UVFile: virtual public FileAbstraction, protected CallbackManager //{
         bool open(int flags, int mode = 0666, OpenCallback cb = nullptr, void* data = nullptr) override;
         bool close(CloseCallback cb = nullptr, void* data = nullptr) override;
         ROBuf  read(size_t n, ReadCallback cb = nullptr, void* data = nullptr) override;
+        ROBuf  readremain(ReadCallback cb = nullptr, void* data = nullptr) override;
         size_t write(ROBuf buf, WriteCallback cb = nullptr, void* data = nullptr) override;
 
         bool seek(int offset, SeekType type = SeekType::START, SeekCallback cb = nullptr, void* data = nullptr) override;
@@ -51,6 +52,6 @@ class UVFile: virtual public FileAbstraction, protected CallbackManager //{
         bool     error() override;
         uint16_t mode() override;
 
-        virtual ~UVFile();
+        ~UVFile();
 }; //}
 

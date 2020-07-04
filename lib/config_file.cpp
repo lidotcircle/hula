@@ -53,13 +53,13 @@ bool ConfigFile::loadFromFile(LoadCallback cb, void* data) //{
 
     ROBuf buf;
     if(cb == nullptr) {
-        buf = this->read(-1, nullptr, nullptr);
+        buf = this->readremain(nullptr, nullptr);
         if(buf.size() == 0) {
-            this->setError("read() fail");
+            this->setError("readremain() fail");
             return false;
         }
     } else {
-        this->read(-1, read_callback, ptr);
+        this->readremain(read_callback, ptr);
         return true;
     }
 
@@ -98,7 +98,7 @@ void ConfigFile::open_callback(int status, void* data) //{
     }
 
     _this->add_callback(msg);
-    _this->read(-1, read_callback, msg);
+    _this->readremain(read_callback, msg);
 } //}
 /** [static] */
 void ConfigFile::seek_callback(int status, void* data) //{
@@ -120,7 +120,7 @@ void ConfigFile::seek_callback(int status, void* data) //{
     }
 
     _this->add_callback(msg);
-    _this->read(-1, read_callback, msg);
+    _this->readremain(read_callback, msg);
 } //}
 /** [static] */
 void ConfigFile::read_callback(ROBuf buf, int status, void* data) //{
@@ -135,7 +135,7 @@ void ConfigFile::read_callback(ROBuf buf, int status, void* data) //{
     _this->remove_callback(msg);
 
     if(status < 0) {
-        _this->setError("read() fail");
+        _this->setError("readremain() fail");
         _cb(-1, _data);
         return;
     }
