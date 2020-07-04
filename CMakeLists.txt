@@ -16,32 +16,36 @@ set(kproxy_lib_src
     lib/kserver_server.cpp
     lib/kserver_server2net.cpp
     lib/kserver_multiplexer.cpp
+    lib/kserver_config.cpp
 
     lib/stream.cpp
     lib/stream_libuv.cpp
     lib/stream_memory.cpp
+
+    lib/file_libuv.cpp
+    lib/config_file.cpp
 
     lib/kclient_relay.cpp
     lib/kclient_server.cpp
     lib/kclient_socks5.cpp
     lib/kclient_clientproxy.cpp
     lib/kclient_multiplexer.cpp
+    lib/kclient_config.cpp
 
     lib/kpacket.cpp
+    lib/socks5.cpp
 
     lib/logger.cpp
+
+    lib/events.cpp
     lib/readonly_buf.cpp
+    lib/ObjectFactory.cpp
+    lib/object_manager.cpp
 
     lib/utils.cpp
     lib/utils_hideuv.cpp
     lib/libuv_utils.cpp
 
-    lib/ObjectFactory.cpp
-
-    lib/events.cpp
-    lib/config_file.cpp
-    lib/socks5.cpp
-    lib/object_manager.cpp
     lib/tcpabstraction.cpp
     lib/websocket.cpp
     lib/websocket_libuv.cpp

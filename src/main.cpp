@@ -41,7 +41,7 @@ int main() //{
 
     uv_tcp_t* tcp = new uv_tcp_t();
     uv_tcp_init(&loop, tcp);
-    auto config = std::shared_ptr<ServerConfig>(new ServerConfig(&loop, "../tests/server_config.json"));
+    auto config = std::shared_ptr<ServerConfig>(new UVServerConfig(&loop, "../tests/server_config.json"));
     config->loadFromFile(nullptr, nullptr);
     KProxyServer::UVServer server(tcp, config);
 

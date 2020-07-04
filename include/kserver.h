@@ -3,7 +3,7 @@
 #include "events.h"
 #include "utils.h"
 #include "kpacket.h"
-#include "config_file.h"
+#include "kserver_config.h"
 #include "config.h"
 #include "object_manager.h"
 

@@ -10,7 +10,7 @@
 #include "robuf.h"
 #include "utils.h"
 #include "events.h"
-#include "config_file.h"
+#include "kclient_config.h"
 #include "dlinkedlist.hpp"
 #include "socks5.h"
 #include "object_manager.h"

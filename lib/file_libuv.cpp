@@ -378,7 +378,7 @@ void UVFile::write_callback(uv_fs_t* p_req) //{
     delete rbuf;
  
     CAST_OUT_DATA(ReadCallback);
-    assert(uv_fs_get_type(req.get()) == uv_fs_type::UV_FS_READ);
+    assert(uv_fs_get_type(req.get()) == uv_fs_type::UV_FS_WRITE);
 
     if(!run) {
         _cb(ROBuf(), -1, _data);
@@ -482,6 +482,53 @@ void UVFile::stat_callback_for_seek(std::shared_ptr<Stat> stat, int status, void
     else    _cb(1, _data);
 } //}
 
+bool UVFile::truncate(size_t size, TruncateCallback cb, void* data) //{
+{
+    assert(this->m_fd > 0);
+    assert(this->m_error == false);
+
+    uv_fs_t* req = new uv_fs_t();
+
+    if(cb == nullptr) {
+        assert(data == nullptr);
+        auto rv = uv_fs_ftruncate(this->mp_loop, req, this->m_fd, size, nullptr);
+        if(rv < 0) {
+            this->m_error = true;
+            freereq(req);
+            return false;
+        }
+        this->m_pos = 0;
+        return true;
+    }
+
+    auto ptr = new uvfile_state(this, reinterpret_cast<void*>(cb), data);
+    this->add_callback(ptr);
+    uv_req_set_data((uv_req_t*)req, ptr);
+
+    uv_fs_ftruncate(this->mp_loop, req, this->m_fd, size, truncate_callback);
+    return true;
+} //}
+/** [static] */
+void UVFile::truncate_callback(uv_fs_t* p_req) //{
+{
+    CAST_OUT_DATA(TruncateCallback);
+    assert(uv_fs_get_type(req.get()) == uv_fs_type::UV_FS_FTRUNCATE);
+    
+    if(!run) {
+        _cb(-1, _data);
+        return;
+    }
+    _this->remove_callback(msg);
+
+    if(req->result < 0) {
+        _this->m_error = true;
+        _cb(-1, _data);
+    } else {
+        _cb(0, _data);
+        _this->m_pos = 0;
+    }
+} //}
+
 bool UVFile::reopen(const std::string& filename, int flag, int mode, OpenCallback cb, void* data) //{
 {
     this->m_filename = filename;
@@ -498,4 +545,10 @@ const std::string& UVFile::filename() {return this->m_filename;}
 bool UVFile::opened()   {return this->m_fd > 0;}
 bool UVFile::error()    {return this->m_error;}
 uint16_t UVFile::mode() {return this->m_mode;}
+
+static void dummy_close_callback(int status, void*) {}
+UVFile::~UVFile() //{
+{
+    if(this->opened()) this->close(dummy_close_callback, nullptr);
+} //}
 

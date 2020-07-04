@@ -1,4 +1,5 @@
-#include "../include/config_file.h"
+#include "../include/kclient_config.h"
+#include "../include/kserver_config.h"
 #include "../include/logger.h"
 
 #include <assert.h>
@@ -36,26 +37,25 @@ void load_cb(int error, void* data) //{
     std::cout << "-- pass read config test" << std::endl;
 
     config->Users()["test"] = "test_password";
-    config->new_file("./good.json");
 
     config->writeToFile(write_cb, config);
 } //}
 
 void test_client_config(uv_loop_t* loop) //{
 {
-    ClientConfig* config = new ClientConfig(loop, "../tests/client_config.json");
+    ClientConfig* config = new UVClientConfig(loop, "../tests/client_config.json");
     config->loadFromFile(load_cb, config);
 } //}
 
 void test_server_config(uv_loop_t* loop) //{
 {
-    ServerConfig* config = new ServerConfig(loop, "../tests/server_config.json");
+    ServerConfig* config = new UVServerConfig(loop, "../tests/server_config.json");
     config->loadFromFile(load_cb_server, config);
 } //}
 
 void test_server_config2(uv_loop_t* loop) //{
 {
-    ServerConfig* config = new ServerConfig(loop, "../tests/server_config.json");
+    ServerConfig* config = new UVServerConfig(loop, "../tests/server_config.json");
     config->loadFromFile(nullptr, nullptr);
 
     assert(config->validateUser("admin", "password"));

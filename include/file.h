@@ -37,6 +37,7 @@ class FileAbstraction //{
         using WriteCallback    = void (*)(ROBuf buf, int status, void* data);
         using SeekCallback     = void (*)(int status, void* data);
         using StatCallback     = void (*)(std::shared_ptr<Stat> stat, int status, void* data);
+        using TruncateCallback = void (*)(int status, void* data);
 
 
     public:
@@ -52,6 +53,8 @@ class FileAbstraction //{
 
         virtual bool reopen(const std::string& filename, int flags, int mode, OpenCallback cb = nullptr, void* data = nullptr) = 0;
         virtual const std::string& filename() = 0;
+
+        virtual bool truncate(size_t size, TruncateCallback cb, void* data) = 0;
 
         virtual bool     opened() = 0;
         virtual bool     error() = 0;

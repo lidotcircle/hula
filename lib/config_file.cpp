@@ -1,688 +1,271 @@
 #include "../include/config_file.h"
-#include "../include/utils.h"
 #include "../include/config.h"
 
 #include <assert.h>
-
+#include <stdio.h>
 #include <uv.h>
 
-#include <exception>
 
-
-//                      class SingleServerInfo             //{
-SingleServerInfo::SingleServerInfo(const std::string& addr,    uint16_t port, const std::string& server_name,
-                                   const std::string& name, const std::string& pass,
-                                   const std::string& cert, const std::string& cipher) //{
+struct load_state: public CallbackPointer {
+    ConfigFile* _this;
+    ConfigFile::LoadCallback _cb;
+    void* _data;
+    load_state(decltype(_this) _this, decltype(_cb) cb, void* data): _this(_this), _cb(cb), _data(data) {}
+};
+bool ConfigFile::loadFromFile(LoadCallback cb, void* data) //{
 {
-    this->m_addr = addr;
-    this->m_port = k_htons(port); // FIXME ??
+    this->clearError();
 
-    this->m_server_name = server_name;
+    load_state* ptr = nullptr;
+    if(cb != nullptr) {
+        ptr = new load_state(this, cb, data);
+        this->add_callback(ptr);
+    } else assert(data == nullptr);
 
-    this->m_user = name;
-    this->m_pass = pass;
-    this->m_cert = cert;
-    this->m_cipher = cipher;
-} //}
-
-json SingleServerInfo::to_json() //{
-{
-    json result = json::object();
-    result["server_name"] = this->m_server_name;
-    result["address"] = this->m_addr;
-    result["port"]    = this->m_port; // FIXME ??
-    result["certificate"] = this->m_cert;
-    result["cipher"] = this->m_cipher;
-    result["username"] = this->m_user;
-    result["password"] = this->m_pass;
-    return result;
-} //}
-
-//}
-
-
-//                 class ClientConfig                      //{
-ClientConfig::ClientConfig(uv_loop_t* loop, const char* filename) //{
-{
-    this->mp_loop = loop;
-    this->m_state = CONFIG_UNINIT;
-    this->m_filename = std::string(filename);
-
-    this->m_policy.m_rule = PROXY_RULE_ALL;
-    this->m_policy.m_mode = PROXY_MODE_PORT;
-    this->m_policy.m_addr = 0;
-    this->m_policy.m_port = 1080;
-} //}
-
-bool ClientConfig::validateUser(const std::string& username, const std::string& password) //{
-{
-    assert(this->m_state > CONFIG_ERROR);
-
-    auto u = this->m_accounts.find(username);
-    if(u == this->m_accounts.end()) return false;
-    if(u->second != password) return false;
-    return true;
-} //}
-
-int ClientConfig::loadFromFile(LoadCallback cb, void* data) //{
-{
-    uv_fs_t req;
-    int fd = uv_fs_open(nullptr, &req, 
-                      this->m_filename.c_str(), O_RDONLY,
-                      0, nullptr);
-    uv_fs_req_cleanup(&req);
-    if(fd < 0) {
-        this->m_error = "fail to open file";
-        cb(errno, data);
-        return -1;
+    bool seek = true;
+    if(!this->opened()) {
+        if(cb == nullptr) {
+            auto rv = this->open(O_RDWR, 0644, nullptr, nullptr);
+            if(!rv) {
+                this->setError("open() fail");
+                return false;
+            }
+            seek = false;
+        } else {
+            this->open(O_RDWR, 0644, open_callback, ptr);
+            return true;
+        }
     }
 
-    int status = uv_fs_fstat(nullptr, &req, fd, nullptr);
+    assert(this->opened());
+    if(seek) {
+        if(cb == nullptr) {
+            auto rv = this->seek(0, SeekType::START, nullptr, nullptr);
+            if(!rv) {
+                this->setError("seek() fail");
+                return false;
+            }
+        } else {
+            this->seek(0, SeekType::START, seek_callback, ptr);
+            return true;
+        }
+    }
+
+    ROBuf buf;
+    if(cb == nullptr) {
+        buf = this->read(-1, nullptr, nullptr);
+        if(buf.size() == 0) {
+            this->setError("read() fail");
+            return false;
+        }
+    } else {
+        this->read(-1, read_callback, ptr);
+        return true;
+    }
+
+    if(this->fromROBuf(buf)) {
+        return true;
+    } else {
+        return false;
+    }
+} //}
+
+#define CASTOUT()  \
+    load_state* msg = \
+        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data)); \
+    assert(msg); \
+    auto _this = msg->_this; \
+    auto _cb = msg->_cb; \
+    auto _data = msg->_data; \
+    auto run = msg->CanRun();
+/** [static] */
+void ConfigFile::open_callback(int status, void* data) //{
+{
+    CASTOUT();
+
+    if(!run) {
+        delete msg;
+        _cb(-1, _data);
+        return;
+    }
+    _this->remove_callback(msg);
+
     if(status < 0) {
-        this->m_error = "fail to stat config file";
-        uv_fs_close(nullptr, &req, fd, nullptr);
-        uv_fs_req_cleanup(&req);
-        cb(errno, data);
-        return -1;
+        _this->setError("open() fail");
+        delete msg;
+        _cb(-1, _data);
+        return;
     }
 
-    uv_buf_t* buf = new uv_buf_t();
-    buf->base = (char*)malloc(uv_fs_get_statbuf(&req)->st_size + 1);
-    buf->base[uv_fs_get_statbuf(&req)->st_size] = '\0';
-    buf->len = uv_fs_get_statbuf(&req)->st_size;
-    uv_fs_req_cleanup(&req);
+    _this->add_callback(msg);
+    _this->read(-1, read_callback, msg);
+} //}
+/** [static] */
+void ConfigFile::seek_callback(int status, void* data) //{
+{
+    CASTOUT();
 
-    uv_fs_t* read_req = new uv_fs_t();
-    uv_req_set_data((uv_req_t*)read_req, 
-            new std::tuple<ClientConfig*, uv_file, uv_buf_t*, LoadCallback, void*>(this, fd, buf, cb, data));
-    return uv_fs_read(this->mp_loop, read_req, fd, buf, 1, 0, ClientConfig::read_file_callback);
+    if(!run) {
+        delete msg;
+        _cb(-1, _data);
+        return;
+    }
+    _this->remove_callback(msg);
 
-    /*
-    uv_fs_req_cleanup(&req);
-    if(nread != buf.len) {
-        this->m_error = "fail to read config file";
-        free(buf.base);
-        uv_fs_close(nullptr, &req, fd, nullptr);
-        uv_fs_req_cleanup(&req);
-        cb(1, data);
-        return -1;
+    if(status < 0) {
+        _this->setError("seek() fail");
+        delete msg;
+        _cb(-1, _data);
+        return;
     }
 
-    json jsonx;
-    try {
-         jsonx = json::parse(std::string(buf.base)); // FIXME json error
-    } catch (nlohmann::detail::parse_error err) {
-        this->m_error = err.what();
-        free(buf.base);
-        uv_fs_close(nullptr, &req, fd, nullptr);
-        uv_fs_req_cleanup(&req);
-        cb(1, data);
-        return -1;
+    _this->add_callback(msg);
+    _this->read(-1, read_callback, msg);
+} //}
+/** [static] */
+void ConfigFile::read_callback(ROBuf buf, int status, void* data) //{
+{
+    CASTOUT();
+    delete msg;
+
+    if(!run) {
+        _cb(-1, _data);
+        return;
+    }
+    _this->remove_callback(msg);
+
+    if(status < 0) {
+        _this->setError("read() fail");
+        _cb(-1, _data);
+        return;
     }
 
-    free(buf.base);
-    uv_fs_close(nullptr, &req, fd, nullptr);
-    uv_fs_req_cleanup(&req);
-
-    if(this->from_json(jsonx, cb, data) < 0) {
-        cb(1, data);
-        return -1;
-    }
-    cb(0, data);
-    return 0;
-    */
+    if(_this->fromROBuf(buf))
+        _cb(0, _data);
+    else
+        _cb(-1, _data);
 } //}
 
 /** [static] */
-void ClientConfig::read_file_callback(uv_fs_t* req) //{
+void ConfigFile::close_callback(int status, void* data) {}
+
+
+using write_state = load_state;
+bool ConfigFile::writeToFile(WriteCallback cb, void* data) //{
 {
-    assert(uv_fs_get_type(req) == uv_fs_type::UV_FS_READ);
-    std::tuple<ClientConfig*, uv_file, uv_buf_t*, LoadCallback, void*>* x = 
-        (std::tuple<ClientConfig*, uv_file, uv_buf_t*, LoadCallback, void*>*)uv_req_get_data((uv_req_t*)req);
-    ClientConfig* _this;
-    uv_buf_t* uv_buf;
-    uv_file file_fd;
-    LoadCallback cb;
-    void* data;
-    std::tie(_this, file_fd, uv_buf, cb, data) = *x;
-    delete x;
+    this->clearError();
 
-    uv_fs_req_cleanup(req);
-
-    int open_status = uv_fs_get_system_error(req);
-    if(open_status > 0) {
-        _this->m_state = CONFIG_ERROR;
-        _this->m_error = "fail to open file";
-        Logger::logger->debug("%s", uv_buf->base); // TODO
-        cb(open_status, data);
-
-        free(uv_buf->base);
-        delete uv_buf;
-
-        uv_fs_close(_this->mp_loop, req, file_fd, ClientConfig::close_file_callback);
-
-        return;
-    }
-
-    json jsonx;
-    try {
-         jsonx = json::parse(std::string(uv_buf->base)); // FIXME json error
-    } catch (nlohmann::detail::parse_error err) {
-        _this->m_error = err.what();
-        free(uv_buf->base);
-        cb(1, data);
-        uv_fs_close(nullptr, req, file_fd, nullptr);
-        uv_fs_req_cleanup(req);
-        delete req;
-        delete uv_buf;
-        return;
-    }
-
-    free(uv_buf->base);
-    uv_fs_close(nullptr, req, file_fd, nullptr);
-    uv_fs_req_cleanup(req);
-    delete req;
-    delete uv_buf;
-
-    if(_this->from_json(jsonx) < 0) {
-        if(_this->m_error == "") _this->m_error = "bad json";
-        __logger->error("%s", _this->m_error.c_str());
-        cb(1, data);
-        return;
-    }
-    _this->m_state = CONFIG_SYNC;
-    if(cb != nullptr) cb(0, data);
-    return;
-} //}
-void ClientConfig::close_file_callback(uv_fs_t* req) //{
-{
-    assert(uv_fs_get_type(req) == uv_fs_type::UV_FS_CLOSE);
-    delete req;
-} //}
-
-int ClientConfig::from_json(const json& jsonx) //{
-{
-    __logger->debug("call ClientConfig::from_json()");
-    if(this->set_policy(jsonx) < 0) {
-        this->m_state = CONFIG_ERROR;
-        return -1;
-    }
-    if(this->set_servers(jsonx) < 0) {
-        this->m_state = CONFIG_ERROR;
-        return -1;
-    }
-    if(this->set_users(jsonx) < 0) {
-        this->m_state = CONFIG_ERROR;
-        return -1;
-    }
-    this->m_state = CONFIG_SYNC;
-    return 0;
-} //}
-
-static bool get_valid_port(const json& x, uint16_t* out) //{
-{
-    assert(x.is_number() || x.is_string());
-    uint64_t port_x;
-    if(x.is_number()) {
-        port_x = x.get<uint64_t>();
-    } else {
-        port_x = atoi(x.get<std::string>().c_str());
-    }
-
-    if(port_x > 1 << 16 || port_x == 0) return false;
-    *out = port_x;
-    return true;
-} //}
-int ClientConfig::set_policy(const json& jsonx) //{
-{
-    if(jsonx.find("mode") == jsonx.end() || 
-       jsonx.find("rule") == jsonx.end() || 
-       jsonx.find("bind_address") == jsonx.end() || 
-       jsonx.find("bind_port") == jsonx.end() || 
-       jsonx.find("socks5_authentication") == jsonx.end()) {
-        this->m_error = "policy fields don't match required";
-        return -1;
-    }
-
-    auto mode = jsonx["mode"];
-    auto rule = jsonx["rule"];
-    auto bind_address = jsonx["bind_address"];
-    auto bind_port = jsonx["bind_port"];
-    auto method = jsonx["socks5_authentication"];
-    if(!mode.is_string()) {
-        this->m_error = "invalid proxy mode";
-        return -1;
-    }
-    if(!rule.is_string()) {
-        this->m_error = "invalid proxy rule";
-        return -1;
-    }
-    if(!method.is_string()) {
-        this->m_error = "invalid method";
-        return -1;
-    }
-    if(!bind_address.is_string()) return -1;
-    if(!bind_port.is_string() && !bind_port.is_number()) return -1;
-
-    if(mode.get<std::string>() == "global") {
-        this->m_policy.m_mode = PROXY_MODE_GLOBAL;
-    } else if(mode.get<std::string>() == "port") {
-        this->m_policy.m_mode = PROXY_MODE_PORT;
-    } else {
-        this->m_error = "incorrect proxy mode";
-        return -1;
-    }
-
-    if(rule.get<std::string>() == "all") {
-        this->m_policy.m_rule = PROXY_RULE_ALL;
-    } else if(rule.get<std::string>() == "match") {
-        this->m_policy.m_rule = PROXY_RULE_MATCH;
-    } else if(rule.get<std::string>() == "nomatch") {
-        this->m_policy.m_rule = PROXY_RULE_NOT_MATCH;
-    } else {
-        this->m_error = "incorrect proxy rule";
-        return -1;
-    }
-
-    if(method.get<std::string>() == "allowed") {
-        this->m_policy.m_method = SOCKS5_NO_REQUIRED;
-    } else if(method.get<std::string>() == "password") {
-        this->m_policy.m_method = SOCKS5_PASSWORD;
-    } else {
-        this->m_error = "incorrect authentication method";
-        return -1;
-    }
-
-    uint32_t ipv4;
-    if(str_to_ip4(bind_address.get<std::string>().c_str(), &ipv4) == false)
-        return -1;
-    this->m_policy.m_addr = ipv4;
-
-    uint16_t port_x;
-    if(!get_valid_port(bind_port, &port_x)) {
-        return -1;
-    }
-    this->m_policy.m_port = port_x;
-
-    return 0;
-} //}
-int ClientConfig::set_servers(const json& jsonx) //{
-{
-    this->m_servers.clear();
-    if(jsonx.find("servers") == jsonx.end())
-        return 0;
-
-    if(!jsonx["servers"].is_array()) {
-        this->m_error = "bad config format at 'servers'";
-        return -1;
-    }
-
-    json m = jsonx["servers"];
-    for(auto j = m.begin(); j != m.end(); j++) {
-        if(!j->is_object()) {
-            // TODO report bad format
-            continue;
-        }
-        if(!j->at("server_name").is_string() ||
-           !j->at("address").is_string() ||
-           (!j->at("port").is_string() && !j->at("port").is_number()) ||
-           !j->at("certificate").is_string() ||
-           !j->at("cipher").is_string() ||
-           !j->at("username").is_string() ||
-           !j->at("password").is_string()
-          ) {
-            // TODO report bad format
-            continue;
-        }
-        // TODO address check, cipher check, certificate check
-        uint16_t port;
-        if(!get_valid_port(j->at("port"), &port)) {
-            // TODO report error
-            return -1;
-        }
-        auto server_name = j->at("server_name").get<std::string>();
-        auto address     = j->at("address").get<std::string>();
-        auto certificate = j->at("certificate").get<std::string>();
-        auto cipher      = j->at("cipher").get<std::string>();
-        auto username    = j->at("username").get<std::string>();
-        auto password    = j->at("password").get<std::string>();
-
-        this->m_servers.push_back(
-                SingleServerInfo(address, port, 
-                                 server_name, username, 
-                                 password, certificate, cipher));
-    }
-    return 0;
-} //}
-int ClientConfig::set_users(const json& jsonx) //{
-{
-    this->m_accounts.clear();
-    if(jsonx.find("local_users") == jsonx.end())
-        return 0;
-
-    if(!jsonx["local_users"].is_array()) {
-        this->m_error = "bad format in 'local_users'";
-        return -1;
-    }
-
-
-    json m = jsonx["local_users"];
-    for(auto j = m.begin(); j != m.end(); j++) {
-        if(!j->is_object()) {
-            // TODO report bad format
-            continue;
-        }
-        if(!j->at("username").is_string() ||
-           !j->at("password").is_string()
-          ) {
-            // TODO report bad format
-            continue;
-        }
-        auto username    = j->at("username").get<std::string>();
-        auto password    = j->at("password").get<std::string>();
-
-        if(this->m_accounts.find(username) != this->m_accounts.end()) {
-            // report duplicated username
-            continue;
-        }
-        this->m_accounts[username] = password;
-    }
-    return 0;
-} //}
-
-
-int ClientConfig::writeToFile(WriteCallback cb, void* data) //{
-{
-    // TODO state ?
-    auto json_data = this->to_json().dump(4);
-    uv_fs_t req;
-    int fd = uv_fs_open(nullptr, &req, 
-                      this->m_filename.c_str(), O_WRONLY | O_TRUNC | O_CREAT,
-                      S_IRWXU | S_IRWXG | S_IRWXO, nullptr);
-    uv_fs_req_cleanup(&req);
-    if(fd < 0) {
-        this->m_error = "open file '" + this->m_filename + "' fail";
-        cb(errno, data);
-        return -1;
-    }
-
-    uv_buf_t* buf = new uv_buf_t();
-    buf->base = (char*)malloc(json_data.size() + 1);
-    memcpy(buf->base, json_data.c_str(), json_data.size() + 1);
-    buf->len = json_data.size() + 1;
-
-    uv_fs_t* write_req = new uv_fs_t();
-    uv_req_set_data((uv_req_t*)write_req, 
-            new std::tuple<ClientConfig*, uv_file, uv_buf_t*, WriteCallback, void*>(
-                this, fd, buf, cb, data));
-
-    uv_fs_write(this->mp_loop, write_req, fd, buf, 1, 0, ClientConfig::write_file_callback);
-    return 0;
-} //}
-
-json ClientConfig::to_json() //{
-{
-    json result = json::object();
-    switch(this->m_policy.m_mode) {
-        case PROXY_MODE_GLOBAL: 
-            result["mode"] = "global";
-            break;
-        case PROXY_MODE_PORT:
-            result["mode"] = "port";
-            break;
-    }
-    switch(this->m_policy.m_rule) {
-        case PROXY_RULE_ALL:
-            result["rule"] = "all";
-            break;
-        case PROXY_RULE_MATCH:
-            result["rule"] = "match";
-            break;
-        case PROXY_RULE_NOT_MATCH:
-            result["rule"] = "nomatch";
-            break;
-    }
-    result["bind_address"] = std::string(ip4_to_str(this->m_policy.m_addr));
-    result["bind_port"]    = this->m_policy.m_port; // FIXME
-
-    result["servers"] = this->servers_to_json();
-    result["local_users"]   = this->users_to_json();
-    return result;
-} //}
-json ClientConfig::servers_to_json() //{
-{
-    json result = json::array();
-    for(auto& i: this->m_servers) 
-        result.push_back(i.to_json());
-    return result;
-} //}
-json ClientConfig::users_to_json() //{
-{
-    json result = json::array();
-    for(auto& i: this->m_accounts) {
-        json user = json::object();
-        user["username"] = i.first;
-        user["password"] = i.second;
-        result.push_back(user);
-    }
-
-    return result;
-} //}
-
-// static
-void ClientConfig::write_file_callback(uv_fs_t* req) //{
-{
-    assert(uv_fs_get_type(req) == uv_fs_type::UV_FS_WRITE);
-    std::tuple<ClientConfig*, uv_file, uv_buf_t*, WriteCallback, void*>* x =
-        (std::tuple<ClientConfig*, uv_file, uv_buf_t*, WriteCallback, void*>*) uv_req_get_data((uv_req_t*)req);
-    ClientConfig* _this;
-    uv_file file_fd;
-    uv_buf_t* uv_buf;
-    WriteCallback cb;
-    void* data;
-    std::tie(_this, file_fd, uv_buf, cb, data) = *x;
-
-    int error_code = uv_fs_get_system_error(req);
-
-    delete x;
-    free(uv_buf->base);
-    delete uv_buf;
-    uv_fs_req_cleanup(req);
-
-    if(error_code > 0) {
-        _this->m_error = "write to file fail";
-        cb(error_code, data);
-    } else {
-        cb(0, data);
-    }
-
-    uv_fs_close(_this->mp_loop, req, file_fd, ClientConfig::close_file_callback);
-    return;
-} //}
-
-//}
-
-
-//                   class ServerConfig                  //{
-ServerConfig::ServerConfig(uv_loop_t* loop, const std::string& filename) //{
-{
-    this->m_bind_addr = 0;
-    this->m_bind_port = 1122;
-    this->mp_loop = loop;
-    this->m_filename = filename;
-    this->m_state = CONFIG_UNINIT;
-} //}
-
-bool ServerConfig::validateUser(const std::string& username, const std::string& password) //{
-{
-    assert(this->m_state > CONFIG_ERROR);
-
-    auto u = this->m_users.find(username);
-    if(u == this->m_users.end()) return false;
-    if(u->second != password) return false;
-    return true;
-} //}
-
-int ServerConfig::loadFromFile(LoadCallback cb, void* data) //{
-{
-    uv_fs_t req;
-    int fd = uv_fs_open(nullptr, &req, 
-                      this->m_filename.c_str(), O_RDONLY,
-                      0, nullptr);
-    uv_fs_req_cleanup(&req);
-    if(fd < 0) {
-        this->m_error = "fail to open file";
-        if(cb != nullptr) cb(errno, data);
-        return -1;
-    }
-
-    int status = uv_fs_fstat(nullptr, &req, fd, nullptr);
-    if(status < 0) {
-        this->m_error = "fail to stat config file";
-        uv_fs_close(nullptr, &req, fd, nullptr);
-        uv_fs_req_cleanup(&req);
-        if(cb != nullptr) cb(errno, data);
-        return -1;
-    }
-
-    uv_buf_t* buf = new uv_buf_t();
-    buf->base = (char*)malloc(uv_fs_get_statbuf(&req)->st_size + 1);
-    buf->base[uv_fs_get_statbuf(&req)->st_size] = '\0';
-    buf->len = uv_fs_get_statbuf(&req)->st_size;
-    uv_fs_req_cleanup(&req);
-
-    uv_fs_t* read_req = new uv_fs_t();
-    uv_req_set_data((uv_req_t*)read_req, 
-            new std::tuple<ServerConfig*, uv_file, uv_buf_t*, LoadCallback, void*>(this, fd, buf, cb, data));
+    write_state* ptr = nullptr;
     if(cb != nullptr) {
-        return uv_fs_read(this->mp_loop, read_req, fd, buf, 1, 0, ServerConfig::read_file_callback);
-    } else {
-        int ret = uv_fs_read(this->mp_loop, read_req, fd, buf, 1, 0, nullptr);
-        ServerConfig::read_file_callback(read_req);
-        if(this->m_error.size() == 0)
-            return ret;
-        else
-            return -1;
-    }
-} //}
+        ptr = new write_state(this, cb, data);
+        this->add_callback(ptr);
+    } else assert(data == nullptr);
 
-// static
-void ServerConfig::read_file_callback(uv_fs_t* req) //{
-{
-    assert(uv_fs_get_type(req) == uv_fs_type::UV_FS_READ);
-    std::tuple<ServerConfig*, uv_file, uv_buf_t*, LoadCallback, void*>* x = 
-        (std::tuple<ServerConfig*, uv_file, uv_buf_t*, LoadCallback, void*>*)uv_req_get_data((uv_req_t*)req);
-    ServerConfig* _this;
-    uv_buf_t* uv_buf;
-    uv_file file_fd;
-    LoadCallback cb;
-    void* data;
-    std::tie(_this, file_fd, uv_buf, cb, data) = *x;
-    delete x;
-
-    uv_fs_req_cleanup(req);
-
-    int open_status = uv_fs_get_system_error(req);
-    if(open_status > 0) {
-        _this->m_state = CONFIG_ERROR;
-        _this->m_error = "fail to open file";
-        Logger::logger->debug("%s", uv_buf->base); // TODO
-        if(cb != nullptr) cb(open_status, data);
-
-        free(uv_buf->base);
-        delete uv_buf;
-
-        uv_fs_close(nullptr, req, file_fd, nullptr);
-        delete req;
-
-        return;
-    }
-
-    json jsonx;
-    try {
-         jsonx = json::parse(std::string(uv_buf->base));
-    } catch (nlohmann::detail::parse_error err) {
-        _this->m_error = err.what();
-        free(uv_buf->base);
-        if(cb != nullptr) cb(1, data);
-        uv_fs_close(nullptr, req, file_fd, nullptr);
-        uv_fs_req_cleanup(req);
-        delete req;
-        delete uv_buf;
-        return;
-    }
-
-    free(uv_buf->base);
-    uv_fs_close(nullptr, req, file_fd, nullptr);
-    uv_fs_req_cleanup(req);
-    delete req;
-    delete uv_buf;
-
-    if(_this->from_json(jsonx) < 0) {
-        if(_this->m_error == "") _this->m_error = "bad json";
-        __logger->error("%s", _this->m_error.c_str());
-        cb(1, data);
-        return;
-    }
-    _this->m_state = CONFIG_SYNC;
-    if(cb != nullptr) cb(0, data);
-    return;
-} //}
-
-int ServerConfig::from_json(const json& jsonx) //{
-{
-    if(!jsonx.is_object()) return -1;
-    if(jsonx.find("rsa_private_key") == jsonx.end()) return -1;
-    if(!jsonx["rsa_private_key"].is_string()) return -1;
-    this->m_rsa_private_key = jsonx["rsa_private_key"].get<std::string>();
-
-    if(jsonx.find("cipher") == jsonx.end()) return -1;
-    if(!jsonx["cipher"].is_string()) return -1;
-    this->m_cipher = jsonx["cipher"].get<std::string>();
-
-    if(jsonx.find("bind_address") == jsonx.end()) return -1;
-    if(!jsonx["bind_address"].is_string()) return -1;
-
-    uint32_t addr;
-    if(str_to_ip4(jsonx["bind_address"].get<std::string>().c_str(), &addr) == false) {
-        logger->error("bad ipv4 address '%s'", jsonx["bind_address"].get<std::string>().c_str());
-        return -1;
-    }
-    this->m_bind_addr = k_ntohl(addr);
-    
-    if(jsonx.find("bind_port") == jsonx.end()) return -1;
-    if(!jsonx["bind_port"].is_string() && !jsonx["bind_port"].is_number()) return -1;
-    uint16_t port;
-    if(get_valid_port(jsonx["bind_port"], &port) == false) {
-        logger->error("bad port");
-        return -1;
-    }
-    this->m_bind_port = port;
-
-    if(jsonx.find("users") == jsonx.end()) {
-        logger->warn("server without any user maybe useless");
-        return 0;
-    }
-
-    if(!jsonx["users"].is_array()) return -1;
-
-    json users = jsonx["users"];
-    for(auto& i: users) {
-        if(i.find("username") == i.end() ||
-           i.find("password") == i.end() ||
-           !i["username"].is_string() ||
-           !i["password"].is_string()) {
-            logger->warn("bad user account");
-            continue;
+    if(!this->opened()) {
+        if(cb == nullptr) {
+            auto rv = this->open(O_RDWR | O_CREAT, 0644, nullptr, nullptr);
+            if(!rv) {
+                this->setError("open fail");
+                return false;
+            }
+        } else {
+            this->open(O_RDWR | O_CREAT, 0644, open_callback_for_write, ptr);
+            return true;
         }
-        this->m_users[i["username"].get<std::string>()] = i["password"].get<std::string>();
     }
 
-    return 0;
+    assert(this->opened());
+
+    if(cb == nullptr) {
+        bool rv = this->truncate(0, nullptr, nullptr);
+        if(rv == false) {
+            this->setError("truncate() fail");
+            return false;
+        }
+    } else {
+        this->truncate(0, truncate_callback_for_write, ptr);
+        return true;
+    }
+
+    ROBuf buf = this->toROBuf();
+    bool rv = this->write(buf, nullptr, nullptr);
+    if(rv == false) this->setError("write() fail");
+    return rv;
+} //}
+#define CASTOUT_WRITE()  \
+    write_state* msg = \
+        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data)); \
+    assert(msg); \
+    auto _this = msg->_this; \
+    auto _cb = msg->_cb; \
+    auto _data = msg->_data; \
+    auto run = msg->CanRun();
+
+/** [static] */
+void ConfigFile::open_callback_for_write(int status, void* data) //{
+{
+    CASTOUT_WRITE();
+
+    if(!run) {
+        delete msg;
+        _cb(-1, _data);
+        return;
+    }
+    _this->remove_callback(msg);
+
+    if(status < 0) {
+        _this->setError("open() fail");
+        delete msg;
+        _cb(-1, _data);
+        return;
+    }
+
+    _this->add_callback(msg);
+    _this->truncate(0, truncate_callback_for_write, msg);
+} //}
+/** [static] */
+void ConfigFile::truncate_callback_for_write(int status, void* data) //{
+{
+    CASTOUT_WRITE();
+
+    if(!run) {
+        delete msg;
+        _cb(-1, _data);
+        return;
+    }
+    _this->remove_callback(msg);
+
+    if(status < 0) {
+        _this->setError("truncate() fail");
+        delete msg;
+        _cb(-1, _data);
+        return;
+    }
+
+    ROBuf buf = _this->toROBuf();
+    _this->add_callback(msg);
+    _this->write(buf, write_callback, msg);
+} //}
+/** [static] */
+void ConfigFile::write_callback(ROBuf buf, int status, void* data) //{
+{
+    CASTOUT_WRITE();
+
+    delete msg;
+    if(!run) {
+        _cb(-1, _data);
+        return;
+    }
+    _this->remove_callback(msg);
+
+    if(status < 0) {
+        _this->setError("write() error");
+        _cb(-1, _data);
+    } else {
+        _cb(0,  _data);
+    }
 } //}
 
-std::string ServerConfig::RSA() {return this->m_rsa_private_key;}
-std::string ServerConfig::Cipher() {return this->m_cipher;}
-//}
-
+void ConfigFile::setError(const std::string& error) {this->m_error.push(error);}
+void ConfigFile::clearError() {this->m_error = std::stack<std::string>();}
 

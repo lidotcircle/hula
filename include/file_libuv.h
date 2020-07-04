@@ -1,3 +1,5 @@
+#pragma once
+
 #include "file.h"
 #include "object_manager.h"
 
@@ -25,6 +27,7 @@ class UVFile: virtual public FileAbstraction, protected CallbackManager //{
         static void stat_callback(uv_fs_t* req);
         static void stat_callback_for_readall(std::shared_ptr<Stat>, int, void*);
         static void stat_callback_for_seek(std::shared_ptr<Stat>, int, void*);
+        static void truncate_callback(uv_fs_t* req);
 
         ROBuf __read(size_t n, ReadCallback cb, void* data);
         bool  setoffset(int offset, SeekType type, size_t filesize);
@@ -39,11 +42,15 @@ class UVFile: virtual public FileAbstraction, protected CallbackManager //{
         bool seek(int offset, SeekType type = SeekType::START, SeekCallback cb = nullptr, void* data = nullptr) override;
         std::shared_ptr<Stat> stat(StatCallback cb, void* data) override;
 
+        bool truncate(size_t size, TruncateCallback cb, void* data) override;
+
         bool reopen(const std::string& filename, int flag = 0, int mode = 0, OpenCallback cb = nullptr, void* data = nullptr) override;
         const std::string& filename() override;
 
         bool     opened() override;
         bool     error() override;
         uint16_t mode() override;
+
+        virtual ~UVFile();
 }; //}
 
