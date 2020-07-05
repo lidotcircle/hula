@@ -28,18 +28,19 @@ void load_cb_server(int error, void* data) //{
     delete config;
 } //}
 
-void load_cb(int error, void* data) //{
+void load_cb(int status, void* data) //{
 {
-    if(error > 0) Logger::logger->debug("%s", strerror(error));
-    assert(error <= 0);
     ClientConfig* config = (ClientConfig*)data;
+
+    assert(status >= 0);
+    assert(config->getError().size() == 0);
+    assert(config->Servers().size() == 1);
+    assert(config->Users().size() == 1);
 
     std::cout << "-- pass read config test" << std::endl;
 
     config->Users()["test"] = "test_password";
-
     assert(config->setNewFile("./hello.json"));
-
     config->writeToFile(write_cb, config);
 } //}
 

@@ -17,9 +17,12 @@
  * @param {ROBuf} income latest recieved buffer
  * @return if get<0>(return) is false, frame error
  */
-std::tuple<bool, ROBuf, ROBuf, PACKET_OPCODE, ConnectionId> decode_packet(const ROBuf remain, const ROBuf income) //{
+std::tuple<bool, bool, ROBuf, ROBuf, PACKET_OPCODE, ConnectionId> decode_packet(const ROBuf remain, const ROBuf income) //{
 {
     xassert(!income.empty());
+
+    PACKET_OPCODE op = PACKET_OPCODE::PACKET_OP_RESERVED;
+    ConnectionId id  = 0xFF;
 
     PacketHeader header;
     memset(&header, 0, sizeof(PacketHeader));
@@ -31,8 +34,12 @@ std::tuple<bool, ROBuf, ROBuf, PACKET_OPCODE, ConnectionId> decode_packet(const 
         i = sizeof(PacketHeader);
     if(i > 0)
         memcpy(&header, remain.base(), i);
-    if(i < sizeof(PacketHeader) || income.size() > 0)
+    if(i < sizeof(PacketHeader))
         memcpy((char*)&header + i, income.base(), __MIN(sizeof(PacketHeader) - i, income.size()));
+
+    i += __MIN(sizeof(PacketHeader) - i, income.size());
+    if(i < offsetof(PacketHeader, extend_length))
+        return std::make_tuple(true, false, ROBuf(), remain + income, op, id);
 
     size_t header_size = 0;
     switch(header.length) {
@@ -50,33 +57,25 @@ std::tuple<bool, ROBuf, ROBuf, PACKET_OPCODE, ConnectionId> decode_packet(const 
             break;
     }
 
-    PACKET_OPCODE op     = (PACKET_OPCODE)header.opcode;
-    ConnectionId id = header.id;
-
     if(remain.size() + income.size() < header_size)
-        return std::make_tuple(true, ROBuf(), remain + income, op, id);
+        return std::make_tuple(true, false, ROBuf(), remain + income, op, id);
 
-    if(len == 0)
-        return std::make_tuple(false, ROBuf(), remain + income, op, id);
+    if((header.length == 0xFE && len < 0xFE) ||
+       (header.length == 0XFF && len < (1 << 16))) 
+        return std::make_tuple(false, false, ROBuf(), ROBuf(), op, id);
 
     if(len + header_size > remain.size() + income.size()) {
-        if(!remain.empty()) {
-            return std::make_tuple(true, ROBuf(), remain + income, op, id);
-        } else {
-            return std::make_tuple(true, ROBuf(), income, op, id);
-        }
+        return std::make_tuple(true, false, ROBuf(), remain + income, op, id);
     } else {
-        ROBuf merge;
-        if(!remain.empty()) {
-            merge = remain + income;
-        } else {
-            merge = income;
-        }
+        op = (PACKET_OPCODE)header.opcode;
+        id = header.id;
+
+        ROBuf merge = remain + income;
         ROBuf frame = ROBuf(merge, len, header_size);
-        if(merge.size() == len + header_size)
-            return std::make_tuple(true, frame, ROBuf(), op, id);
-        ROBuf remain = ROBuf(merge, merge.size() - len - header_size, len + header_size);
-        return std::make_tuple(true, frame, remain, op, id);
+        ROBuf remain = ROBuf();
+        if(merge.size() > len + header_size)
+            remain = ROBuf(merge, merge.size() - len - header_size, len + header_size);
+        return std::make_tuple(true, true, frame, remain, op, id);
     }
 } //}
 
@@ -97,18 +96,22 @@ std::tuple<bool, std::vector<std::tuple<ROBuf, PACKET_OPCODE, uint8_t>>, ROBuf> 
 
     while(true) {
         bool noerror;
-        ROBuf a, b;
+        bool finish;
+        ROBuf f, r;
         PACKET_OPCODE op;
         uint8_t id;
-        std::tie(noerror, a, b, op, id) = decode_packet(x_remain, x_income);
+        std::tie(noerror, finish, f, r, op, id) = decode_packet(x_remain, x_income);
+
         if(noerror == false)
-            return std::make_tuple(false, ret, b);
-        if(!a.empty()) ret.push_back(std::make_tuple(a, op, id));
-        x_income = b;
-        x_remain = ROBuf();
-        if(a.empty() || b.empty()) {
-            x_remain = b;
+            return std::make_tuple(false, ret, x_remain);
+
+        if(finish) ret.push_back(std::make_tuple(f, op, id));
+        if(!finish || r.size() == 0) {
+            x_remain = r;
             break;
+        } else {
+            x_remain = ROBuf();
+            x_income = r;
         }
     }
 
@@ -129,14 +132,14 @@ ROBuf encode_packet_header(PACKET_OPCODE op, ConnectionId id, size_t len) //{
     header.id = id;
 
     if(len < 0xFE) {
-        header_size = offsetof(PacketHeader, extend_length.e16);
+        header_size = offsetof(PacketHeader, extend_length);
         header.length = len;
-    } else if(len > 2 << 16) {
-        header_size = offsetof(PacketHeader, extend_length.e32);
+    } else if(len < (1 << 16)) {
+        header_size = offsetof(PacketHeader, extend_length) + 2;
         header.length = 0xFE;
         header.extend_length.e16 = htons(len);
     } else  {
-        header_size = sizeof(PacketHeader);
+        header_size = offsetof(PacketHeader, extend_length) + 4;
         header.length = 0xFF;
         header.extend_length.e32 = htonl(len);
     }
@@ -151,7 +154,8 @@ ROBuf encode_packet_header(PACKET_OPCODE op, ConnectionId id, size_t len) //{
 ROBuf encode_packet(PACKET_OPCODE op, ConnectionId id, size_t len, void* buf) //{
 {
     ROBuf header = encode_packet_header(op, id, len);
-    ROBuf payload = ROBuf(buf, len);
+    ROBuf payload;
+    if(len > 0) payload = ROBuf(buf, len);
     ROBuf ret = header + payload;
     return ret;
 } //}

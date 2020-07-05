@@ -99,13 +99,14 @@ void ConnectionProxy::__connectToServer(ConnectCallback cb, void* data) //{
 
     uint32_t ipv4_addr; // TODO maybe support IPV6 literal
     if(str_to_ip4(this->mp_server_info->addr().c_str(), &ipv4_addr))
-        this->connect(ipv4_addr, this->mp_server_info->port(), connect_to_remote_server_callback, nullptr);
+        this->connect(ipv4_addr, this->mp_server_info->port(), connect_to_remote_server_callback, ptr);
     else
-        this->connect(this->mp_server_info->addr(), this->mp_server_info->port(), connect_to_remote_server_callback, nullptr);
+        this->connect(this->mp_server_info->addr(), this->mp_server_info->port(), connect_to_remote_server_callback, ptr);
 } //}
-/** [static] callback for uv_connect(0 in @connect_to_with_sockaddr() */
+/** [static] callback for connect() in @__connectToServer() */
 void ConnectionProxy::connect_to_remote_server_callback(int status, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     __connect_to_server_callback_state* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);
@@ -128,6 +129,7 @@ void ConnectionProxy::connect_to_remote_server_callback(int status, void* data) 
 using __authentication_write_state = ConnectionProxy_callback_state;
 void ConnectionProxy::send_authentication_info() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_state == __State::STATE_CONNECTING);
     this->m_state = __State::STATE_AUTH;
 
@@ -149,10 +151,12 @@ void ConnectionProxy::send_authentication_info() //{
     this->add_callback(ptr);
 
     this->_write(auth_buf, ConnectionProxy::on_authentication_write, ptr);
+    this->start_read();
 } //}
 /** [static] */
 void ConnectionProxy::on_authentication_write(ROBuf buf, int status, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     __authentication_write_state* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     auto _this = msg->_this;
@@ -195,7 +199,7 @@ void ConnectionProxy::authenticate(ROBuf buf) //{
     return;
 } //}
 
-/** dispatch unencrypted data */
+/** dispatch data */
 void ConnectionProxy::dispatch_data(ROBuf buf) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -204,10 +208,15 @@ void ConnectionProxy::dispatch_data(ROBuf buf) //{
     bool noerror;
     std::vector<std::tuple<ROBuf, PACKET_OPCODE, uint8_t>> packets;
     std::tie(noerror, packets, this->m_remain) = mm;
+
     if(noerror == false) {
+        __logger->warn("packet error");
         this->close();
         return;
     }
+
+    auto checker = new ObjectChecker();
+    this->SetChecker(checker);
 
     for(auto& p: packets) {
         ROBuf frame;
@@ -215,11 +224,13 @@ void ConnectionProxy::dispatch_data(ROBuf buf) //{
         uint8_t id;
         std::tie(frame, opcode, id) = p;
 
+        if(!checker->exist()) break;
+
         if(this->m_map.find(id) == this->m_map.end()) {
             if(opcode ==  PACKET_OP_ACCEPT_CONNECTION)
                 continue;
             this->close();
-            return;
+            break;
         }
 
         ClientProxyAbstraction* cc = this->m_map[id];
@@ -258,14 +269,32 @@ void ConnectionProxy::dispatch_data(ROBuf buf) //{
             default:
                 __logger->warn("KProxyClient recieve a packet with unexpected opcode. close current connection it");
                 this->close();
-                return;
+                break;
         }
     }
+
+    if(checker->exist()) this->cleanChecker(checker);
+    delete checker;
 } //}
 
 using __send_close_connection_state = ConnectionProxy_callback_state;
-static void __send_close_connection_callback(ROBuf buf, int status, void* data) //{
+/**
+ * send a packet that indicate close connection id of which is #id
+ * @param {uint8_t id} the id should be deallocated by @ConnecitonProxy::remove_connection() */
+void ConnectionProxy::send_close_connection(uint8_t id) //{
 {
+    __logger->debug("call %s", FUNCNAME);
+    auto pkt = encode_packet(PACKET_OP_CLOSE_CONNECTION, id, ROBuf((char*)"close", 5));
+
+    auto ptr = new __send_close_connection_state(this);
+    this->add_callback(ptr);
+
+    this->_write(pkt, __send_close_connection_callback, ptr);
+} //}
+/** [static] */
+void ConnectionProxy::__send_close_connection_callback(ROBuf buf, int status, void* data) //{
+{
+    __logger->debug("call %s", FUNCNAME);
     __send_close_connection_state* msg =
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);
@@ -279,19 +308,6 @@ static void __send_close_connection_callback(ROBuf buf, int status, void* data) 
 
     if(status < 0)
         _this->close();
-} //}
-/**
- * send a packet that indicate close connection id of which is #id
- * @param {uint8_t id} the id should be deallocated by @ConnecitonProxy::remove_connection() */
-void ConnectionProxy::send_close_connection(uint8_t id) //{
-{
-    __logger->debug("call %s", FUNCNAME);
-    auto pkt = encode_packet(PACKET_OP_CLOSE_CONNECTION, id, ROBuf((char*)"close", 5));
-
-    auto ptr = new __send_close_connection_state(this);
-    this->add_callback(ptr);
-
-    this->_write(pkt, __send_close_connection_callback, ptr);
 } //}
 
 void ConnectionProxy::connectToServer(ConnectCallback cb, void* data) {this->__connectToServer(cb, data);}
@@ -396,21 +412,6 @@ void ConnectionProxy::remove_clientConnection(uint8_t id, ClientProxyAbstraction
 
 /** function for flow control */
 using __startread_stopread_state = ConnectionProxy_callback_state;
-static void __startstop_read_write_callback(ROBuf buf, int status, void* data) //{
-{
-    __startread_stopread_state* msg = 
-        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
-    assert(msg);
-
-    auto _this = msg->_this;
-    auto run   = msg->CanRun();
-
-    if(!run) return;
-    _this->remove_callback(msg);
-
-    if(status < 0)
-        _this->close();
-} //}
 void ConnectionProxy::sendStartConnectionRead(uint8_t id) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -432,6 +433,24 @@ void ConnectionProxy::sendStopConnectionRead(uint8_t id) //{
     this->add_callback(ptr);
 
     this->_write(buf, __startstop_read_write_callback, ptr);
+} //}
+/** [static] */
+void ConnectionProxy::__startstop_read_write_callback(ROBuf buf, int status, void* data) //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    __startread_stopread_state* msg = 
+        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
+    assert(msg);
+
+    auto _this = msg->_this;
+    auto run   = msg->CanRun();
+    delete msg;
+
+    if(!run) return;
+    _this->remove_callback(msg);
+
+    if(status < 0)
+        _this->close();
 } //}
 using __send_end_connection_state = ConnectionProxy_callback_state;
 #define __send_end_connection_callback __send_close_connection_callback

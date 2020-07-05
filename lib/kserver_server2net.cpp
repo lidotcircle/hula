@@ -21,7 +21,10 @@ ServerToNetConnection::ServerToNetConnection(ClientConnectionProxy* proxy, Conne
     this->m_net_to_user_buffer = 0;
     this->m_user_to_net_buffer = 0;
 
-    this->m_net_tcp_start_read = false;
+    this->m_one_say_end = false;
+    this->m_has_recieved_end = false;
+
+    this->m_inform_client_stop_read = false;
 } //}
 
 /** connect to server throught internet */
@@ -136,13 +139,34 @@ void ServerToNetConnection::tcp2net_connect_callback(int status, void* data) //{
     _this->__start_net_to_user();
 } //}
 
-/** start relay from net to user */
+/** traffic control */
 void ServerToNetConnection::__start_net_to_user() //{
 {
     __logger->debug("call %s", FUNCNAME);
-    assert(this->m_net_tcp_start_read == false);
-    this->m_net_tcp_start_read = true;
-    this->start_read();
+    if(!this->in_read())
+        this->start_read();
+} //}
+void ServerToNetConnection::__stop_net_to_user() //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    if(this->in_read())
+        this->stop_read();
+} //}
+void ServerToNetConnection::__start_user_to_net() //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    if(!this->user_in_read()) {
+        this->mp_proxy->send_connection_start_read(this->m_id, this);
+        this->m_inform_client_stop_read = false;
+    }
+} //}
+void ServerToNetConnection::__stop_user_to_net() //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    if(this->user_in_read()) {
+        this->mp_proxy->send_connection_stop_read(this->m_id, this);
+        this->m_inform_client_stop_read = true;
+    }
 } //}
 
 /** write data to user by pack as a packet */
@@ -154,10 +178,8 @@ void ServerToNetConnection::_write_to_user(ROBuf buf) //{
     this->add_callback(ptr);
     this->mp_proxy->write(this->m_id, buf, ServerToNetConnection::write_to_user_callback, ptr);
 
-    if(this->m_net_to_user_buffer > PROXY_MAX_BUFFER_SIZE) {
-        this->stop_read();
-        this->m_net_tcp_start_read = false;
-    }
+    if(this->m_net_to_user_buffer > PROXY_MAX_BUFFER_SIZE)
+        this->__stop_net_to_user();
 } //}
 /** [static] callback for ClientConnecitonProxy::write() in @_write_to_user() */
 void ServerToNetConnection::write_to_user_callback(ROBuf buf, void* data, int status, bool run) //{
@@ -181,7 +203,7 @@ void ServerToNetConnection::write_to_user_callback(ROBuf buf, void* data, int st
         return;
     }
 
-    if(_this->m_net_to_user_buffer < PROXY_MAX_BUFFER_SIZE && _this->m_net_tcp_start_read == false)
+    if(_this->m_net_to_user_buffer < PROXY_MAX_BUFFER_SIZE && !_this->in_read())
         _this->__start_net_to_user();
 } //}
 
@@ -195,7 +217,11 @@ void ServerToNetConnection::read_callback(ROBuf buf, int status) //{
 } //}
 void ServerToNetConnection::end_signal() //{
 {
-    this->close();
+    this->mp_proxy->send_connection_end(this->m_id, this);
+    if(this->m_one_say_end)
+        this->close();
+    else
+        this->m_one_say_end = true;
 } //}
 
 /** push data from user to net */
@@ -208,11 +234,8 @@ void ServerToNetConnection::PushData(ROBuf buf) //{
 
     this->_write(buf, ServerToNetConnection::tcp2net_write_callback, ptr);
 
-    if(this->m_user_to_net_buffer > PROXY_MAX_BUFFER_SIZE) {
-        // TODO send a packet to inform client stop read the socket
-        this->m_inform_client_stop_read = true;
-        return;
-    }
+    if(this->m_user_to_net_buffer > PROXY_MAX_BUFFER_SIZE && this->user_in_read())
+        this->__stop_user_to_net();
 } //}
 /** [static] callback for _write() in @PushData() */
 void ServerToNetConnection::tcp2net_write_callback(ROBuf buf, int status, void* data) //{
@@ -234,10 +257,53 @@ void ServerToNetConnection::tcp2net_write_callback(ROBuf buf, int status, void* 
         return;
     }
 
-    if(_this->m_user_to_net_buffer < PROXY_MAX_BUFFER_SIZE && _this->m_inform_client_stop_read) {
-        // TODO send back a packet inform client continue to read the socket
-        _this->m_inform_client_stop_read = false;
+    if(_this->m_user_to_net_buffer < PROXY_MAX_BUFFER_SIZE && !_this->user_in_read())
+        _this->__start_user_to_net();
+} //}
+
+void ServerToNetConnection::startRead() //{
+{
+    this->__start_net_to_user();
+} //}
+void ServerToNetConnection::stopRead() //{
+{
+    this->__stop_net_to_user();
+} //}
+
+struct ServerToNetConnection_state: public CallbackPointer {
+    ServerToNetConnection* _this;
+    inline ServerToNetConnection_state(decltype(_this) _this): _this(_this) {}
+};
+void ServerToNetConnection::endSignal() //{
+{
+    if(this->m_has_recieved_end) {
+        this->close();
+        return;
     }
+    this->m_has_recieved_end = true;
+
+    auto ptr = new ServerToNetConnection_state(this);
+    this->add_callback(ptr);
+    this->shutdown(end_signal_shutdown_callback, ptr);
+    if(this->m_one_say_end)
+        this->close();
+    else
+        this->m_one_say_end = true;
+} //}
+/** [static] */
+void ServerToNetConnection::end_signal_shutdown_callback(int status, void* data) //{
+{
+    ServerToNetConnection_state* msg = 
+        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
+    assert(msg);
+
+    auto _this = msg->_this;
+    auto run   = msg->CanRun();
+
+    if(!run) return;
+    _this->remove_callback(msg);
+
+    if(status < 0) _this->close();
 } //}
 
 /** close this object */

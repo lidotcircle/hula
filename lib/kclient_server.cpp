@@ -28,7 +28,7 @@ void Server::on_connection(void* connection) //{
         return;
     }
 
-    Socks5ServerAbstraction* auth = Factory::KProxyClient::createSocks5Server(this, this->m_config, connection);
+    Socks5ServerAbstraction* auth = Factory::KProxyClient::createSocks5Server(this, this->m_config, connection); // FIXME object leak
     this->m_socks5.insert(auth);
     auth->start();
 } //}
@@ -37,8 +37,8 @@ void Server::on_connection(void* connection) //{
 void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
     __logger->debug("call %s", FUNCNAME);
-    this->dispatch_bypass(addr, port, socks5);
-//    this->dispatch_proxy(addr, port, socks5);
+//    this->dispatch_bypass(addr, port, socks5);
+    this->dispatch_proxy(addr, port, socks5);
 } //}
 void Server::dispatch_bypass(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
@@ -85,27 +85,34 @@ void Server::dispatchSocks5(const std::string& addr, uint16_t port, Socks5Server
 void Server::socks5Transfer(Socks5ServerAbstraction* socks5) //{
 {
     __logger->debug("call %s", FUNCNAME);
+    assert(this->m_socks5.find(socks5) != this->m_socks5.end());
+
     auto ff = this->m_auths.find(socks5);
-    assert(ff != this->m_auths.end());
+    if(ff != this->m_auths.end()) {
+        RelayAbstraction*  cr      = dynamic_cast<decltype(cr)>(ff->second);
+        ClientProxyAbstraction* cc = dynamic_cast<decltype(cc)>(ff->second);
+        if(cr != nullptr)
+            cr->run(socks5);
+        else if (cc != nullptr)
+            cc->run(socks5);
+        else
+            assert(false && "runtime error");
 
-    RelayAbstraction*  cr      = dynamic_cast<decltype(cr)>(ff->second);
-    ClientProxyAbstraction* cc = dynamic_cast<decltype(cc)>(ff->second);
-    if(cr != nullptr)
-        cr->run(socks5);
-    else if (cc != nullptr)
-        cc->run(socks5);
-    else
-        assert(false && "runtime error");
-
-    this->m_auths.erase(ff);
+        this->m_auths.erase(ff);
+    } else {
+        socks5->close();
+    }
 } //}
 
 /** select a remote server base on some strategies */
 SingleServerInfo* Server::select_remote_serever() //{
 {
     __logger->debug("call %s", FUNCNAME);
-    for(auto& x: this->m_config->Servers())
+    for(auto& x: this->m_config->Servers()) {
+        __logger->info("select server: %s", x.name().c_str());
         return &x;
+    }
+    __logger->warn("no server avaliable");
     return nullptr;
 } //}
 
@@ -170,13 +177,13 @@ void Server::close() //{
     assert(this->m_closed == false);
     this->m_closed = true;
 
-    auto copy_relay = this->m_socks5_handler;
-    for(auto& relay: copy_relay)
-        relay->close();
-
     auto copy_proxy = this->m_proxy;
     for(auto& proxy: copy_proxy)
         proxy->close();
+
+    auto copy_relay = this->m_socks5_handler;
+    for(auto& relay: copy_relay)
+        relay->close();
 
     auto copy_auth = this->m_auths;
     for(auto& auth: copy_auth)

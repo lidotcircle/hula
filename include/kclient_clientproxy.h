@@ -36,8 +36,13 @@ class ClientConnection: public ClientProxyAbstraction //{
         void __stop_relay_client_to_server();
         void __stop_relay_server_to_client();
 
+        inline bool in_read_server_to_client() {return this->m_server_start_read;}
+        inline bool in_read_client_to_server() {return this->m_client_start_read;}
+
         static void write_to_client_callback(ROBuf buf, int status, void* data);
         static void multiplexer_connect_callback(int status, void* data);
+
+        static void write_callback(ROBuf buf, int status, void* data);
 
         void __connect();
 

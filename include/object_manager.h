@@ -3,6 +3,8 @@
 #include <map>
 #include <set>
 
+#include <assert.h>
+
 namespace UVC { class Base; }
 class EventEmitter;
 
@@ -19,6 +21,29 @@ class ObjectManager {
         inline size_t CallbackLength() {return this->m_callbacks.size();}
 };
 
+
+class ObjectBoundary;
+class ObjectChecker {
+    private:
+        bool m_exist;
+        friend ObjectBoundary;
+
+    public:
+        inline ObjectChecker(): m_exist(true) {}
+        inline bool exist() {return this->m_exist;}
+};
+class ObjectBoundary {
+    private:
+        ObjectChecker* m_checker;
+
+    public:
+        inline ObjectBoundary(): m_checker(nullptr) {}
+        virtual inline ~ObjectBoundary() {if(m_checker) m_checker->m_exist = false;}
+        inline void SetChecker(ObjectChecker* cc) {assert(cc != nullptr); assert(m_checker == nullptr); this->m_checker = cc;}
+        inline void cleanChecker(ObjectChecker* cc) {assert(m_checker == cc && m_checker->exist()); this->m_checker = nullptr;}
+};
+
+
 class CallbackManager;
 class CallbackPointer {
     private:
@@ -31,7 +56,7 @@ class CallbackPointer {
         inline bool CanRun() {return this->can_run;}
 };
 
-class CallbackManager {
+class CallbackManager: public ObjectBoundary {
     private:
         std::set<CallbackPointer*> m_list;
         bool m_invalidate;

@@ -90,16 +90,21 @@ void ClientConnectionProxy::dispatch_packet_data(ROBuf buf) //{
     std::tie(noerror, x, this->m_remains) = result;
 
     if(!noerror) {
-        // packet error, give up TODO
+        __logger->warn("packet error");
         this->close();
         return;
     }
+
+    auto checker = new ObjectChecker();
+    this->SetChecker(checker);
 
     for(auto& z: x) {
         ROBuf a;
         PACKET_OPCODE b;
         uint8_t id;
         std::tie(a, b, id) = z;
+
+        if(!checker->exist()) break;
 
         switch(b) {
             case PACKET_OP_CREATE_CONNECTION:
@@ -109,8 +114,9 @@ void ClientConnectionProxy::dispatch_packet_data(ROBuf buf) //{
                 if(this->m_map.find(id) != this->m_map.end()) {
                     this->dispatch_reg(id, a);
                 } else {
-                    this->close();
                     __logger->warn("ClientConnectionProxy: unexpected id REG");
+                    this->close();
+                    break;
                 }
                 break;
             case PACKET_OP_CLOSE_CONNECTION:
@@ -119,13 +125,34 @@ void ClientConnectionProxy::dispatch_packet_data(ROBuf buf) //{
                 else
                     __logger->warn("ClientConnectionProxy: unexpected id CLOSE");
                 break;
+            case PACKET_OP_START_READ:
+                if(this->m_map.find(id) != this->m_map.end())
+                    this->m_map[id]->startRead();
+                else
+                    __logger->warn("ClientConnectionProxy: lose start read signal");
+                break;
+            case PACKET_OP_STOP_READ:
+                if(this->m_map.find(id) != this->m_map.end())
+                    this->m_map[id]->stopRead();
+                else
+                    __logger->warn("ClientConnectionProxy: lose stop read signal");
+                break;
+            case PACKET_OP_END_CONNECTION:
+                if(this->m_map.find(id) != this->m_map.end())
+                    this->m_map[id]->endSignal();
+                else
+                    __logger->warn("ClientConnectionProxy: lose end signal");
+                break;
             case PACKET_OP_RESERVED:
             default:
-                logger->warn("unexcepted packet which use reserved opcode");
+                __logger->warn("unexcepted packet which use reserved opcode");
                 this->close();
                 break;
         }
     }
+
+    if(checker->exist()) this->cleanChecker(checker);
+    delete checker;
 } //}
 
 /* dispatch data base on opcode in packet
@@ -156,7 +183,7 @@ void ClientConnectionProxy::dispatch_new(uint8_t id, ROBuf buf) //{
     addr[buf.size() - 2] = '\0';
 
     this->m_wait_connect.insert(id);
-    auto newcon = Factory::createToNet(this, this->newUnderlyStream(), id, std::string(addr), port);
+    auto newcon = Factory::createToNet(this, this->newUnderlyStream(), id, std::string(addr), port); // FIXME
     this->m_map[id] = newcon;
     newcon->connect_to();
 
@@ -216,6 +243,7 @@ int ClientConnectionProxy::__write(ROBuf buf, WriteCallback cb, void* data) //{
 /** implement abstract method */
 void ClientConnectionProxy::read_callback(ROBuf buf, int status) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     if(status < 0) {
         this->close();
         return;
@@ -224,6 +252,7 @@ void ClientConnectionProxy::read_callback(ROBuf buf, int status) //{
 } //}
 void ClientConnectionProxy::end_signal() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     this->close();
 } //}
 
@@ -269,9 +298,36 @@ void ClientConnectionProxy::remove_connection(uint8_t id, ToNetAbstraction* con)
     delete con;
 } //}
 
+void ClientConnectionProxy::send_simple_packet(uint8_t id, PACKET_OPCODE opcode, ToNetAbstraction* net) //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    assert(id < SINGLE_PROXY_MAX_CONNECTION);
+    assert(this->m_map.find(id) != this->m_map.end());
+    assert(this->m_map[id] == net);
+
+    auto b = encode_packet(opcode, id, ROBuf());
+    this->__write(b, nullptr, nullptr);
+} //}
+void ClientConnectionProxy::send_connection_end(uint8_t id, ToNetAbstraction* net) //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    this->send_simple_packet(id, PACKET_OPCODE::PACKET_OP_END_CONNECTION, net);
+} //}
+void ClientConnectionProxy::send_connection_start_read(uint8_t id, ToNetAbstraction* net) //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    this->send_simple_packet(id, PACKET_OPCODE::PACKET_OP_START_READ, net);
+} //}
+void ClientConnectionProxy::send_connection_stop_read(uint8_t id, ToNetAbstraction* net) //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    this->send_simple_packet(id, PACKET_OPCODE::PACKET_OP_STOP_READ, net);
+} //}
+
 /** close this object */
 void ClientConnectionProxy::close() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     auto m = this->m_map;
     for(auto& x: m)
         x.second->close();

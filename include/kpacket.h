@@ -70,8 +70,9 @@ struct PacketHeader {
 });
 
 
-/** @return <noerror, frame, remain, opcode, id> */
-std::tuple<bool, ROBuf, ROBuf, PACKET_OPCODE, ConnectionId> decode_packet(ROBuf remain, ROBuf income);
+/** @return <noerror, finish, frame, remain, opcode, id> */
+std::tuple<bool, bool, ROBuf, ROBuf, PACKET_OPCODE, ConnectionId> decode_packet(ROBuf remain, ROBuf income);
+/** @return <noerror, <frame, opcode, id>, remain> */
 std::tuple<bool, std::vector<std::tuple<ROBuf, PACKET_OPCODE, uint8_t>>, ROBuf> decode_all_packet(ROBuf remain, ROBuf income);
 
 ROBuf encode_packet_header(PACKET_OPCODE op, ConnectionId id, size_t len);

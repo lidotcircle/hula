@@ -7,11 +7,16 @@
 #include <unordered_set>
 
 NS_PROXY_SERVER_START
+class ToNetAbstraction;
 
 class ConnectionProxyAbstraction: virtual public EBStreamAbstraction {
     public:
         virtual void close() = 0;
         inline virtual void start() {CALL_PURE_VIRTUAL_FUNCTION();};
+
+        virtual void send_connection_end(uint8_t id, ToNetAbstraction*) = 0;
+        virtual void send_connection_start_read(uint8_t id, ToNetAbstraction*) = 0;
+        virtual void send_connection_stop_read(uint8_t id, ToNetAbstraction*) = 0;
 };
 
 /**

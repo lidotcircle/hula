@@ -268,10 +268,12 @@ void Socks5Auth::write_callback_reply(ROBuf buf, int status, void* data) //{
 
 void Socks5Auth::netAccept() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     this->__send_reply(SOCKS5_REPLY_SUCCEEDED);
 } //}
 void Socks5Auth::netReject() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     this->__send_reply(SOCKS5_REPLY_CONNECTION_REFUSED); // TODO
 } //}
 

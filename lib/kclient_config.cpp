@@ -9,7 +9,7 @@ SingleServerInfo::SingleServerInfo(const std::string& addr,    uint16_t port, co
                                    const std::string& cert, const std::string& cipher) //{
 {
     this->m_addr = addr;
-    this->m_port = k_htons(port); // FIXME ??
+    this->m_port = port;
 
     this->m_server_name = server_name;
 
@@ -151,7 +151,7 @@ bool ClientConfig::set_policy(const json& jsonx) //{
         this->setError("invalid bind_address, bad format");
         return false;
     }
-    this->m_policy.m_addr = ipv4;
+    this->m_policy.m_addr = k_ntohl(ipv4);
 
     uint16_t port_x;
     if(!get_valid_port(bind_port, &port_x)) {
@@ -166,19 +166,19 @@ bool ClientConfig::set_servers(const json& jsonx) //{
 {
     this->m_servers.clear();
     if(jsonx.find("servers") == jsonx.end()) {
-        this->setError("servers field doesn't exists");
+        this->setError("JSON: servers field doesn't exists");
         return false;
     }
 
     if(!jsonx["servers"].is_array()) {
-        this->setError("bad config format at 'servers'");
+        this->setError("JSON: bad config format at 'servers'");
         return false;
     }
 
     json m = jsonx["servers"];
     for(auto j = m.begin(); j != m.end(); j++) {
         if(!j->is_object()) {
-            // TODO report bad format
+            this->setError("JSON: bad json format, members of [servers] are an object");
             continue;
         }
         if(!j->at("server_name").is_string() ||
@@ -189,13 +189,12 @@ bool ClientConfig::set_servers(const json& jsonx) //{
            !j->at("username").is_string() ||
            !j->at("password").is_string()
           ) {
-            // TODO report bad format
+            this->setError("JSON: required fields doesn't exists in [servers] object");
             continue;
         }
-        // TODO address check, cipher check, certificate check
         uint16_t port;
         if(!get_valid_port(j->at("port"), &port)) {
-            // TODO report error
+            this->setError("JSON: a bad port");
             return -1;
         }
         auto server_name = j->at("server_name").get<std::string>();
@@ -219,7 +218,7 @@ bool ClientConfig::set_users(const json& jsonx) //{
         return true;
 
     if(!jsonx["local_users"].is_array()) {
-        this->setError("bad format in 'local_users'");
+        this->setError("JSON: bad format in 'local_users'");
         return false;
     }
 
@@ -227,20 +226,20 @@ bool ClientConfig::set_users(const json& jsonx) //{
     json m = jsonx["local_users"];
     for(auto j = m.begin(); j != m.end(); j++) {
         if(!j->is_object()) {
-            // TODO report bad format
+            this->setError("JSON: members of [local_users] should be object");
             continue;
         }
         if(!j->at("username").is_string() ||
            !j->at("password").is_string()
           ) {
-            // TODO report bad format
+            this->setError("JSON: [username] and [password] field should be string type");
             continue;
         }
         auto username    = j->at("username").get<std::string>();
         auto password    = j->at("password").get<std::string>();
 
         if(this->m_accounts.find(username) != this->m_accounts.end()) {
-            // report duplicated username
+            this->setError("JSON: duplicated [username]");
             continue;
         }
         this->m_accounts[username] = password;
@@ -282,8 +281,8 @@ json ClientConfig::to_json() //{
             result["rule"] = "nomatch";
             break;
     }
-    result["bind_address"] = std::string(ip4_to_str(this->m_policy.m_addr));
-    result["bind_port"]    = this->m_policy.m_port; // FIXME
+    result["bind_address"] = std::string(ip4_to_str(k_htonl(this->m_policy.m_addr)));
+    result["bind_port"]    = this->m_policy.m_port;
 
     result["servers"] = this->servers_to_json();
     result["local_users"]   = this->users_to_json();

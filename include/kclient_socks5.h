@@ -10,7 +10,7 @@ NS_PROXY_CLIENT_START
 
 /**
  * @class Socks5Auth */
-class Socks5Auth: public Socks5ServerAbstraction, virtual protected EBStreamAbstraction, virtual public CallbackManager  //{
+class Socks5Auth: public Socks5ServerAbstraction, virtual protected EBStreamAbstraction, virtual protected CallbackManager  //{
 {
     private:
         enum SOCKS5_STAGE {

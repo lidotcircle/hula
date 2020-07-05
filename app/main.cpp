@@ -61,8 +61,8 @@ int main() //{
 
     uv_tcp_t* tcp = new uv_tcp_t();
     uv_tcp_init(&loop, tcp);
-    auto config = std::shared_ptr<ClientConfig>(new UVClientConfig(&loop, "../tests/client_config.json"));
-    config->loadFromFile(nullptr, nullptr);
+    auto config = std::shared_ptr<ClientConfig>(new UVClientConfig(&loop, "../tests/client_config.json")); // FIXME object leak
+    assert(config->loadFromFile(nullptr, nullptr));
     KProxyClient::UVServer server(config, tcp);
     config.reset();
 

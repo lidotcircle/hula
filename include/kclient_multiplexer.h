@@ -65,6 +65,9 @@ class ConnectionProxy: public ProxyMultiplexerAbstraction //{
 
         void send_close_connection(uint8_t id);
 
+        static void __startstop_read_write_callback(ROBuf buf, int status, void* data);
+        static void __send_close_connection_callback(ROBuf buf, int status, void* data);
+
 
    public:
         ConnectionProxy(Server* server, SingleServerInfo* server_info);

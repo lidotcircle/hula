@@ -6,11 +6,14 @@
 
 NS_PROXY_SERVER_START
 
-class ToNetAbstraction: virtual public EBStreamAbstraction {
+class ToNetAbstraction: virtual protected EBStreamAbstraction {
     public:
         virtual void close() = 0;
         virtual void connect_to() = 0;
         virtual void PushData(ROBuf buf) = 0;
+        virtual void startRead() = 0;
+        virtual void stopRead() = 0;
+        virtual void endSignal() = 0;
 };
 
 /**
@@ -42,6 +45,7 @@ class ClientConnectionProxy: public ConnectionProxyAbstraction, private Callback
         void dispatch_close(uint8_t id, ROBuf buf);  // OPCODE PACKET_OP_CLOSE
 
         int __write(ROBuf buf, WriteCallback cb, void* data);
+        void send_simple_packet(uint8_t id, PACKET_OPCODE opcode, ToNetAbstraction* net);
 
 
     protected:
@@ -63,6 +67,10 @@ class ClientConnectionProxy: public ConnectionProxyAbstraction, private Callback
         int reject_connection(uint8_t id, NEW_CONNECTION_REPLY reason);
 
         void remove_connection(uint8_t id, ToNetAbstraction* con);
+
+        void send_connection_end(uint8_t id, ToNetAbstraction*) override;
+        void send_connection_start_read(uint8_t id, ToNetAbstraction*) override;
+        void send_connection_stop_read(uint8_t id, ToNetAbstraction*) override;
 
         void close() override;
 

@@ -68,7 +68,7 @@ class Socks5RequestProxy {
 class RelayAbstraction: public Socks5RequestProxy {
 };
 
-class ClientProxyAbstraction: public Socks5RequestProxy, virtual protected EBStreamAbstraction, virtual public CallbackManager {
+class ClientProxyAbstraction: public Socks5RequestProxy, virtual protected EBStreamAbstraction, virtual protected CallbackManager {
     protected:
         virtual void sendServerEnd() = 0;
         virtual void startServerRead() = 0;
@@ -81,7 +81,7 @@ class ClientProxyAbstraction: public Socks5RequestProxy, virtual protected EBStr
         virtual void connectFail(ConnectResult) = 0;
 };
 
-class ProxyMultiplexerAbstraction: virtual protected EBStreamAbstraction, virtual public CallbackManager {
+class ProxyMultiplexerAbstraction: virtual protected EBStreamAbstraction, virtual protected CallbackManager {
     public:
         using WriteCallbackMM = void(*)(ROBuf buf, int status, void*);
         using ConnectCallback = void (*)(int status, void*);
