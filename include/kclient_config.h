@@ -110,6 +110,9 @@ struct ClientPolicy //{
     Socks5AuthMethod m_method;
     uint16_t  m_port;
     uint32_t  m_addr;
+    inline ClientPolicy(): m_mode(PROXY_MODE_PORT), m_rule(PROXY_RULE_ALL), 
+                           m_addr(0), m_port(1080), 
+                           m_method(Socks5AuthMethod::SOCKS5_NO_REQUIRED) {}
 }; //}
 
 

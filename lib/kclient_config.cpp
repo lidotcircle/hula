@@ -35,13 +35,7 @@ json SingleServerInfo::to_json() //{
 //}
 
 
-ClientConfig::ClientConfig() //{
-{
-    this->m_policy.m_rule = PROXY_RULE_ALL;
-    this->m_policy.m_mode = PROXY_MODE_PORT;
-    this->m_policy.m_addr = 0;
-    this->m_policy.m_port = 1080;
-} //}
+ClientConfig::ClientConfig(): m_policy(), m_servers(), m_accounts() {}
 
 bool ClientConfig::validateUser(const std::string& username, const std::string& password) //{
 {

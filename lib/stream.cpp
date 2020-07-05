@@ -1,6 +1,9 @@
 #include "../include/stream.hpp"
 #include "../include/utils.h"
 
+#include "../include/logger.h"
+#include "../include/config.h"
+
 
 void EBStreamObject::read_callback(ROBuf buf, int status) //{
 {
@@ -68,6 +71,7 @@ struct EBStreamObject$connectWith_sockaddr$connect: public CallbackPointer {
 };
 int EBStreamObject::connectWith_sockaddr(sockaddr* addr) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false);
     auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
     this->add_callback(ptr);
@@ -75,6 +79,7 @@ int EBStreamObject::connectWith_sockaddr(sockaddr* addr) //{
 } //}
 int EBStreamObject::connectWith_address(const std::string& addr, uint16_t port) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false);
     auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
     this->add_callback(ptr);
@@ -83,6 +88,7 @@ int EBStreamObject::connectWith_address(const std::string& addr, uint16_t port) 
 /** [static] */
 void EBStreamObject::connect_callback(int status, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
    EBStreamObject$connectWith_sockaddr$connect* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);

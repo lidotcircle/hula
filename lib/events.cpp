@@ -14,8 +14,10 @@ const auto& CBList_insert_to_tail = DLinkedList_insert_to_tail<CallbackState>;
 
 void  EventEmitter::delete_all() //{
 {
-    for(auto& cbs: this->m_listeners)
+    for(auto& cbs: this->m_listeners) {
         CBList_delete_all(&cbs.second);
+        assert(cbs.second == nullptr);
+    }
 } //}
 
 void* EventEmitter::on(const std::string& event, EventCallback cb, CBFlags flags) //{
@@ -32,10 +34,11 @@ void  EventEmitter::emit(const std::string& event, EventArgs::Base* argv) //{
     if(this->m_listeners.find(event) == this->m_listeners.end()) return;
     CBList_head(&this->m_listeners[event]);
     CBList* h = this->m_listeners[event];
+    std::vector<EventCallback> wait_cb_list; /** callback may modify this object, so defer callback */
     while(h != nullptr) {
-        EventCallback ccb = (EventCallback)h->value.cb;
+        EventCallback ccb = h->value.cb;
         assert(ccb != nullptr);
-        ccb(this, event, argv);
+        wait_cb_list.push_back(ccb);
         if((h->value.flags & CB_ONCE) != 0) { // delete callback;
             bool prev = h->prev != nullptr;
             CBList_delete(&h);
@@ -44,6 +47,8 @@ void  EventEmitter::emit(const std::string& event, EventArgs::Base* argv) //{
             h = h->next;
         }
     }
+    for(auto cb: wait_cb_list) cb(this, event, argv);
+    delete argv;
 } //}
 void  EventEmitter::remove(void* l) //{
 {

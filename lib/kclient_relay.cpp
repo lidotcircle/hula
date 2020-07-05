@@ -82,7 +82,6 @@ void RelayConnection::client_data_listener(EVENTARGS) //{
 {
     DOIT("data", DataArgs);
     auto buf = args->_buf;
-    delete args;
 
     if(_this->mp_server_manager->write(buf) < 0) {
         _this->mp_client_manager->stopRead();
@@ -94,7 +93,6 @@ void RelayConnection::server_data_listener(EVENTARGS) //{
 {
     DOIT("data", DataArgs);
     auto buf = args->_buf;
-    delete args;
 
     if(_this->mp_client_manager->write(buf) < 0) {
         _this->mp_server_manager->stopRead();
@@ -106,7 +104,7 @@ void RelayConnection::server_data_listener(EVENTARGS) //{
 void RelayConnection::client_drain_listener(EVENTARGS) //{
 {
     DOIT("drain", DrainArgs);
-    delete args;
+
     assert(_this->m_client_drain_listener_reg != nullptr);
     _this->mp_client_manager->remove(_this->m_client_drain_listener_reg);
     _this->m_client_drain_listener_reg = nullptr;
@@ -115,7 +113,7 @@ void RelayConnection::client_drain_listener(EVENTARGS) //{
 void RelayConnection::server_drain_listener(EVENTARGS) //{
 {
     DOIT("drain", DrainArgs);
-    delete args;
+
     assert(_this->m_server_drain_listener_reg != nullptr);
     _this->mp_server_manager->remove(_this->m_server_drain_listener_reg);
     _this->m_server_drain_listener_reg = nullptr;
@@ -125,7 +123,6 @@ void RelayConnection::server_drain_listener(EVENTARGS) //{
 void RelayConnection::client_end_listener(EVENTARGS) //{
 {
     DOIT("end", EndArgs);
-    delete args;
 
     if(_this->m_client_end) {
         _this->close();
@@ -139,7 +136,6 @@ void RelayConnection::client_end_listener(EVENTARGS) //{
 void RelayConnection::server_end_listener(EVENTARGS) //{
 {
     DOIT("end", EndArgs);
-    delete args;
 
     if(_this->m_server_end) {
         _this->close();
@@ -154,7 +150,6 @@ void RelayConnection::server_end_listener(EVENTARGS) //{
 void RelayConnection::client_error_listener(EVENTARGS) //{
 {
     DOIT("error", ErrorArgs);
-    delete args;
 
     assert(_this->mp_socks5 == nullptr);
 
@@ -163,7 +158,6 @@ void RelayConnection::client_error_listener(EVENTARGS) //{
 void RelayConnection::server_error_listener(EVENTARGS) //{
 {
     DOIT("error", ErrorArgs);
-    delete args;
 
     if(_this->mp_socks5 != nullptr) {
         auto pp = _this->mp_socks5;
@@ -177,7 +171,6 @@ void RelayConnection::server_error_listener(EVENTARGS) //{
 void RelayConnection::server_connect_listener(EVENTARGS) //{
 {
     DOIT("connect", ConnectArgs);
-    delete args;
 
     assert(_this->mp_socks5 != nullptr);
     auto pp = _this->mp_socks5;

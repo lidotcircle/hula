@@ -1,4 +1,6 @@
 #include "../include/stream_libuv.hpp"
+#include "../include/config.h"
+#include "../include/logger.h"
 
 #include "stream_libuv_cb_data.h"
 
@@ -79,8 +81,12 @@ void EBStreamUV::uv_connection_callback(uv_stream_t* stream, int status) //{
     }
 } //}
 
+#include "../include/utils.h"
 bool EBStreamUV::connect(struct sockaddr* addr, ConnectCallback cb, void* data) //{
 {
+    __logger->info("call %s=(%s:%d)", FUNCNAME, 
+            ip4_to_str(((sockaddr_in*)addr)->sin_addr.s_addr), 
+            k_ntohs(((sockaddr_in*)addr)->sin_port));
     auto ptr = new EBStreamUV$connect$uv_connect(this, cb, data);
     uv_connect_t* req = new uv_connect_t();
     uv_req_set_data((uv_req_t*)req, ptr);
@@ -107,6 +113,7 @@ void EBStreamUV::uv_connect_callback(uv_connect_t* req, int status) //{
 /** wrappers of connect */
 bool EBStreamUV::connect(uint32_t ipv4, uint16_t port, ConnectCallback cb, void* data) //{
 {
+    __logger->info("call %s", FUNCNAME);
     sockaddr_in addr;
     addr.sin_family      = AF_INET;
     addr.sin_addr.s_addr = htonl(ipv4);
@@ -115,6 +122,7 @@ bool EBStreamUV::connect(uint32_t ipv4, uint16_t port, ConnectCallback cb, void*
 } //}
 bool EBStreamUV::connect(uint8_t ipv6[16], uint16_t port, ConnectCallback cb, void* data) //{
 {
+    __logger->info("call %s", FUNCNAME);
     sockaddr_in6 addr;
     addr.sin6_family      = AF_INET6;
     memcpy(&addr.sin6_addr, ipv6, sizeof(*ipv6));
@@ -163,6 +171,7 @@ void EBStreamUV::getaddrinfo_callback(struct addrinfo* res, void(*__freeaddrinfo
         for(a=res;a!=nullptr;a=a->ai_next) {
             if(a->ai_family == AF_INET) {
                 m = a->ai_addr;
+                ((sockaddr_in*)m)->sin_port = htons(_port);
                 break;
             }
         }
@@ -172,6 +181,7 @@ void EBStreamUV::getaddrinfo_callback(struct addrinfo* res, void(*__freeaddrinfo
         for(a=res;a!=nullptr;a=a->ai_next) {
             if(a->ai_family == AF_INET6) {
                 m = a->ai_addr;
+                ((sockaddr_in6*)m)->sin6_port = htons(_port);
                 break;
             }
         }
@@ -189,6 +199,7 @@ void EBStreamUV::getaddrinfo_callback(struct addrinfo* res, void(*__freeaddrinfo
 } //}
 bool EBStreamUV::connect(const std::string& addr, uint16_t port, ConnectCallback cb, void* data) //{
 {
+    __logger->info("call %s", FUNCNAME);
     auto ptr = new __ppp(this, cb, data, port);
     ptr->_force_ipv6 = false;
     this->add_callback(ptr);
@@ -198,6 +209,7 @@ bool EBStreamUV::connect(const std::string& addr, uint16_t port, ConnectCallback
 } //}
 bool EBStreamUV::connectINet6(const std::string& addr, uint16_t port, ConnectCallback cb, void* data) //{
 {
+    __logger->info("call %s", FUNCNAME);
     auto ptr = new __ppp(this, cb, data, port);
     ptr->_force_ipv6 = true;
     this->add_callback(ptr);

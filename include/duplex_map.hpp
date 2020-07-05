@@ -153,9 +153,9 @@ void DuplexMap<T1, T2>::push_back(TypeA oa, TypeB ob) //{
 template<typename T1, typename T2>
 void DuplexMap<T1, T2>::erase(iterator iter) //{
 {
-    assert(iter != this->m_mapa.end());
-    this->m_mapa.erase(this->m_mapa.find(iter->first));
+    assert(iter != this->end());
     this->m_mapb.erase(this->m_mapb.find(iter->second));
+    this->m_mapa.erase(this->m_mapa.find(iter->first));
 } //}
 
 template<typename T1, typename T2>
