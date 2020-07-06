@@ -1,29 +1,31 @@
-// CONFIG
 #pragma once
 
-#define MAX_WRITE_BUFFER_SIZE (1 * 1024 * 1024)
 
-#define RELAY_MAX_BUFFER_SIZE (1 * 1024 * 1024)
-#define PROXY_MAX_BUFFER_SIZE (1 * 1024 * 1024)
+/** http configuration */
+#define HTTP_MAX_WRITE_BUFFER_SIZE (1 * 1024 * 1024)   // threhold of write buffer size
+#define HTTP_PARSER_STRICT 1
 
-#define PROXY_MAX_BUFFER_SIZE_XXX (10 * 1024 * 1024)
 
-#define MAX_LISTEN 500
+/** maximum write buffer size */
+#define RELAY_MAX_BUFFER_SIZE (1)               // maximum write buffer size in directed relay connection
+#define PROXY_MAX_BUFFER_SIZE (1)               // maximum write buffer size in proxy
 
+/** maximum connection per multiplexer */
 #define SINGLE_PROXY_MAX_CONNECTION (1 << 6)
+
+/** timeout for a new proxy connection */
+#define NEW_CONNECTION_TIMEOUT 8000
+
 
 #include "logger.h"
 // #define __logger logger
- #define __logger Logger::logger
+#define __logger Logger::logger
 
-#define HTTP_PARSER_STRICT 1
 
 #if defined(_WIN32) || defined(_WIN64)
 #define FUNCNAME __func__
 #else
 #define FUNCNAME __PRETTY_FUNCTION__
 #endif // defined(_WIN32) || defined(_WIN64)
-
-#define NEW_CONNECTION_TIMEOUT 8000
 
 

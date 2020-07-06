@@ -37,8 +37,8 @@ void Server::on_connection(void* connection) //{
 void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
     __logger->debug("call %s", FUNCNAME);
-//    this->dispatch_bypass(addr, port, socks5);
-    this->dispatch_proxy(addr, port, socks5);
+    this->dispatch_bypass(addr, port, socks5);
+//    this->dispatch_proxy(addr, port, socks5);
 } //}
 void Server::dispatch_bypass(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
@@ -185,9 +185,9 @@ void Server::close() //{
     for(auto& relay: copy_relay)
         relay->close();
 
-    auto copy_auth = this->m_auths;
-    for(auto& auth: copy_auth)
-        auth.first->close();
+    auto copy_socks5 = this->m_socks5;
+    for(auto& socks5: copy_socks5)
+        socks5->close();
 
     this->release();
     this->m_config.reset();

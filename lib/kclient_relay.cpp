@@ -12,7 +12,8 @@ NS_PROXY_CLIENT_START
 
 /** constructor of RelayConnection */
 RelayConnection::RelayConnection(Server* kserver, Socks5ServerAbstraction* socks5, 
-                                 const std::string& server, uint16_t port, void* server_connection) //{
+                                 const std::string& server, uint16_t port, void* server_connection):
+    m_client_drain_listener_reg(), m_server_drain_listener_reg() //{
 {
     __logger->debug("call %s: relay connection to %s:%d", FUNCNAME, server.c_str(), port);
     this->m_client_start_read = false;
@@ -34,8 +35,6 @@ RelayConnection::RelayConnection(Server* kserver, Socks5ServerAbstraction* socks
     this->m_client_end = false;
     this->m_server_end = false;
 
-    this->m_client_drain_listener_reg = nullptr;
-    this->m_server_drain_listener_reg = nullptr;
 }
 //}
 
@@ -60,21 +59,27 @@ void RelayConnection::connectToAddr() //{
 
 void RelayConnection::register_server_listener() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     this->mp_server_manager->on("data", server_data_listener);
     this->mp_server_manager->on("end", server_end_listener);
     this->mp_server_manager->on("error", server_error_listener);
     this->mp_server_manager->on("connect", server_connect_listener);
+    this->m_server_drain_listener_reg = this->mp_server_manager->on("drain", server_drain_listener);
 } //}
 void RelayConnection::register_client_listener() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->mp_client_manager != nullptr);
     this->mp_client_manager->on("data", client_data_listener);
     this->mp_client_manager->on("end", client_end_listener);
     this->mp_client_manager->on("error", client_error_listener);
+    this->m_client_drain_listener_reg = this->mp_client_manager->on("drain", client_drain_listener);
 } //}
 
 #define EVENTARGS EventEmitter*obj, const std::string& event, EventArgs::Base* aaa
-#define DOIT(ename, dt) EBStreamObject* _streamobj = dynamic_cast<decltype(_streamobj)>(obj); assert(_streamobj); \
+#define DOIT(ename, dt) \
+                       __logger->debug("call %s", FUNCNAME); \
+                        EBStreamObject* _streamobj = dynamic_cast<decltype(_streamobj)>(obj); assert(_streamobj); \
                         RelayConnection* _this     = static_cast<decltype(_this)>(_streamobj->fetchPtr()); assert(_this); \
                         EBStreamObject::dt *args   = dynamic_cast<decltype(args)>(aaa);  assert(args); \
                         assert(event == ename);
@@ -83,41 +88,81 @@ void RelayConnection::client_data_listener(EVENTARGS) //{
     DOIT("data", DataArgs);
     auto buf = args->_buf;
 
-    if(_this->mp_server_manager->write(buf) < 0) {
-        _this->mp_client_manager->stopRead();
-        assert(_this->m_client_drain_listener_reg == nullptr);
+    /*
+    bool set = false;
+    if(!_this->m_client_drain_listener_reg.has()) {
+        _this->__stop_relay_client_to_server();
         _this->m_client_drain_listener_reg = _this->mp_client_manager->on("drain", client_drain_listener);
+        assert(_this->m_client_drain_listener_reg.has());
+        set = true;
+    } else {
+        __logger->error("client 0x%lx: already has drain cb", (long)static_cast<EventEmitter*>(_this->mp_client_manager));
     }
+    */
+
+    auto rv = _this->mp_server_manager->write(buf);
+    if(rv < 0 && _this->m_client_start_read)
+        _this->__stop_relay_client_to_server();
+
+    /*
+    _this->mp_client_manager->remove(_this->m_client_drain_listener_reg);
+    _this->m_client_drain_listener_reg.clear();
+    assert(!_this->m_client_drain_listener_reg.has());
+    */
 } //}
 void RelayConnection::server_data_listener(EVENTARGS) //{
 {
     DOIT("data", DataArgs);
     auto buf = args->_buf;
 
-    if(_this->mp_client_manager->write(buf) < 0) {
-        _this->mp_server_manager->stopRead();
-        assert(_this->m_server_drain_listener_reg == nullptr);
+    /*
+    bool set = false;
+    if(!_this->m_server_drain_listener_reg.has()) {
+        _this->__stop_relay_server_to_client();
         _this->m_server_drain_listener_reg = _this->mp_server_manager->on("drain", server_drain_listener);
+        assert(_this->m_server_drain_listener_reg.has());
+        set = true;
+    } else {
+        __logger->error("server 0x%lx: already has drain cb", (long)static_cast<EventEmitter*>(_this->mp_server_manager));
     }
+    */
+
+    auto rv = _this->mp_client_manager->write(buf);
+    if(rv < 0 && _this->m_server_start_read)
+        _this->__stop_relay_server_to_client();
+
+    /*
+    _this->mp_server_manager->remove(_this->m_server_drain_listener_reg);
+    _this->m_server_drain_listener_reg.clear();
+    assert(!_this->m_server_drain_listener_reg.has());
+    */
 } //}
 
 void RelayConnection::client_drain_listener(EVENTARGS) //{
 {
     DOIT("drain", DrainArgs);
 
-    assert(_this->m_client_drain_listener_reg != nullptr);
+    /*
+    assert(_this->m_client_drain_listener_reg.has());
     _this->mp_client_manager->remove(_this->m_client_drain_listener_reg);
-    _this->m_client_drain_listener_reg = nullptr;
-    _this->__relay_server_to_client();
+    _this->m_client_drain_listener_reg.clear();
+    assert(!_this->m_client_drain_listener_reg.has());
+    */
+    if(!_this->m_server_start_read)
+        _this->__relay_server_to_client();
 } //}
 void RelayConnection::server_drain_listener(EVENTARGS) //{
 {
     DOIT("drain", DrainArgs);
 
-    assert(_this->m_server_drain_listener_reg != nullptr);
+    /*
+    assert(_this->m_server_drain_listener_reg.has());
     _this->mp_server_manager->remove(_this->m_server_drain_listener_reg);
-    _this->m_server_drain_listener_reg = nullptr;
-    _this->__relay_client_to_server();
+    _this->m_server_drain_listener_reg.clear();
+    assert(!_this->m_server_drain_listener_reg.has());
+    */
+    if(!_this->m_client_start_read)
+        _this->__relay_client_to_server();
 } //}
 
 void RelayConnection::client_end_listener(EVENTARGS) //{
@@ -182,6 +227,7 @@ void RelayConnection::server_connect_listener(EVENTARGS) //{
 
 void RelayConnection::getStream(void* connection) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->mp_client_manager == nullptr);
     this->mp_client_manager = Factory::createStreamObject(RELAY_MAX_BUFFER_SIZE, connection);
     this->mp_client_manager->storePtr(this);
@@ -219,6 +265,20 @@ void RelayConnection::__relay_server_to_client() //{
     assert(this->m_server_start_read == false);
     this->mp_server_manager->startRead();
     this->m_server_start_read = true;
+} //}
+void RelayConnection::__stop_relay_client_to_server() //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    assert(this->m_client_start_read);
+    this->mp_client_manager->stopRead();
+    this->m_client_start_read = false;
+} //}
+void RelayConnection::__stop_relay_server_to_client() //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    assert(this->m_server_start_read);
+    this->mp_server_manager->stopRead();
+    this->m_server_start_read = false;
 } //}
 
 /** close this object */

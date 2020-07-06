@@ -9,7 +9,6 @@
 
 #include <unordered_map>
 
-#define HTTP_MAX_WRITE_BUFFER_SIZE MAX_WRITE_BUFFER_SIZE
 #define HTTP_VERSION "1.1"
 
 class Http;

@@ -23,16 +23,36 @@ struct CallbackState {
 using CBList = DLinkedList<CallbackState>;
 
 
+class __EventListener {
+    private:
+        friend EventEmitter;
+        std::string m_eventname;
+        CBList*     m_where;
+        inline __EventListener(const std::string& e, CBList* l): m_eventname(e), m_where(l) {}
+
+    public:
+        inline __EventListener(): m_eventname(), m_where(nullptr) {};
+        inline void clear()    {assert(this->m_where != nullptr); this->m_where = nullptr; this->m_eventname = "";}
+        inline bool has()      {return this->m_where != nullptr;}
+        inline operator bool() {return this->m_where != nullptr;}
+};
 class EventEmitter {
+    public:
+        using EventListener = __EventListener;
+
+
     private:
         std::map<std::string, CBList*> m_listeners;
         void delete_all();
 
+
     public:
-        void* on(const std::string&, EventCallback cb, CBFlags flags = CB_NONE);
-        void  emit(const std::string&, EventArgs::Base* argv);
-        void  remove(void*);
-        void  removeall();
+        EventListener on(const std::string&, EventCallback cb, CBFlags flags = CB_NONE);
+        void          emit(const std::string&, EventArgs::Base* argv);
+        int           numberOfListener(const std::string& event);
+        void          remove(EventListener);
+        void          removeall();
+        inline auto listeners() {return this->m_listeners;}
 
         virtual ~EventEmitter();
 };

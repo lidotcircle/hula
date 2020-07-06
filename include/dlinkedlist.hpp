@@ -90,6 +90,18 @@ void DLinkedList_tail(DLinkedList<T>** cbl) //{
     *cbl = c;
 } //}
 template<typename T>
+void DLinkedList_delete_target(DLinkedList<T>** cbl, DLinkedList<T>* target) //{
+{
+    assert(*cbl != nullptr);
+    DLinkedList_head<T>(cbl);
+    DLinkedList<T>* h = *cbl;
+    while(h != target && h != nullptr) h = h->next;
+    assert(h != nullptr);
+
+    DLinkedList_delete(&target);
+    *cbl = target;
+} //}
+template<typename T>
 DLinkedList<T>* DLinkedList_insert_to_head(DLinkedList<T>** cbl, T value) //{
 {
     DLinkedList_head(cbl);
@@ -114,5 +126,17 @@ DLinkedList<T>* DLinkedList_insert_to_tail(DLinkedList<T>** cbl, T value) //{
     if(old_tail != nullptr)
         old_tail->next = new_entry;
     return new_entry;
+} //}
+template<typename T>
+int  DLinkedList_element_count(DLinkedList<T>** cbl) //{
+{
+    int ret = 0;
+    if(*cbl == nullptr) return ret;
+    DLinkedList_head(cbl);
+    auto h = *cbl;
+
+    for(;h!=nullptr;h=h->next, ret++);
+
+    return ret;
 } //}
 

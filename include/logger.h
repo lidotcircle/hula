@@ -51,6 +51,8 @@ private:
     std::string fileName;
     uint32_t pid;
 
+    bool m_enabled;
+
     void helloLogger();
     void initializeOutputFile();
     void initializeOutputStream();
@@ -85,6 +87,9 @@ public:
     void info (const char*, ...);
     void warn (const char*, ...);
     void error(const char*, ...);
+
+    void disable();
+    void enable();
 }; //}
 
 extern Logger* logger;

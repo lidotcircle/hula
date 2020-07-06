@@ -123,6 +123,7 @@ Logger::Logger()//{
     this->initializeOutputFile();
     this->initializeTitle(this->title.c_str());
     this->initializeOutputStream();
+    this->m_enabled = true;
 } //}
 Logger::Logger(const std::string& title, const char* filename, bool clean): //{
     fileName(filename)
@@ -131,18 +132,21 @@ Logger::Logger(const std::string& title, const char* filename, bool clean): //{
     this->initializeTitle(title.c_str());
     this->initializeOutputStream();
     cleaned_logger.push_back(this);
+    this->m_enabled = true;
 } //}
 Logger::Logger(const std::string& title, const char* filename): //{
     fileName(filename)
 {
     this->initializeTitle(title.c_str());
     this->initializeOutputStream();
+    this->m_enabled = true;
 } //}
 Logger::Logger(const std::string& title, const std::string& filename): //{
     fileName(filename)
 {
     this->initializeTitle(title.c_str());
     this->initializeOutputStream();
+    this->m_enabled = true;
 } //}
 Logger::Logger(const std::string& title, std::ostream& outstream): //{
     fileName("")
@@ -150,6 +154,7 @@ Logger::Logger(const std::string& title, std::ostream& outstream): //{
     this->initializeTitle(title.c_str());
     this->outputStream = &outstream;
     this->helloLogger();
+    this->m_enabled = true;
 } //}
 Logger::Logger(const std::string& title) //{
 {
@@ -157,6 +162,7 @@ Logger::Logger(const std::string& title) //{
     this->initializeOutputFile();
     this->initializeTitle(this->title.c_str());
     this->initializeOutputStream();
+    this->m_enabled = true;
 } //}
 
 Logger::~Logger() //{
@@ -193,6 +199,7 @@ void Logger::new_line() //{
 
 void Logger::__logger(const std::string& level, const char* xmsg, va_list list) //{
 {
+    if(!this->m_enabled) return;
     char buf[4096];
     char msg[4096];
     vsnprintf(msg, 4096, xmsg, list);
@@ -221,8 +228,11 @@ void Logger::__logger(const std::string& level, const char* xmsg, va_list list) 
             buf[b - a] = '\0';
             *this->outputStream << (char*)buf;
         }
-        if(b != l) this->new_line();
-        else *this->outputStream << std::endl;
+        if(b != l) {
+            this->new_line();
+        } else {
+            *this->outputStream << std::endl;
+        }
     }
 } //}
 
@@ -291,6 +301,9 @@ void Logger::error(const char* msg, ...) //{
     this->verror(msg, arg_list);
     va_end(arg_list);
 } //}
+
+void Logger::disable() {this->m_enabled = false;}
+void Logger::enable()  {this->m_enabled = true;}
 
 void debug(const char* msg, ...) {va_list list; va_start(list, msg); logger->vdebug(msg, list); va_end(list);}
 void info (const char* msg, ...) {va_list list; va_start(list, msg); logger->vinfo (msg, list); va_end(list);}

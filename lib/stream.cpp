@@ -7,6 +7,7 @@
 
 void EBStreamObject::read_callback(ROBuf buf, int status) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     if(status == 0) {
         this->emit("data", new DataArgs(buf));
     } else {
@@ -15,11 +16,13 @@ void EBStreamObject::read_callback(ROBuf buf, int status) //{
 } //}
 void EBStreamObject::end_signal() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     this->emit("end", new EndArgs());
 } //}
 
 EBStreamObject::EBStreamObject(size_t m) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     this->m_max_write_buffer_size = m;
     this->m_writed_size = 0;
     this->m_closed = false;
@@ -33,6 +36,7 @@ struct EBStreamObject$write$_write: public CallbackPointer {
 };
 int EBStreamObject::write(ROBuf buf) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false);
     this->m_writed_size += buf.size();
     auto ptr = new EBStreamObject$write$_write(this);
@@ -43,6 +47,7 @@ int EBStreamObject::write(ROBuf buf) //{
 /** [static] */
 void EBStreamObject::write_callback(ROBuf buf, int status, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     EBStreamObject$write$_write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);
@@ -60,6 +65,13 @@ void EBStreamObject::write_callback(ROBuf buf, int status, void* data) //{
     _this->m_writed_size -= buf.size();
     if(_this->m_writed_size <= _this->m_max_write_buffer_size &&
        _this->m_writed_size + buf.size() > _this->m_max_write_buffer_size) {
+        /*
+        int n = _this->numberOfListener("drain");
+        __logger->warn("write_callback() DRAIN with %d listener", n);
+        std::cout << "object: " << _this << std::endl;
+        for(auto& x: _this->listeners())
+            std::cout << "    listener of " << x.first << ": " << x.second << std::endl;
+        */
         _this->emit("drain", new DrainArgs());
     }
     return;
@@ -109,15 +121,27 @@ void EBStreamObject::connect_callback(int status, void* data) //{
 
 void EBStreamObject::getDNS(const std::string& addr, GetAddrInfoCallback cb, void* data) //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_closed == false);
     this->getaddrinfo(addr.c_str(), cb, data);
 } //}
 
-void EBStreamObject::startRead() {assert(this->m_end == false && this->m_closed == false); this->start_read();}
-void EBStreamObject::stopRead()  {assert(this->m_end == false && this->m_closed == false); this->stop_read();}
+void EBStreamObject::startRead() //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    assert(this->m_end == false && this->m_closed == false); 
+    this->start_read();
+} //}
+void EBStreamObject::stopRead()  //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    assert(this->m_end == false && this->m_closed == false); 
+    this->stop_read();
+} //}
 static void dummy_end_callback(int, void*) {}
 void EBStreamObject::end()       //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false); 
     this->m_end = true; 
     this->shutdown(dummy_end_callback, nullptr);
@@ -125,6 +149,7 @@ void EBStreamObject::end()       //{
 
 void EBStreamObject::close() //{
 {
+    __logger->debug("call %s", FUNCNAME);
     assert(this->m_closed == false);
     this->m_closed = true;
     this->emit("close", new CloseArgs());

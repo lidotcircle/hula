@@ -24,7 +24,7 @@ class RelayConnection: public RelayAbstraction //{
         EBStreamObject *mp_client_manager, *mp_server_manager;
         bool m_client_end, m_server_end;
 
-        void *m_client_drain_listener_reg, *m_server_drain_listener_reg;
+        EventEmitter::EventListener m_client_drain_listener_reg, m_server_drain_listener_reg;
 
         void register_server_listener();
         void register_client_listener();
@@ -46,6 +46,8 @@ class RelayConnection: public RelayAbstraction //{
 
         void __relay_client_to_server();
         void __relay_server_to_client();
+        void __stop_relay_client_to_server();
+        void __stop_relay_server_to_client();
 
     public:
         RelayConnection(Server* kserver, Socks5ServerAbstraction* socks5, 
