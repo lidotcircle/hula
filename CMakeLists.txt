@@ -24,6 +24,8 @@ set(kproxy_lib_src
 
     lib/file_libuv.cpp
     lib/config_file.cpp
+    lib/proxyrule.cpp
+    lib/proxy_config.cpp
 
     lib/kclient_relay.cpp
     lib/kclient_server.cpp

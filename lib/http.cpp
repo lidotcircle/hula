@@ -318,6 +318,7 @@ __URL__ parse_url(const std::string& str) //{
 {
     __URL__ ret;
     http_parser_url url;
+    http_parser_url_init(&url);
     http_parser_parse_url(str.c_str(), str.size(), 0, &url);
     if(url.field_set & (1 << http_parser_url_fields::UF_USERINFO)) {
         const char* s = str.c_str() + url.field_data[http_parser_url_fields::UF_USERINFO].off;
