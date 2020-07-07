@@ -78,7 +78,7 @@ void StreamRelay::a_end_listener(EVENTARGS) //{
     DOIT("end", EndArgs);
 
     if(_this->m_a_end) {
-        _this->__close();
+        _this->StreamA()->emit("error", new EBStreamObject::ErrorArgs("double end"));
     } else {
         _this->mp_stream_b->end();
         _this->m_a_end = true;
@@ -91,7 +91,7 @@ void StreamRelay::b_end_listener(EVENTARGS) //{
     DOIT("end", EndArgs);
 
     if(_this->m_b_end) {
-        _this->__close();
+        _this->StreamB()->emit("error", new EBStreamObject::ErrorArgs("double end"));
     } else {
         _this->mp_stream_a->end();
         _this->m_b_end = true;
@@ -122,6 +122,8 @@ void StreamRelay::start_relay() //{
     __logger->debug("call %s", FUNCNAME);
     assert(this->mp_stream_a != nullptr);
     assert(this->mp_stream_b != nullptr);
+    this->register_a_listener();
+    this->register_b_listener();
     this->__relay_a_to_b();
     this->__relay_b_to_a();
 } //}
@@ -155,6 +157,23 @@ void StreamRelay::__stop_b_to_a() //{
     this->mp_stream_b->stopRead();
     this->m_b_start_read = false;
 } //}
+
+void StreamRelay::setStreamA(EBStreamObject* stream) //{
+{
+    assert(stream->fetchPtr() == nullptr);
+    assert(this->mp_stream_a == nullptr); 
+    this->mp_stream_a = stream;
+    this->mp_stream_a->storePtr(this);
+} //}
+void StreamRelay::setStreamB(EBStreamObject* stream) //{
+{
+    assert(stream->fetchPtr() == nullptr);
+    assert(this->mp_stream_b == nullptr); 
+    this->mp_stream_b = stream;
+    this->mp_stream_b->storePtr(this);
+} //}
+EBStreamObject* StreamRelay::StreamA() {return this->mp_stream_a;}
+EBStreamObject* StreamRelay::StreamB() {return this->mp_stream_b;}
 
 StreamRelay::~StreamRelay() //{
 {

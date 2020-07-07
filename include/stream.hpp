@@ -126,8 +126,10 @@ class EBStreamObject: virtual protected EBStreamAbstraction, protected CallbackM
         EBStreamObject(size_t max_write_buffer_size);
 
         int  write(ROBuf);
-        int  connectWith_sockaddr(sockaddr*);
-        int  connectWith_address (const std::string& addr, uint16_t port);
+        bool connectTo(struct sockaddr*);
+        bool connectTo(uint32_t ipv4, uint16_t port);
+        bool connectTo(uint8_t ipv6[16], uint16_t port);
+        bool connectTo(const std::string& addr, uint16_t port);
         void getDNS(const std::string& addr, GetAddrInfoCallback cb, void* data);
         void startRead();
         void stopRead();

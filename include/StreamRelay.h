@@ -36,6 +36,10 @@ class StreamRelay //{
         virtual void __close() = 0;
         void start_relay();
 
+        void setStreamA(EBStreamObject*);
+        void setStreamB(EBStreamObject*);
+        EBStreamObject* StreamA();
+        EBStreamObject* StreamB();
 
     public:
         StreamRelay();

@@ -50,7 +50,7 @@ static void interrupt_handle(int sig) //{
 int main() //{
 {
     Logger::logger_init_stdout();
-    Logger::logger->disable();
+//    Logger::logger->disable();
 
     uv_loop_t loop;
     uv_loop_init(&loop);

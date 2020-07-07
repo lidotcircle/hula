@@ -81,7 +81,7 @@ struct EBStreamObject$connectWith_sockaddr$connect: public CallbackPointer {
     EBStreamObject* _this;
     inline EBStreamObject$connectWith_sockaddr$connect(EBStreamObject* _this): _this(_this) {}
 };
-int EBStreamObject::connectWith_sockaddr(sockaddr* addr) //{
+bool EBStreamObject::connectTo(struct sockaddr* addr) //{
 {
     __logger->debug("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false);
@@ -89,13 +89,29 @@ int EBStreamObject::connectWith_sockaddr(sockaddr* addr) //{
     this->add_callback(ptr);
     return this->connect(addr, connect_callback, ptr);
 } //}
-int EBStreamObject::connectWith_address(const std::string& addr, uint16_t port) //{
+bool EBStreamObject::connectTo(const std::string& addr, uint16_t port) //{
 {
     __logger->debug("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false);
     auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
     this->add_callback(ptr);
     return this->connect(addr, port, connect_callback, ptr);
+} //}
+bool EBStreamObject::connectTo(uint32_t ipv4, uint16_t port) //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    assert(this->m_end == false && this->m_closed == false);
+    auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
+    this->add_callback(ptr);
+    return this->connect(ipv4, port, connect_callback, ptr);
+} //}
+bool EBStreamObject::connectTo(uint8_t ipv6[16], uint16_t port) //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    assert(this->m_end == false && this->m_closed == false);
+    auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
+    this->add_callback(ptr);
+    return this->connect(ipv6, port, connect_callback, ptr);
 } //}
 /** [static] */
 void EBStreamObject::connect_callback(int status, void* data) //{
