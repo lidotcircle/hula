@@ -3,6 +3,8 @@
 #include <ctype.h>
 #include <string.h>
 
+#include <iostream>
+
 
 ProxyConfig::ProxyConfig() {}
 void ProxyConfig::addRules(const std::vector<std::string>& rules) //{
@@ -10,6 +12,19 @@ void ProxyConfig::addRules(const std::vector<std::string>& rules) //{
     for(auto& rule: rules) this->m_matcher.add(rule);
 } //}
 bool ProxyConfig::match(const std::string& addr, int port) {return this->m_matcher.match(addr, port);}
+
+static void dummy_load_callback(int, void*) {}
+void ProxyConfig::fileEventRaise(const std::string& filename, FileEventType event) //{
+{
+    std::cout << "file event raised" << std::endl;
+    switch(event) {
+        case RENAME:
+            break;
+        case CHANGE:
+            this->loadFromFile(dummy_load_callback, nullptr);
+            break;
+    }
+} //}
 
 bool ProxyConfig::fromROBuf(ROBuf buf) //{
 {

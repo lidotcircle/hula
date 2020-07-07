@@ -4,6 +4,8 @@
     "bind_address": "0.0.0.0",
     "bind_port": 1080,
     "socks5_authentication": "allowed",
+    "proxy_rule": "../tests/gfwlist.txt",
+    "ad_rule": "../tests/adblock.txt",
 
     "local_users": [
         {

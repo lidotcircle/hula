@@ -21,6 +21,7 @@ set(kproxy_lib_src
     lib/stream.cpp
     lib/stream_libuv.cpp
     lib/stream_memory.cpp
+    lib/StreamRelay.cpp
 
     lib/file_libuv.cpp
     lib/config_file.cpp

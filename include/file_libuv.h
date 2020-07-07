@@ -20,6 +20,9 @@ class UVFile: virtual public FileAbstraction, protected CallbackManager //{
 
         uv_loop_t* mp_loop;
 
+        uv_fs_event_t* m_file_watcher;
+        bool m_watching;
+
         static void open_callback(uv_fs_t* req);
         static void close_callback(uv_fs_t* req);
         static void read_callback(uv_fs_t* req);
@@ -31,6 +34,10 @@ class UVFile: virtual public FileAbstraction, protected CallbackManager //{
 
         ROBuf __read(size_t n, ReadCallback cb, void* data);
         bool  setoffset(int offset, SeekType type, size_t filesize);
+
+        void register_file_watcher();
+        void release_file_watcher();
+        static void file_watcher_callback(uv_fs_event_t* handle, const char* filename, int event, int status);
 
     public:
         UVFile(uv_loop_t* loop, const std::string& filename);
@@ -53,6 +60,7 @@ class UVFile: virtual public FileAbstraction, protected CallbackManager //{
         int  flags()  override;
         int  mode()   override;
 
+        inline auto get_uv_loop() {return this->mp_loop;}
         ~UVFile();
 }; //}
 

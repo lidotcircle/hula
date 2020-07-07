@@ -71,6 +71,12 @@ void test_matcher3(uv_loop_t* loop) //{
     delete config;
 } //}
 
+void test_matcher4(uv_loop_t* loop) //{
+{
+    UVProxyConfig* config = new UVProxyConfig(loop, "../tests/gfwlist.txt");
+    config->loadFromFile(nullptr, nullptr);
+} //}
+
 int main() {
     uv_loop_t loop;
     uv_loop_init(&loop);
@@ -78,6 +84,7 @@ int main() {
     test_matcher1();
     test_matcher2();
     test_matcher3(&loop);
+    test_matcher4(&loop);
 
     uv_run(&loop, UV_RUN_DEFAULT);
     uv_loop_close(&loop);

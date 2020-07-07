@@ -39,6 +39,12 @@ class FileAbstraction //{
         using StatCallback     = void (*)(std::shared_ptr<Stat> stat, int status, void* data);
         using TruncateCallback = void (*)(int status, void* data);
 
+        using FileEventType = enum {RENAME, CHANGE};
+
+
+    protected:
+        inline virtual void fileEventRaise(const std::string& filename, FileEventType) {}
+
 
     public:
         virtual bool open(int flags, int mode = 0666, OpenCallback cb = nullptr, void* data = nullptr) = 0;

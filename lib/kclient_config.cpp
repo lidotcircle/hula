@@ -35,7 +35,7 @@ json SingleServerInfo::to_json() //{
 //}
 
 
-ClientConfig::ClientConfig(): m_policy(), m_servers(), m_accounts() {}
+ClientConfig::ClientConfig(): m_policy(), m_servers(), m_accounts(), mp_proxyrule(nullptr), mp_adblock_rule(nullptr) {}
 
 bool ClientConfig::validateUser(const std::string& username, const std::string& password) //{
 {
@@ -86,6 +86,7 @@ bool ClientConfig::set_policy(const json& jsonx) //{
        jsonx.find("rule") == jsonx.end() || 
        jsonx.find("bind_address") == jsonx.end() || 
        jsonx.find("bind_port") == jsonx.end() || 
+       jsonx.find("proxy_rule") == jsonx.end() || 
        jsonx.find("socks5_authentication") == jsonx.end()) {
         this->setError("policy fields don't match required");
         return false;
@@ -96,6 +97,7 @@ bool ClientConfig::set_policy(const json& jsonx) //{
     auto bind_address = jsonx["bind_address"];
     auto bind_port = jsonx["bind_port"];
     auto method = jsonx["socks5_authentication"];
+    auto proxyrule = jsonx["proxy_rule"];
     if(!mode.is_string()) {
         this->setError("invalid proxy mode");
         return false;
@@ -115,6 +117,16 @@ bool ClientConfig::set_policy(const json& jsonx) //{
     if(!bind_port.is_string() && !bind_port.is_number()) {
         this->setError("invalid bind_port");
         return false;
+    }
+    if(!proxyrule.is_string()) {
+        this->setError("proxy_rule: invalid filename");
+        return false;
+    } else {
+        this->m_policy.m_proxyrule_filename = proxyrule.get<std::string>();
+    }
+    if(jsonx.find("ad_rule") != jsonx.end()) {
+        auto ad_rule = jsonx["ad_rule"];
+        if(ad_rule.is_string()) this->m_policy.m_adrule_filename = ad_rule;
     }
 
     if(mode.get<std::string>() == "global") {
@@ -159,7 +171,6 @@ bool ClientConfig::set_policy(const json& jsonx) //{
         return false;
     }
     this->m_policy.m_port = port_x;
-
     return true;
 } //}
 bool ClientConfig::set_servers(const json& jsonx) //{
@@ -247,6 +258,10 @@ bool ClientConfig::set_users(const json& jsonx) //{
     return true;
 } //}
 
+struct __clientconfig_state: public CallbackPointer {
+    ClientConfig* _this;
+    inline __clientconfig_state(decltype(_this)_this): _this(_this) {}
+};
 bool ClientConfig::from_json(const json& jsonx) //{
 {
     __logger->debug("call ClientConfig::from_json()");
@@ -256,7 +271,71 @@ bool ClientConfig::from_json(const json& jsonx) //{
         return false;
     if(!this->set_users(jsonx))
         return false;
+
+    if(this->mp_proxyrule != nullptr) delete this->mp_proxyrule;
+    this->mp_proxyrule = this->createProxyConfig(this->m_policy.m_proxyrule_filename);
+    auto ptr = new __clientconfig_state(this);
+    this->add_callback(ptr);
+    this->mp_proxyrule->loadFromFile(load_proxyrule_callback, ptr);
+
+    if(this->m_policy.m_adrule_filename.size() > 0) {
+        if(this->mp_adblock_rule != nullptr) delete this->mp_adblock_rule;
+        this->mp_adblock_rule = this->createProxyConfig(this->m_policy.m_adrule_filename);
+        auto ptr = new __clientconfig_state(this);
+        this->add_callback(ptr);
+        this->mp_adblock_rule->loadFromFile(load_adrule_callback, ptr);
+    }
+
     return true;
+} //}
+/** [static] */
+void ClientConfig::load_proxyrule_callback(int status, void* data) //{
+{
+    __clientconfig_state* msg = 
+        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
+    assert(msg);
+
+    auto _this = msg->_this;
+    auto run = msg->CanRun();
+    delete msg;
+
+    if(!run) return;
+    _this->remove_callback(msg);
+
+    if(status < 0) {
+        assert(false);
+        _this->setError("load proxy rule fail");
+    }
+} //}
+/** [static] */
+void ClientConfig::load_adrule_callback(int status, void* data) //{
+{
+    __clientconfig_state* msg = 
+        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
+    assert(msg);
+
+    auto _this = msg->_this;
+    auto run = msg->CanRun();
+    delete msg;
+
+    if(!run) return;
+    _this->remove_callback(msg);
+
+    if(status < 0) {
+        assert(false);
+        _this->setError("load ad rule fail");
+    }
+} //}
+
+bool ClientConfig::ProxyMatch(const std::string& addr, int port) //{
+{
+    if(this->mp_proxyrule == nullptr) return false;
+    return this->mp_proxyrule->match(addr, port);
+} //}
+bool ClientConfig::AdMatch(const std::string& addr, int port) //{
+{
+    if(this->mp_adblock_rule == nullptr) return false;
+    return this->mp_adblock_rule->match(addr, port);
 } //}
 
 json ClientConfig::to_json() //{
@@ -306,5 +385,11 @@ json ClientConfig::users_to_json() //{
     }
 
     return result;
+} //}
+
+ClientConfig::~ClientConfig() //{
+{
+    if(this->mp_proxyrule != nullptr) delete this->mp_proxyrule;
+    if(this->mp_adblock_rule != nullptr) delete this->mp_adblock_rule;
 } //}
 

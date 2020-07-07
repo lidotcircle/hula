@@ -10,9 +10,13 @@ class ProxyConfig: public ConfigFile //{
     private:
         ProxyRuleMatcher m_matcher;
 
+
     protected:
         bool  fromROBuf(ROBuf buf) override;
         ROBuf toROBuf() override;
+
+        void fileEventRaise(const std::string&, FileEventType) override;
+
 
     public:
         ProxyConfig();

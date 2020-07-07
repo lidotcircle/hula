@@ -1,4 +1,5 @@
 #include "../include/file_libuv.h"
+#include "../include/libuv_utils.h"
 
 #include <assert.h>
 
@@ -58,6 +59,54 @@ UVFile::UVFile(uv_loop_t* loop, const std::string& filename): m_filename(filenam
     this->m_close_error = false;
 
     this->m_pos = 0;
+
+    this->m_watching = false;
+    this->m_file_watcher = nullptr;
+    this->register_file_watcher();
+    this->m_watching = true;
+} //}
+
+void UVFile::register_file_watcher() //{
+{
+    assert(this->m_file_watcher == nullptr);
+    this->m_file_watcher = new uv_fs_event_t();
+    uv_fs_event_init(this->mp_loop, this->m_file_watcher);
+    uv_handle_set_data((uv_handle_t*)this->m_file_watcher, this);
+    uv_fs_event_start(this->m_file_watcher, file_watcher_callback, this->m_filename.c_str(), 0);
+} //}
+void UVFile::release_file_watcher() //{
+{
+    uv_fs_event_stop(this->m_file_watcher);
+    uv_close((uv_handle_t*)this->m_file_watcher, UVU::delete_closed_handle<decltype(this->m_file_watcher)>);
+    this->m_file_watcher = nullptr;
+} //}
+/** [static] */
+void UVFile::file_watcher_callback(uv_fs_event_t* handle, const char* filename, int event, int status) //{
+{
+    UVFile* _this = static_cast<decltype(_this)>(uv_handle_get_data((uv_handle_t*)handle));
+
+    if(status < 0) {
+        /*
+        _this->release_file_watcher(); // TODO
+        _this->m_watching = false;
+        */
+        return;
+    }
+
+    if(_this->m_error) {
+        _this->release_file_watcher();
+        _this->m_watching = false;
+        return;
+    }
+
+    switch(event) {
+        case uv_fs_event::UV_RENAME:
+            _this->fileEventRaise(filename, FileEventType::RENAME);
+            break;
+        case uv_fs_event::UV_CHANGE:
+            _this->fileEventRaise(filename, FileEventType::CHANGE);
+            break;
+    }
 } //}
 
 bool UVFile::open(int flags, int mode, OpenCallback cb, void* data) //{
@@ -549,6 +598,12 @@ bool UVFile::reopen(const std::string& filename, int flag, int mode, OpenCallbac
     this->m_close_error = false;
     this->m_flags = 0;
     this->m_mode = 0;
+
+    if(this->m_watching)
+        this->release_file_watcher();
+    this->m_watching = true;
+    this->register_file_watcher();
+
     return this->open(flag | O_CREAT, mode, cb, data);
 } //}
 const std::string& UVFile::filename() {return this->m_filename;}
@@ -565,5 +620,6 @@ UVFile::~UVFile() //{
         uv_fs_t* req = new uv_fs_t();
         uv_fs_close(this->mp_loop, req, this->m_fd, clean_close_callback);
     }
+    if(this->m_watching) this->release_file_watcher();
 } //}
 

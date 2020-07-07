@@ -6,6 +6,7 @@
 
 #include "config_file.h"
 #include "file_libuv.h"
+#include "proxy_config.h"
 
 using nlohmann::json;
 
@@ -17,6 +18,8 @@ using nlohmann::json;
  *     "socks5_auth": "allowed" | "password",
  *     "bind_address": <valid_ipv4>,
  *     "bind_port":    <port>,
+ *     "proxy_rule": <filename>,
+ *     "ad_rule": <filename>, // optional
  *
  *     "servers": [
  *         {
@@ -107,12 +110,16 @@ struct ClientPolicy //{
 {
     ProxyMode m_mode;
     ProxyRule m_rule;
-    Socks5AuthMethod m_method;
     uint16_t  m_port;
     uint32_t  m_addr;
+
+    Socks5AuthMethod m_method;
+    std::string      m_proxyrule_filename;
+    std::string      m_adrule_filename;
     inline ClientPolicy(): m_mode(PROXY_MODE_PORT), m_rule(PROXY_RULE_ALL), 
                            m_addr(0), m_port(1080), 
-                           m_method(Socks5AuthMethod::SOCKS5_NO_REQUIRED) {}
+                           m_method(Socks5AuthMethod::SOCKS5_NO_REQUIRED),
+                           m_proxyrule_filename(), m_adrule_filename() {}
 }; //}
 
 
@@ -122,6 +129,8 @@ class ClientConfig: public ConfigFile //{
         ClientPolicy                                 m_policy;
         std::vector<SingleServerInfo>                m_servers;
         std::unordered_map<std::string, std::string> m_accounts;
+        ProxyConfig* mp_proxyrule;
+        ProxyConfig* mp_adblock_rule;
 
         bool  fromROBuf(ROBuf buf) override;
         ROBuf toROBuf() override;
@@ -134,6 +143,13 @@ class ClientConfig: public ConfigFile //{
         json to_json();
         json servers_to_json();
         json users_to_json();
+
+
+    protected:
+        virtual ProxyConfig* createProxyConfig(const std::string& filename) = 0;
+        static void load_proxyrule_callback(int status, void* data);
+        static void load_adrule_callback(int status, void* data);
+
 
     public:
         ClientConfig();
@@ -151,11 +167,17 @@ class ClientConfig: public ConfigFile //{
 
         inline auto BindAddr() {return this->m_policy.m_addr;}
         inline auto BindPort() {return this->m_policy.m_port;}
+
+        bool ProxyMatch(const std::string& addr, int port);
+        bool AdMatch   (const std::string& addr, int port);
+
+        ~ClientConfig();
 }; //}
 
 
 class UVClientConfig: public ClientConfig, public UVFile {
     public:
     inline UVClientConfig(uv_loop_t* loop, const std::string& filename): ClientConfig(), UVFile(loop, filename) {}
+    inline ProxyConfig* createProxyConfig(const std::string& filename) override {return new UVProxyConfig(this->get_uv_loop(), filename);}
 };
 

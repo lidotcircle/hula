@@ -37,8 +37,15 @@ void Server::on_connection(void* connection) //{
 void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
     __logger->debug("call %s", FUNCNAME);
-    this->dispatch_bypass(addr, port, socks5);
-//    this->dispatch_proxy(addr, port, socks5);
+    if(this->m_config->AdMatch(addr, port)) {
+        socks5->netAccept();
+        return;
+    }
+    if(this->m_config->ProxyMatch(addr, port)) {
+        this->dispatch_proxy(addr, port, socks5);
+    } else {
+        this->dispatch_bypass(addr, port, socks5);
+    }
 } //}
 void Server::dispatch_bypass(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
