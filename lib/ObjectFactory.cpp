@@ -1,6 +1,7 @@
 #include "../include/ObjectFactory.hpp"
 #include "../include/kserver_libuv.h"
 #include "../include/kclient_libuv.h"
+#include "../include/stream_byprovider.h"
 
 
 namespace Factory {
@@ -14,8 +15,11 @@ namespace Factory {
         return new KProxyServer::UVToNet((uv_tcp_t*)connection, proxy, id, addr, port);
     }
 
-    EBStreamObject* createStreamObject(size_t max_write_buffer_size, void* connection) {
+    EBStreamObject* createUVStreamObject(size_t max_write_buffer_size, void* connection) {
         return new EBStreamObjectUV((uv_tcp_t*)connection, max_write_buffer_size);
+    }
+    EBStreamObject* createKProxyMultiplexerStreamObject(size_t max_write_buffer_size, KProxyMultiplexerStreamProvider* provider) {
+        return new EBStreamObjectKProxyMultiplexerProvider(provider, max_write_buffer_size);
     }
 
     namespace KProxyClient {
@@ -35,6 +39,9 @@ namespace Factory {
         }
         ProxyMultiplexerAbstraction* createMultiplexer(Server* server, SingleServerInfo* config, void* connection) {
             return new KProxyClient::UVMultiplexer(server, config, (uv_tcp_t*)connection);
+        }
+        ProxyMultiplexerAbstraction2* createMultiplexer2(Server* server, SingleServerInfo* config, void* connection) {
+            return new KProxyClient::UVMultiplexer2(server, config, (uv_tcp_t*)connection);
         }
     };
 };

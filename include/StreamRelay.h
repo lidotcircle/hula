@@ -1,9 +1,10 @@
 #pragma once
 
 #include "stream.hpp"
+#include "object_manager.h"
 
 /** @class relay traffic between two StreamObject */
-class StreamRelay //{
+class StreamRelay: protected CallbackManager //{
 {
     private:
         EBStreamObject *mp_stream_a, *mp_stream_b;
@@ -20,16 +21,27 @@ class StreamRelay //{
         static void a_drain_listener(EventEmitter* obj, const std::string& event, EventArgs::Base* args);
         static void b_drain_listener(EventEmitter* obj, const std::string& event, EventArgs::Base* args);
 
+        static void a_shouldstartwrite_listener(EventEmitter* obj, const std::string& event, EventArgs::Base* args);
+        static void b_shouldstartwrite_listener(EventEmitter* obj, const std::string& event, EventArgs::Base* args);
+
+        static void a_shouldstopwrite_listener(EventEmitter* obj, const std::string& event, EventArgs::Base* args);
+        static void b_shouldstopwrite_listener(EventEmitter* obj, const std::string& event, EventArgs::Base* args);
+
         static void a_end_listener(EventEmitter* obj, const std::string& event, EventArgs::Base* args);
         static void b_end_listener(EventEmitter* obj, const std::string& event, EventArgs::Base* args);
 
         static void a_error_listener(EventEmitter* obj, const std::string& event, EventArgs::Base* args);
         static void b_error_listener(EventEmitter* obj, const std::string& event, EventArgs::Base* args);
 
+        int m_a_random = 0;
+        int m_b_random = 0;
         void __relay_a_to_b();
         void __relay_b_to_a();
         void __stop_a_to_b();
         void __stop_b_to_a();
+
+        static void __wait_a_start_read(void* data);
+        static void __wait_b_start_read(void* data);
 
 
     protected:

@@ -2,6 +2,7 @@
 
 #include "kserver_server.h"
 #include "kclient.h"
+#include "StreamProvider_KProxyMultiplexer.h"
 
 #include <memory>
 
@@ -19,7 +20,8 @@ namespace Factory {
     KProxyServer::ToNetAbstraction*           createToNet(KProxyServer::ClientConnectionProxy* proxy, void* connection, 
                                                           uint8_t id, const std::string& addr, uint16_t port);
 
-    EBStreamObject* createStreamObject(size_t max_write_buffer_size, void* connection);
+    EBStreamObject* createUVStreamObject(size_t max_write_buffer_size, void* connection);
+    EBStreamObject* createKProxyMultiplexerStreamObject(size_t max_write_buffer_size, void* provider);
 
     namespace KProxyClient {
         using namespace ::KProxyClient;

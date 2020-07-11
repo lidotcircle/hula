@@ -4,12 +4,32 @@
 #include "StreamProvider.h"
 
 
-class EBStreamByProvider: public virtual EBStreamAbstraction //{
+class EBStreamByProvider: public virtual EBStreamAbstraction, protected CallbackManager //{
 {
     private:
-        StreamProvider* mp_provider;
+        struct __virtualbase {inline virtual ~__virtualbase() {}};
+        struct __info_type: public __virtualbase {
+            StreamProvider* mp_provider = nullptr;
+            StreamProvider::StreamId m_id;
+            bool m_send_end = false;
+        }* m_info;
         bool m_stream_read;
         static void __freeaddrinfo(struct addrinfo*);
+
+        static void write_callback(ROBuf buf, int status, void* data);
+        static void connect_callback(int status, void* data);
+        static void shutdown_callback(ROBuf buf, int status, void* data);
+
+        static void getaddrinfo_callback(std::vector<uint32_t> ipv4, std::vector<uint8_t[16]> ipv6, int status, void* data);
+        static void getaddrinfoipv4_callback(std::vector<uint32_t> ipv4s, int status, void* data);
+        static void getaddrinfoipv6_callback(std::vector<uint8_t[16]> ipv6s, int status, void* data);
+
+        void register_callback();
+        static void r_read_callback(EBStreamAbstraction* obj, ROBuf);
+        static void r_error_callback(EBStreamAbstraction* obj);
+        static void r_end_callback(EBStreamAbstraction* obj);
+        static void r_shouldstartwrite_callback(EBStreamAbstraction* obj);
+        static void r_shouldstopwrite_callback(EBStreamAbstraction* obj);
 
 
     protected:
@@ -50,6 +70,13 @@ class EBStreamByProvider: public virtual EBStreamAbstraction //{
         bool  hasStreamObject() override;
 
         void timeout(TimeoutCallback cb, void* data, int time) override;
+}; //}
 
+
+class EBStreamObjectKProxyMultiplexerProvider: public EBStreamByProvider, public EBStreamObject //{
+{
+    public:
+        inline EBStreamObjectKProxyMultiplexerProvider(StreamProvider* connection, size_t max): 
+            EBStreamByProvider(connection), EBStreamObject(max) {}
 }; //}
 

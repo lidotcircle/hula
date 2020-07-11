@@ -12,9 +12,13 @@
 
 /** maximum connection per multiplexer */
 #define SINGLE_PROXY_MAX_CONNECTION (1 << 6)
+#define SINGLE_MULTIPLEXER_MAX_CONNECTION (1 << 6)
 
 /** timeout for a new proxy connection */
 #define NEW_CONNECTION_TIMEOUT 8000
+
+/** maximum wait time(ms) to shouldStartWrite event after an shouldStopWrite */
+#define MAXIMUM_SHOULD_START_WAIT_TIMEOUT 20000
 
 
 #include "logger.h"

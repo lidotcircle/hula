@@ -14,6 +14,7 @@
 #include "dlinkedlist.hpp"
 #include "socks5.h"
 #include "object_manager.h"
+#include "StreamProvider_KProxyMultiplexer.h"
 
 #include "stream.hpp"
 
@@ -81,6 +82,8 @@ class ClientProxyAbstraction: public Socks5RequestProxy, virtual protected EBStr
         virtual void connectFail(ConnectResult) = 0;
 };
 
+class ClientProxyAbstraction2: public Socks5RequestProxy {};
+
 class ProxyMultiplexerAbstraction: virtual protected EBStreamAbstraction, virtual protected CallbackManager {
     public:
         using WriteCallbackMM = void(*)(ROBuf buf, int status, void*);
@@ -103,6 +106,23 @@ class ProxyMultiplexerAbstraction: virtual protected EBStreamAbstraction, virtua
         virtual void sendStartConnectionRead(uint8_t id) = 0;
         virtual void sendStopConnectionRead (uint8_t id) = 0;
         virtual void connectionEnd(uint8_t id, ClientProxyAbstraction* obj) = 0;
+
+        virtual void close() = 0;
+};
+
+class ProxyMultiplexerAbstraction2:  protected KProxyMultiplexerStreamProvider {
+    public:
+        using ConnectCallback = void (*)(int status, void*);
+
+
+    public:
+        virtual bool    full() = 0;
+        virtual uint8_t getConnectionNumbers() = 0;
+        virtual bool    connected() = 0;
+        virtual bool    uninit() = 0;
+
+        virtual void connectToServer(ConnectCallback cb, void* data) = 0;
+        virtual void remove_clientConnection(ClientProxyAbstraction2*) = 0;
 
         virtual void close() = 0;
 };

@@ -43,3 +43,7 @@ char* ip4_to_str(uint32_t ip4);
 bool  str_to_ip4(const char*, uint32_t* out);
 int   ip4_addr(const char* ip, int port, struct sockaddr_in* addr);
 
+bool k_inet_ntop(int af, const void* src, char* dst, size_t size);
+bool k_inet_pton(int af, const char* src, void* dst);
+std::pair<std::string, uint16_t> k_sockaddr_to_str(struct sockaddr*);
+

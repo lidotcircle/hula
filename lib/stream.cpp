@@ -20,6 +20,18 @@ void EBStreamObject::end_signal() //{
     this->emit("end", new EndArgs());
 } //}
 
+void EBStreamObject::should_start_write() //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    this->emit("shouldStartWrite", new ShouldStartWriteArgs());
+} //}
+void EBStreamObject::should_stop_write() //{
+{
+    __logger->debug("call %s", FUNCNAME);
+    this->emit("shouldStopWrite", new ShouldStopWriteArgs());
+} //}
+
+
 EBStreamObject::EBStreamObject(size_t m) //{
 {
     __logger->debug("call %s", FUNCNAME);
@@ -171,6 +183,10 @@ void EBStreamObject::close() //{
     this->emit("close", new CloseArgs());
 } //}
 
+void EBStreamObject::SetTimeout(TimeoutCallback cb, void* data, int time_ms) {this->timeout(cb, data, time_ms);}
+
 void  EBStreamObject::storePtr(void* ptr) {this->m_store_ptr = ptr;}
 void* EBStreamObject::fetchPtr() {return this->m_store_ptr;}
+
+EBStreamObject::~EBStreamObject() {}
 

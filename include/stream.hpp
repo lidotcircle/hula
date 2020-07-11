@@ -38,6 +38,10 @@ class EBStreamAbstraction: virtual public EventEmitter //{
 
         inline virtual void read_callback(ROBuf buf, int status) {CALL_PURE_VIRTUAL_FUNCTION();};
         inline virtual void end_signal() {CALL_PURE_VIRTUAL_FUNCTION();};
+
+        inline virtual void should_start_write() {CALL_PURE_VIRTUAL_FUNCTION();}
+        inline virtual void should_stop_write () {CALL_PURE_VIRTUAL_FUNCTION();}
+
         inline virtual void on_connection(void* connection) {CALL_PURE_VIRTUAL_FUNCTION();};
 
 
@@ -84,6 +88,9 @@ class EBStreamAbstraction: virtual public EventEmitter //{
  * @event end
  * @event error
  * @event close
+ *
+ * @event shouldStartRead
+ * @event shouldStopRead
  */
 class EBStreamObject: virtual protected EBStreamAbstraction, protected CallbackManager, virtual public EventEmitter //{
 {
@@ -104,6 +111,9 @@ class EBStreamObject: virtual protected EBStreamAbstraction, protected CallbackM
         struct EndArgs: public EventArgs::Base {};
         struct ConnectArgs: public EventArgs::Base {};
 
+        struct ShouldStartWriteArgs: public EventArgs::Base {};
+        struct ShouldStopWriteArgs:  public EventArgs::Base {};
+
 
     private:
         size_t m_max_write_buffer_size;
@@ -117,9 +127,13 @@ class EBStreamObject: virtual protected EBStreamAbstraction, protected CallbackM
         static void write_callback(ROBuf, int status, void* data);
         static void connect_callback(int status, void* data);
 
+
     protected:
         void read_callback(ROBuf buf, int status) override;
         void end_signal() override;
+
+        void should_start_write() override;
+        void should_stop_write () override;
 
 
     public:
@@ -135,8 +149,12 @@ class EBStreamObject: virtual protected EBStreamAbstraction, protected CallbackM
         void stopRead();
         void end();
         void close();
+        
+        void SetTimeout(TimeoutCallback cb, void* data, int time_ms);
 
         void  storePtr(void* ptr);
         void* fetchPtr();
+
+        virtual ~EBStreamObject();
 }; //}
 

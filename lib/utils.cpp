@@ -134,4 +134,8 @@ uint16_t k_ntohs(uint16_t v) //{
 } //}
 
 int ip4_addr(const char* ip, int port, struct sockaddr_in* addr) {return __ip4_addr(ip, port, addr);}
+bool k_inet_ntop(int af, const void* src, char* dst, size_t size) {return __k_inet_ntop(af, src, dst, size);}
+bool k_inet_pton(int af, const char* src, void* dst)              {return __k_inet_pton(af, src, dst);}
+
+std::pair<std::string, uint16_t> k_sockaddr_to_str(struct sockaddr* addr) {return __k_sockaddr_to_str(addr);}
 

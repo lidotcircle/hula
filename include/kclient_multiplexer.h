@@ -96,7 +96,7 @@ class ConnectionProxy: public ProxyMultiplexerAbstraction //{
 
         void close() override;
         ~ConnectionProxy();
-}; //
+}; //}
 
 
 NS_PROXY_CLIENT_END

@@ -24,7 +24,7 @@ RelayConnection::RelayConnection(Server* kserver, Socks5ServerAbstraction* socks
     this->m_closed = false;
 
     assert(server_connection != nullptr);
-    this->setStreamA(Factory::createStreamObject(RELAY_MAX_BUFFER_SIZE, server_connection));
+    this->setStreamA(Factory::createUVStreamObject(RELAY_MAX_BUFFER_SIZE, server_connection));
 }
 //}
 
@@ -60,7 +60,7 @@ void RelayConnection::server_connect_listener(EventEmitter* em, const std::strin
 void RelayConnection::getStream(void* connection) //{
 {
     __logger->debug("call %s", FUNCNAME);
-    this->setStreamB(Factory::createStreamObject(RELAY_MAX_BUFFER_SIZE, connection));
+    this->setStreamB(Factory::createUVStreamObject(RELAY_MAX_BUFFER_SIZE, connection));
 } //}
 /** transfer tcp connection from Socks5Auth object to this object */
 void RelayConnection::run(Socks5ServerAbstraction* socks5) //{
