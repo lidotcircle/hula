@@ -15,6 +15,7 @@ ServerToNetConnection::ServerToNetConnection(ClientConnectionProxy* proxy, EBStr
                                              void* connection, StreamProvider::StreamId id, 
                                              const std::string& addr, uint16_t port) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->m_id = id;
     this->m_addr = addr;
     this->m_port = port;
@@ -31,6 +32,7 @@ ServerToNetConnection::ServerToNetConnection(ClientConnectionProxy* proxy, EBStr
 /** [static] */
 void ServerToNetConnection::connect_listener(EventEmitter* obj, const std::string& eventname, EventArgs::Base* args) //{
 {
+    DEBUG("call %s", FUNCNAME);
     EBStreamObject* stream = dynamic_cast<decltype(stream)>(obj);
     assert(stream);
     StreamRelay* relay = static_cast<decltype(relay)>(stream->fetchPtr());
@@ -46,6 +48,7 @@ void ServerToNetConnection::connect_listener(EventEmitter* obj, const std::strin
 
 void ServerToNetConnection::connectToAddr() //{
 {
+    DEBUG("call %s", FUNCNAME);
     static struct sockaddr_storage addr;
     if(k_inet_pton(AF_INET, this->m_addr.c_str(), &addr)) {;
         struct sockaddr_in* addr_in = (decltype(addr_in))&addr;
@@ -62,11 +65,13 @@ void ServerToNetConnection::connectToAddr() //{
 
 void ServerToNetConnection::__close() //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->close();
 } //}
 
 void ServerToNetConnection::close() //{
 {
+    DEBUG("call %s", FUNCNAME);
     if(!this->m_connected)
         this->mp_proxy->CreateConnectionFail(this->m_id, 0x01);
 

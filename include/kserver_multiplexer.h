@@ -44,8 +44,6 @@ class ClientConnectionProxy: virtual public EBStreamAbstraction, public KProxyMu
         void start() override;
 
         void CreateNewConnection(EBStreamObject* obj, StreamId, const std::string& addr, uint16_t port) override;
-        void CreateConnectionSuccess(StreamId) override;
-        void CreateConnectionFail   (StreamId, uint8_t reason) override;
 
         void remove_connection(ToNetAbstraction* con) override;
         void close() override;

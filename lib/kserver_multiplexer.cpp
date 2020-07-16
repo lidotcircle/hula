@@ -39,7 +39,7 @@ void ClientConnectionProxy::read_callback(ROBuf buf, int status) //{
     if(this->in_authentication) {
         this->dispatch_authentication_data(allbuf);
     } else {
-        this->read_callback(allbuf, 0);
+        this->prm_read_callback(allbuf);
     }
 } //}
 static void dummy_shutdown_callback(int status, void*) {}
@@ -72,17 +72,17 @@ void ClientConnectionProxy::dispatch_authentication_data(ROBuf buf) //{
 {
     DEBUG("call %s", FUNCNAME);
     assert(this->in_authentication && "????????");
-    if(this->m_remains.size() < 2) {
+    if(buf.size() < 2) {
         this->m_remains = buf;
         return;
     }
-    uint8_t username_len = this->m_remains.base()[0];
-    if(this->m_remains.size() < username_len + 3) {
+    uint8_t username_len = buf.base()[0];
+    if(buf.size() < username_len + 3) {
         this->m_remains = buf;
         return;
     }
-    uint8_t password_len = this->m_remains.base()[username_len + 1];
-    if(this->m_remains.size() < username_len + password_len + 2) {
+    uint8_t password_len = buf.base()[username_len + 1];
+    if(buf.size() < username_len + password_len + 2) {
         this->m_remains = buf;
         return;
     }
@@ -134,23 +134,17 @@ void ClientConnectionProxy::authentication_write_callback(ROBuf buf, int status,
 
 void ClientConnectionProxy::start() //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->start_read();
 } //}
 
 void ClientConnectionProxy::CreateNewConnection(EBStreamObject* obj, StreamId id, const std::string& addr, uint16_t port) //{
 {
+    DEBUG("call %s", FUNCNAME);
     auto connection = this->newUnderlyStream();
     ToNetAbstraction* relay = Factory::createToNet(this, obj, connection, id, addr, port);
     this->m_relays.insert(relay);
     relay->connectToAddr();
-} //}
-void ClientConnectionProxy::CreateConnectionSuccess(StreamId id) //{
-{
-    this->accept_connection(id);
-} //}
-void ClientConnectionProxy::CreateConnectionFail(StreamId id, uint8_t reason) //{
-{
-    this->reject_connection(id, reason);
 } //}
 
 /** delete a conneciton */

@@ -554,7 +554,7 @@ struct __uv_timeout_state__ {
 };
 static void __uv_timeout_callback(uv_timer_t* timer) //{
 {
-    DEBUG("call %s", FUNCNAME);
+//    DEBUG("call %s", FUNCNAME);
     __uv_timeout_state__* msg = static_cast<decltype(msg)>(uv_handle_get_data((uv_handle_t*)timer));
     uv_timer_stop(timer);
     auto cb = msg->_cb;
@@ -567,7 +567,7 @@ static void __uv_timeout_callback(uv_timer_t* timer) //{
 } //}
 bool EBStreamUV::timeout(TimeoutCallback cb, void* data, int time_ms) //{
 {
-    DEBUG("call %s", FUNCNAME);
+//    DEBUG("call %s", FUNCNAME);
     if(this->mp_tcp == nullptr) return false;
     uv_loop_t* loop = uv_handle_get_loop((uv_handle_t*)this->mp_tcp);
     uv_timer_t* timer = new uv_timer_t();
