@@ -18,7 +18,7 @@ class ToNetAbstraction: virtual protected EBStreamAbstraction {
 
 /**
  * @class ClientConnectionProxy Multiplexing a single ssl/tls connection to multiple tcp connection */
-class ClientConnectionProxy: public ConnectionProxyAbstraction, private CallbackManager //{
+class ClientConnectionProxy: public ConnectionProxyAbstraction, virtual private CallbackManager //{
 {
     public:
         using WriteCallback = void (*)(ROBuf buf, void* data, int status, bool run);

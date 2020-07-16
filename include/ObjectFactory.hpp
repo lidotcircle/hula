@@ -3,6 +3,7 @@
 #include "kserver_server.h"
 #include "kclient.h"
 #include "StreamProvider_KProxyMultiplexer.h"
+#include "StreamObject.h"
 
 #include <memory>
 

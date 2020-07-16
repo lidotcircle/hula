@@ -12,7 +12,7 @@
 struct addrinfo;
 struct sockaddr;
 
-class EBStreamAbstraction: virtual public EventEmitter //{
+class EBStreamAbstraction: virtual public EventEmitter, virtual protected CallbackManager //{
 {
     public:
         /** #status < 0 means error */
@@ -33,6 +33,17 @@ class EBStreamAbstraction: virtual public EventEmitter //{
             LISTENNING
         };
         CONNECTION_STATE m_state;
+
+        size_t      m_stat_speed_out;
+        size_t      m_stat_speed_in;
+        size_t      m_stat_traffic_out;
+        size_t      m_stat_traffic_in;
+
+        bool m_waiting_calculating;
+        void recalculatespeed();
+        static void calculate_speed_callback(void* data);
+        EBStreamAbstraction() noexcept;
+
 
         virtual void _write(ROBuf buf, WriteCallback cb, void* data) = 0;
 
@@ -78,83 +89,16 @@ class EBStreamAbstraction: virtual public EventEmitter //{
         virtual void  release() = 0;
         virtual bool  hasStreamObject() = 0;
 
-        virtual void timeout(TimeoutCallback cb, void* data, int time_ms) = 0;
-}; //}
+        /** statistics */
+        size_t speed_out();            // bytes/second
+        size_t speed_in ();            // bytes/second
+        size_t traffic_out();          // bytes
+        size_t traffic_in ();          // bytes
+        virtual std::string remote_addr();     // remote address
+        virtual uint16_t remote_port();        // remote port
+        virtual std::string local_addr();      // local address
+        virtual uint16_t local_port();         // local port
 
-/**
- * @event drain
- * @event data
- * @event connect
- * @event end
- * @event error
- * @event close
- *
- * @event shouldStartRead
- * @event shouldStopRead
- */
-class EBStreamObject: virtual protected EBStreamAbstraction, protected CallbackManager, virtual public EventEmitter //{
-{
-    public:
-        using WriteCallback       = EBStreamAbstraction::WriteCallback;
-        using ConnectCallback     = EBStreamAbstraction::ConnectCallback;
-        using GetAddrInfoCallback = EBStreamAbstraction::GetAddrInfoCallback;
-        struct DataArgs: public EventArgs::Base {
-            ROBuf _buf;
-            inline DataArgs(ROBuf buf): _buf(buf) {}
-        };
-        struct ErrorArgs: public EventArgs::Base {
-            std::string _msg;
-            inline ErrorArgs(const std::string& err): _msg(err) {}
-        };
-        struct DrainArgs: public EventArgs::Base {};
-        struct CloseArgs: public EventArgs::Base {};
-        struct EndArgs: public EventArgs::Base {};
-        struct ConnectArgs: public EventArgs::Base {};
-
-        struct ShouldStartWriteArgs: public EventArgs::Base {};
-        struct ShouldStopWriteArgs:  public EventArgs::Base {};
-
-
-    private:
-        size_t m_max_write_buffer_size;
-        size_t m_writed_size;
-
-        bool m_end;
-        bool m_closed;
-
-        void* m_store_ptr;
-
-        static void write_callback(ROBuf, int status, void* data);
-        static void connect_callback(int status, void* data);
-
-
-    protected:
-        void read_callback(ROBuf buf, int status) override;
-        void end_signal() override;
-
-        void should_start_write() override;
-        void should_stop_write () override;
-
-
-    public:
-        EBStreamObject(size_t max_write_buffer_size);
-
-        int  write(ROBuf);
-        bool connectTo(struct sockaddr*);
-        bool connectTo(uint32_t ipv4, uint16_t port);
-        bool connectTo(uint8_t ipv6[16], uint16_t port);
-        bool connectTo(const std::string& addr, uint16_t port);
-        void getDNS(const std::string& addr, GetAddrInfoCallback cb, void* data);
-        void startRead();
-        void stopRead();
-        void end();
-        void close();
-        
-        void SetTimeout(TimeoutCallback cb, void* data, int time_ms);
-
-        void  storePtr(void* ptr);
-        void* fetchPtr();
-
-        virtual ~EBStreamObject();
+        virtual bool timeout(TimeoutCallback cb, void* data, int time_ms) = 0;
 }; //}
 

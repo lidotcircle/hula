@@ -15,7 +15,7 @@ class KProxyMultiplexerService //{
 }; //}
 
 
-class KProxyMultiplexerStreamProvider: public virtual StreamProvider, protected CallbackManager, public KProxyMultiplexerService //{
+class KProxyMultiplexerStreamProvider: public virtual StreamProvider, virtual protected CallbackManager, public KProxyMultiplexerService //{
 {
     private:
         class __KMStreamID: public __StreamID {

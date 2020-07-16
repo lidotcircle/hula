@@ -8,188 +8,91 @@
 #define DEBUG(all...) __logger->debug(all)
 
 
-void EBStreamObject::read_callback(ROBuf buf, int status) //{
+EBStreamAbstraction::EBStreamAbstraction() noexcept //{
 {
-    DEBUG("call %s", FUNCNAME);
-    if(status == 0) {
-        this->emit("data", new DataArgs(buf));
+    this->m_stat_speed_in = 0;
+    this->m_stat_speed_out = 0;
+    this->m_stat_traffic_in = 0;
+    this->m_stat_traffic_out = 0;
+    this->m_waiting_calculating = false;
+} //}
+
+struct __prev_traffic: public CallbackPointer {
+    EBStreamAbstraction* _this;
+    size_t _prev_out;
+    size_t _prev_in;
+    inline __prev_traffic(EBStreamAbstraction* _this, size_t prev_out, size_t prev_in): _this(_this), _prev_out(prev_out), _prev_in(prev_in) {}
+};
+void EBStreamAbstraction::recalculatespeed() //{
+{
+    if(this->m_waiting_calculating) return;
+    auto ptr = new __prev_traffic(this, this->m_stat_traffic_out, this->m_stat_traffic_in);
+    this->add_callback(ptr);
+
+    if(!this->timeout(calculate_speed_callback, ptr, STREAM_RECALCULATE_SPEED_PER)) {
+        this->remove_callback(ptr);
+        delete ptr;
     } else {
-        this->emit("error", new ErrorArgs("read error"));
+        this->m_waiting_calculating = true;
     }
-} //}
-void EBStreamObject::end_signal() //{
-{
-    DEBUG("call %s", FUNCNAME);
-    this->emit("end", new EndArgs());
-} //}
-
-void EBStreamObject::should_start_write() //{
-{
-    DEBUG("call %s", FUNCNAME);
-    this->emit("shouldStartWrite", new ShouldStartWriteArgs());
-} //}
-void EBStreamObject::should_stop_write() //{
-{
-    DEBUG("call %s", FUNCNAME);
-    this->emit("shouldStopWrite", new ShouldStopWriteArgs());
-} //}
-
-
-EBStreamObject::EBStreamObject(size_t m) //{
-{
-    DEBUG("call %s", FUNCNAME);
-    this->m_max_write_buffer_size = m;
-    this->m_writed_size = 0;
-    this->m_closed = false;
-    this->m_end = false;
-    this->m_store_ptr = nullptr;
-} //}
-
-struct EBStreamObject$write$_write: public CallbackPointer {
-    EBStreamObject* _this;
-    inline EBStreamObject$write$_write(EBStreamObject* _this): _this(_this) {}
-};
-int EBStreamObject::write(ROBuf buf) //{
-{
-    DEBUG("call %s", FUNCNAME);
-    assert(this->m_end == false && this->m_closed == false);
-    this->m_writed_size += buf.size();
-    auto ptr = new EBStreamObject$write$_write(this);
-    this->add_callback(ptr);
-    this->_write(buf, write_callback, ptr);
-    return (this->m_writed_size > this->m_max_write_buffer_size) ? -1 : 0;
 } //}
 /** [static] */
-void EBStreamObject::write_callback(ROBuf buf, int status, void* data) //{
+void EBStreamAbstraction::calculate_speed_callback(void* data) //{
 {
-    DEBUG("call %s", FUNCNAME);
-    EBStreamObject$write$_write* msg = 
+    __prev_traffic* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);
+
     auto _this = msg->_this;
-    auto run   = msg->CanRun();
-    delete msg;
-    if(!run) return;
-    _this->remove_callback(msg);
-
-    if(status < 0) {
-        _this->emit("error", new ErrorArgs("write error"));
-        return;
-    }
-
-    _this->m_writed_size -= buf.size();
-    if(_this->m_writed_size <= _this->m_max_write_buffer_size &&
-       _this->m_writed_size + buf.size() > _this->m_max_write_buffer_size) {
-        /*
-        int n = _this->numberOfListener("drain");
-        __logger->warn("write_callback() DRAIN with %d listener", n);
-        std::cout << "object: " << _this << std::endl;
-        for(auto& x: _this->listeners())
-            std::cout << "    listener of " << x.first << ": " << x.second << std::endl;
-        */
-        _this->emit("drain", new DrainArgs());
-    }
-    return;
-} //}
-
-struct EBStreamObject$connectWith_sockaddr$connect: public CallbackPointer {
-    EBStreamObject* _this;
-    inline EBStreamObject$connectWith_sockaddr$connect(EBStreamObject* _this): _this(_this) {}
-};
-bool EBStreamObject::connectTo(struct sockaddr* addr) //{
-{
-    DEBUG("call %s", FUNCNAME);
-    assert(this->m_end == false && this->m_closed == false);
-    auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
-    this->add_callback(ptr);
-    return this->connect(addr, connect_callback, ptr);
-} //}
-bool EBStreamObject::connectTo(const std::string& addr, uint16_t port) //{
-{
-    DEBUG("call %s", FUNCNAME);
-    assert(this->m_end == false && this->m_closed == false);
-    auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this); // FIXME LOSS
-    this->add_callback(ptr);
-    return this->connect(addr, port, connect_callback, ptr);
-} //}
-bool EBStreamObject::connectTo(uint32_t ipv4, uint16_t port) //{
-{
-    DEBUG("call %s", FUNCNAME);
-    assert(this->m_end == false && this->m_closed == false);
-    auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
-    this->add_callback(ptr);
-    return this->connect(ipv4, port, connect_callback, ptr);
-} //}
-bool EBStreamObject::connectTo(uint8_t ipv6[16], uint16_t port) //{
-{
-    DEBUG("call %s", FUNCNAME);
-    assert(this->m_end == false && this->m_closed == false);
-    auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
-    this->add_callback(ptr);
-    return this->connect(ipv6, port, connect_callback, ptr);
-} //}
-/** [static] */
-void EBStreamObject::connect_callback(int status, void* data) //{
-{
-    DEBUG("call %s", FUNCNAME);
-   EBStreamObject$connectWith_sockaddr$connect* msg = 
-        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
-    assert(msg);
-    auto _this = msg->_this;
-    auto run   = msg->CanRun();
+    auto _prev_out = msg->_prev_out;
+    auto _prev_in = msg->_prev_in;
+    auto run = msg->CanRun();
     delete msg;
 
     if(!run) return;
     _this->remove_callback(msg);
 
-    if(status < 0) {
-        _this->emit("error", new ErrorArgs("connect error"));
-        return;
-    }
+    _this->m_waiting_calculating = false;
+    auto speed_out = (_this->m_stat_traffic_out - _prev_out) / STREAM_RECALCULATE_SPEED_PER;
+    auto speed_in  = (_this->m_stat_traffic_in  - _prev_in ) / STREAM_RECALCULATE_SPEED_PER;
+    _this->m_stat_speed_out = speed_out;
+    _this->m_stat_speed_in  = speed_in;
 
-    _this->emit("connect", new ConnectArgs());
+    _this->recalculatespeed();
 } //}
 
-void EBStreamObject::getDNS(const std::string& addr, GetAddrInfoCallback cb, void* data) //{
+size_t EBStreamAbstraction::speed_out() //{
 {
-    DEBUG("call %s", FUNCNAME);
-    assert(this->m_closed == false);
-    this->getaddrinfo(addr.c_str(), cb, data);
+    this->recalculatespeed();
+    return this->m_stat_speed_out;
 } //}
-
-void EBStreamObject::startRead() //{
+size_t EBStreamAbstraction::speed_in() //{
 {
-    DEBUG("call %s", FUNCNAME);
-    assert(this->m_end == false && this->m_closed == false); 
-    this->start_read();
+    this->recalculatespeed();
+    return this->m_stat_speed_in;
 } //}
-void EBStreamObject::stopRead()  //{
+size_t EBStreamAbstraction::traffic_out() //{
 {
-    DEBUG("call %s", FUNCNAME);
-    assert(this->m_end == false && this->m_closed == false); 
-    this->stop_read();
+    return this->m_stat_traffic_out;
 } //}
-static void dummy_end_callback(int, void*) {}
-void EBStreamObject::end()       //{
+size_t EBStreamAbstraction::traffic_in() //{
 {
-    DEBUG("call %s", FUNCNAME);
-    assert(this->m_end == false && this->m_closed == false); 
-    this->m_end = true; 
-    this->shutdown(dummy_end_callback, nullptr);
+    return this->m_stat_traffic_in;
 } //}
-
-void EBStreamObject::close() //{
+std::string EBStreamAbstraction::remote_addr() //{
 {
-    DEBUG("call %s", FUNCNAME);
-    assert(this->m_closed == false);
-    this->m_closed = true;
-    this->emit("close", new CloseArgs());
+    return "";
 } //}
-
-void EBStreamObject::SetTimeout(TimeoutCallback cb, void* data, int time_ms) {this->timeout(cb, data, time_ms);}
-
-void  EBStreamObject::storePtr(void* ptr) {this->m_store_ptr = ptr;}
-void* EBStreamObject::fetchPtr() {return this->m_store_ptr;}
-
-EBStreamObject::~EBStreamObject() {}
+std::string EBStreamAbstraction::local_addr()  //{
+{
+    return "";
+} //}
+uint16_t EBStreamAbstraction::remote_port() //{
+{
+    return 0;
+} //}
+uint16_t EBStreamAbstraction::local_port()  //{
+{
+    return 0;
+} //}
 

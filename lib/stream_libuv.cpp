@@ -7,7 +7,7 @@
 #include <assert.h>
 #include <string.h>
 
-#define DEFAULT_BACKLOG 100
+#define DEFAULT_BACKLOG       100
 
 #define DEBUG(all...) __logger->debug(all)
 
@@ -34,6 +34,7 @@ void EBStreamUV::_write(ROBuf buf, WriteCallback cb, void* data) //{
     auto ptr = new EBStreamUV$_write$uv_write(this, buf, uv_buf, cb, data);
     uv_req_set_data((uv_req_t*)req, ptr);
 
+    this->m_stat_traffic_out += buf.size();
     uv_write(req, (uv_stream_t*)this->mp_tcp, uv_buf, 1, EBStreamUV::uv_write_callback);
 } //}
 /** [static] */
@@ -257,6 +258,7 @@ void EBStreamUV::uv_stream_read_callback(uv_stream_t* stream, ssize_t nread, con
     }
 
     ROBuf rbuf(buf->base, nread, 0, free);
+    _this->m_stat_traffic_in += rbuf.size();
     _this->read_callback(rbuf, 0);
 } //}
 
@@ -416,6 +418,8 @@ EBStreamUV::EBStreamUV(uv_tcp_t* tcp) //{
     if(this->mp_tcp != nullptr)
         uv_handle_set_data((uv_handle_t*)this->mp_tcp, this);
     this->m_stream_read = false;
+
+    this->recalculatespeed();
 } //}
 EBStreamUV::~EBStreamUV() //{
 {
@@ -480,6 +484,65 @@ void  EBStreamUV::regain(void* ptr) //{
     uv_handle_set_data((uv_handle_t*)this->mp_tcp, this);
 } //}
 
+
+std::string EBStreamUV::remote_addr()//{
+{
+    static char storage[256];
+    memset(storage, 0, sizeof(storage));
+    struct sockaddr_storage addr;
+    int len = 0;
+    if(this->mp_tcp == nullptr) return "";
+    if(uv_tcp_getpeername(this->mp_tcp, (struct sockaddr*)&addr, &len) < 0) return "";
+    if(uv_inet_ntop(addr.ss_family, &addr, storage, sizeof(storage)) < 0)   return "";
+    return storage;
+} //}
+uint16_t EBStreamUV::remote_port() //{
+{
+    struct sockaddr_storage addr;
+    int len = 0;
+    if(this->mp_tcp == nullptr) return 0;
+    if(uv_tcp_getpeername(this->mp_tcp, (struct sockaddr*)&addr, &len) < 0) return 0;
+
+    if(addr.ss_family == AF_INET) {
+        struct sockaddr_in* addr_in = (decltype(addr_in))&addr;
+        return k_ntohs(addr_in->sin_port);
+    } else if(addr.ss_family == AF_INET6) {
+        struct sockaddr_in6* addr_in6 = (decltype(addr_in6))&addr;
+        return k_ntohs(addr_in6->sin6_port);
+    } else {
+        return 0;
+    }
+} //}
+std::string EBStreamUV::local_addr()//{
+{
+    static char storage[256];
+    memset(storage, 0, sizeof(storage));
+    struct sockaddr_storage addr;
+    int len = 0;
+    if(this->mp_tcp == nullptr) return "";
+    if(uv_tcp_getsockname(this->mp_tcp, (struct sockaddr*)&addr, &len) < 0) return "";
+    if(uv_inet_ntop(addr.ss_family, &addr, storage, sizeof(storage)) < 0)   return "";
+    return storage;
+} //}
+uint16_t EBStreamUV::local_port() //{
+{
+    struct sockaddr_storage addr;
+    int len = 0;
+    if(this->mp_tcp == nullptr) return 0;
+    if(uv_tcp_getpeername(this->mp_tcp, (struct sockaddr*)&addr, &len) < 0) return 0;
+
+    if(addr.ss_family == AF_INET) {
+        struct sockaddr_in* addr_in = (decltype(addr_in))&addr;
+        return k_ntohs(addr_in->sin_port);
+    } else if(addr.ss_family == AF_INET6) {
+        struct sockaddr_in6* addr_in6 = (decltype(addr_in6))&addr;
+        return k_ntohs(addr_in6->sin6_port);
+    } else {
+        return 0;
+    }
+} //}
+
+
 struct __uv_timeout_state__ {
     EBStreamAbstraction::TimeoutCallback _cb;
     void* _data; 
@@ -498,13 +561,15 @@ static void __uv_timeout_callback(uv_timer_t* timer) //{
 
     uv_close((uv_handle_t*)timer, delete_closed_handle<decltype(timer)>);
 } //}
-void EBStreamUV::timeout(TimeoutCallback cb, void* data, int time_ms) //{
+bool EBStreamUV::timeout(TimeoutCallback cb, void* data, int time_ms) //{
 {
     DEBUG("call %s", FUNCNAME);
+    if(this->mp_tcp == nullptr) return false;
     uv_loop_t* loop = uv_handle_get_loop((uv_handle_t*)this->mp_tcp);
     uv_timer_t* timer = new uv_timer_t();
     uv_timer_init(loop, timer);
     uv_handle_set_data((uv_handle_t*)timer, new __uv_timeout_state__(cb, data));
     uv_timer_start(timer, __uv_timeout_callback, time_ms, 0);
+    return true;
 } //}
 

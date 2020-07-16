@@ -1,10 +1,10 @@
 #pragma once
 
-#include "stream.hpp"
+#include "StreamObject.h"
 #include "object_manager.h"
 
 /** @class relay traffic between two StreamObject */
-class StreamRelay: protected CallbackManager //{
+class StreamRelay: virtual protected CallbackManager //{
 {
     private:
         EBStreamObject *mp_stream_a, *mp_stream_b;

@@ -48,6 +48,7 @@ void EBStreamByProvider::_write(ROBuf buf, WriteCallback cb, void* data) //{
     assert(this->m_info->m_send_end == false);
     auto ptr = new __write_cb_state(this, cb, data);
     this->add_callback(ptr);
+    this->m_stat_traffic_out += buf.size();
     this->m_info->mp_provider->write(this->m_info->m_id, buf, write_callback, ptr);
 } //}
 /** [static] */
@@ -306,6 +307,12 @@ EBStreamByProvider::EBStreamByProvider(StreamProvider* provider) //{
     assert(this->m_info->m_id);
     this->m_stream_read = false;
     this->register_callback();
+
+    this->m_stat_local_port = 0;
+    this->m_stat_remote_port = 0;
+    this->m_stat_local_address = "";
+    this->m_stat_remote_address = "";
+    this->recalculatespeed();
 } //}
 EBStreamByProvider::~EBStreamByProvider() //{
 {
@@ -320,6 +327,7 @@ void EBStreamByProvider::r_read_callback(EBStreamAbstraction* obj, ROBuf buf) //
 {
     DEBUG("call %s", FUNCNAME);
     CASTTOTHIS();
+    _this->m_stat_traffic_in += buf.size();
     _this->read_callback(buf, 0);
 } //}
 void EBStreamByProvider::r_error_callback(EBStreamAbstraction* obj) //{
@@ -424,10 +432,12 @@ bool  EBStreamByProvider::hasStreamObject() //{
     return this->m_info != nullptr;
 } //}
 
-void EBStreamByProvider::timeout(TimeoutCallback cb, void* data, int time) //{
+bool EBStreamByProvider::timeout(TimeoutCallback cb, void* data, int time) //{
 {
     DEBUG("call %s", FUNCNAME);
+    if(this->m_info == nullptr) return false;
     CHECK_SOCKET();
     this->m_info->mp_provider->timeout(cb, data, time);
+    return true;
 } //}
 

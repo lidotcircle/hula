@@ -7,7 +7,7 @@ NS_PROXY_SERVER_START
 
 /**
  * @class ServerToNetConnection Proxy a single tcp connection. When new packet arrives, relay the packet to client */
-class ServerToNetConnection: public ToNetAbstraction, protected CallbackManager //{
+class ServerToNetConnection: public ToNetAbstraction, virtual protected CallbackManager //{
 {
     private:
         bool m_inform_client_stop_read;

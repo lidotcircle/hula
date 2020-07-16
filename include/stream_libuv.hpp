@@ -6,7 +6,7 @@
 #include <uv.h>
 
 
-class EBStreamUV: virtual public EBStreamAbstraction, protected CallbackManager //{
+class EBStreamUV: virtual public EBStreamAbstraction //{
 {
     private:
         uv_tcp_t* mp_tcp;
@@ -59,10 +59,16 @@ class EBStreamUV: virtual public EBStreamAbstraction, protected CallbackManager 
         void  release() override;
         bool  hasStreamObject() override;
 
-        void timeout(TimeoutCallback cb, void* data, int time) override;
+        std::string remote_addr() override;        // remote address
+        uint16_t remote_port()    override;        // remote port
+        std::string local_addr()  override;        // local address
+        uint16_t local_port()     override;        // local port
+
+        bool timeout(TimeoutCallback cb, void* data, int time) override;
 }; //}
 
 
+#include "StreamObject.h"
 class EBStreamObjectUV: public EBStreamUV, public EBStreamObject //{
 {
     public:

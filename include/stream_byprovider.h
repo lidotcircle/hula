@@ -1,10 +1,11 @@
 #pragma once
 
 #include "stream.hpp"
+#include "StreamObject.h"
 #include "StreamProvider.h"
 
 
-class EBStreamByProvider: public virtual EBStreamAbstraction, protected CallbackManager //{
+class EBStreamByProvider: public virtual EBStreamAbstraction //{
 {
     private:
         struct __virtualbase {inline virtual ~__virtualbase() {}};
@@ -14,6 +15,12 @@ class EBStreamByProvider: public virtual EBStreamAbstraction, protected Callback
             bool m_send_end = false;
         }* m_info;
         bool m_stream_read;
+
+        std::string m_stat_remote_address;
+        std::string m_stat_local_address;
+        uint16_t    m_stat_remote_port;
+        uint16_t    m_stat_local_port;
+
         static void __freeaddrinfo(struct addrinfo*);
 
         static void write_callback(ROBuf buf, int status, void* data);
@@ -69,7 +76,7 @@ class EBStreamByProvider: public virtual EBStreamAbstraction, protected Callback
         void  release() override;
         bool  hasStreamObject() override;
 
-        void timeout(TimeoutCallback cb, void* data, int time) override;
+        bool timeout(TimeoutCallback cb, void* data, int time) override;
 }; //}
 
 

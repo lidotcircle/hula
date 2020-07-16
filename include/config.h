@@ -20,6 +20,9 @@
 /** maximum wait time(ms) to shouldStartWrite event after an shouldStopWrite */
 #define MAXIMUM_SHOULD_START_WAIT_TIMEOUT 20000
 
+/** frequency of calculating stream speed */
+#define STREAM_RECALCULATE_SPEED_PER 500
+
 
 #include "logger.h"
 // #define __logger logger
