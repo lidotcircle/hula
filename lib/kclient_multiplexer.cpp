@@ -86,7 +86,7 @@ void ConnectionProxy::prm_timeout(KProxyMultiplexerStreamProvider::TimeoutCallba
 {
     DEBUG("call %s", FUNCNAME);
     EBStreamAbstraction* stream_this = static_cast<decltype(stream_this)>(this);
-    stream_this->timeout(cb, data, ms);
+    assert(stream_this->timeout(cb, data, ms));
 } //}
 
 using __connect_to_server_callback_state = ConnectionProxy_callback_state;
@@ -257,7 +257,7 @@ ConnectionProxy::~ConnectionProxy() //{
     }
 } //}
 
-void ConnectionProxy::CreateNewConnection(StreamId, const std::string& addr, uint8_t port) //{
+void ConnectionProxy::CreateNewConnection(EBStreamObject* obj, StreamId, const std::string& addr, uint16_t port) //{
 {
     __logger->warn("call %s, bad opcode in client", FUNCNAME);
     this->close();

@@ -30,12 +30,11 @@ class UVRelay: public RelayConnection {
             const std::string& addr, uint16_t port, uv_tcp_t* connection):
         RelayConnection(server, socks5, addr, port, connection) {}
 };
-class UVClientConnection: protected EBStreamUV, public ClientConnection {
+class UVClientConnection: public ClientConnection {
     public:
     inline UVClientConnection(Server* server, ProxyMultiplexerAbstraction* mgr, 
-                              const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5,
-                              uv_tcp_t* connection):
-        ClientConnection(server, mgr, addr, port, socks5), EBStreamUV(connection) {}
+                              const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5):
+        ClientConnection(server, mgr, addr, port, socks5){}
 };
 
 NS_PROXY_CLIENT_END

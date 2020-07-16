@@ -44,6 +44,7 @@ class StreamProvider //{
 
         using RegisterReadCallback             = void (*)(EBStreamAbstraction*, ROBuf buf);
         using RegisterErrorCallback            = void (*)(EBStreamAbstraction*);
+        using RegisterCloseCallback            = void (*)(EBStreamAbstraction*);
         using RegisterEndCallback              = void (*)(EBStreamAbstraction*);
         using RegisterShouldStartWriteCallback = void (*)(EBStreamAbstraction*);
         using RegisterShouldStopWriteCallback  = void (*)(EBStreamAbstraction*);
@@ -85,6 +86,7 @@ class StreamProvider //{
 
         virtual void registerReadCallback(StreamId, RegisterReadCallback) = 0;
         virtual void registerErrorCallback(StreamId, RegisterErrorCallback) = 0;
+        virtual void registerCloseCallback(StreamId, RegisterErrorCallback) = 0;
         virtual void registerEndCallback(StreamId, RegisterEndCallback) = 0;
         virtual void registerShouldStartWriteCallback(StreamId, RegisterShouldStartWriteCallback) = 0;
         virtual void registerShouldStopWriteCallback(StreamId, RegisterShouldStopWriteCallback) = 0;

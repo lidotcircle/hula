@@ -23,10 +23,11 @@ class UVMultiplexer: virtual public EBStreamUV, public ClientConnectionProxy {
             EBStreamUV(connection), ClientConnectionProxy(server) {}
 };
 
-class UVToNet:        virtual public EBStreamUV, public ServerToNetConnection {
+class UVToNet: public ServerToNetConnection {
     public:
-        inline UVToNet(uv_tcp_t* connection, ClientConnectionProxy* proxy, ConnectionId id, const std::string& addr, uint16_t port):
-            EBStreamUV(connection), ServerToNetConnection(proxy, id, addr, port) {}
+        inline UVToNet(ClientConnectionProxy* proxy, EBStreamObject* obj, uv_tcp_t* connection, 
+                       StreamProvider::StreamId id, const std::string& addr, uint16_t port):
+            ServerToNetConnection(proxy, obj, connection, id, addr, port) {}
 };
 
 

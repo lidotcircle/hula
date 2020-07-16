@@ -12,7 +12,6 @@ set(kproxy_client kproxy)
 
 set(kproxy_lib kpx)
 set(kproxy_lib_src 
-    lib/kserver_libuv.cpp
     lib/kserver_server.cpp
     lib/kserver_server2net.cpp
     lib/kserver_multiplexer.cpp

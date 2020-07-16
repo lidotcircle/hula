@@ -85,7 +85,7 @@ class ConnectionProxy: public ProxyMultiplexerAbstraction,
 
         void close() override;
 
-        void CreateNewConnection(StreamId, const std::string& addr, uint8_t port) override;
+        void CreateNewConnection(EBStreamObject* obj, StreamId, const std::string& addr, uint16_t port) override;
         void CreateConnectionSuccess(StreamId) override;
         void CreateConnectionFail   (StreamId, uint8_t reason) override;
 

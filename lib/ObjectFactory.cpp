@@ -11,8 +11,10 @@ namespace Factory {
     KProxyServer::ConnectionProxyAbstraction* createConnectionProxy(KProxyServer::Server* server, void* connection) {
         return new KProxyServer::UVMultiplexer((uv_tcp_t*)connection, server);
     }
-    KProxyServer::ToNetAbstraction* createToNet(KProxyServer::ClientConnectionProxy* proxy, void* connection, uint8_t id, const std::string& addr, uint16_t port) {
-        return new KProxyServer::UVToNet((uv_tcp_t*)connection, proxy, id, addr, port);
+    KProxyServer::ToNetAbstraction* createToNet(KProxyServer::ClientConnectionProxy* proxy, EBStreamObject* stream, 
+                                                void* connection, StreamProvider::StreamId id, 
+                                                const std::string& addr, uint16_t port) {
+        return new KProxyServer::UVToNet(proxy, stream, (uv_tcp_t*)connection, id, addr, port);
     }
 
     EBStreamObject* createUVStreamObject(size_t max_write_buffer_size, void* connection) {
@@ -35,7 +37,7 @@ namespace Factory {
         }
         ClientProxyAbstraction*      createProxy(Server* server, ProxyMultiplexerAbstraction* mgr, 
                                                  const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) {
-            return new KProxyClient::UVClientConnection(server, mgr, addr, port, socks5, nullptr);
+            return new KProxyClient::UVClientConnection(server, mgr, addr, port, socks5);
         }
         ProxyMultiplexerAbstraction* createMultiplexer(Server* server, SingleServerInfo* config, void* connection) {
             return new KProxyClient::UVMultiplexer(server, config, (uv_tcp_t*)connection);

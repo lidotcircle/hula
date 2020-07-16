@@ -360,6 +360,7 @@ void EBStreamByProvider::register_callback() //{
     DEBUG("call %s", FUNCNAME);
     this->m_info->mp_provider->registerReadCallback(this->m_info->m_id, r_read_callback);
     this->m_info->mp_provider->registerErrorCallback(this->m_info->m_id, r_error_callback);
+    this->m_info->mp_provider->registerCloseCallback(this->m_info->m_id, r_error_callback);
     this->m_info->mp_provider->registerEndCallback(this->m_info->m_id, r_end_callback);
     this->m_info->mp_provider->registerShouldStartWriteCallback(this->m_info->m_id, r_shouldstartwrite_callback);
     this->m_info->mp_provider->registerShouldStopWriteCallback(this->m_info->m_id, r_shouldstopwrite_callback);

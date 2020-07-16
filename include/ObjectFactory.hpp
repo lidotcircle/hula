@@ -18,8 +18,9 @@ class ServerConfig;
 namespace Factory {
     KProxyServer::Server*                     createServer(std::shared_ptr<ServerConfig> config, void* connection);
     KProxyServer::ConnectionProxyAbstraction* createConnectionProxy(KProxyServer::Server* server, void* connection);
-    KProxyServer::ToNetAbstraction*           createToNet(KProxyServer::ClientConnectionProxy* proxy, void* connection, 
-                                                          uint8_t id, const std::string& addr, uint16_t port);
+    KProxyServer::ToNetAbstraction*           createToNet(KProxyServer::ClientConnectionProxy* proxy, EBStreamObject* stream, 
+                                                          void* connection, StreamProvider::StreamId id, 
+                                                          const std::string& addr, uint16_t port);
 
     EBStreamObject* createUVStreamObject(size_t max_write_buffer_size, void* connection);
     EBStreamObject* createKProxyMultiplexerStreamObject(size_t max_write_buffer_size, KProxyMultiplexerStreamProvider* provider);

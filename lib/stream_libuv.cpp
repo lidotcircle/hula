@@ -252,8 +252,12 @@ void EBStreamUV::uv_stream_read_callback(uv_stream_t* stream, ssize_t nread, con
 
     if(nread <= 0) {
         free(buf->base);
-        if(nread < 0) _this->read_callback(ROBuf(), -1);
-        else          _this->end_signal();
+        if(nread < 0) {
+            // _this->release(); TODO
+            _this->read_callback(ROBuf(), -1);
+        } else {
+            _this->end_signal();
+        }
         return;
     }
 
