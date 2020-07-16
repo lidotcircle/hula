@@ -5,12 +5,15 @@
 #include "../include/callback_data.h"
 
 
+#define DEBUG(all...) __logger->debug(all)
+
+
 NS_PROXY_SERVER_START
 
 ServerToNetConnection::ServerToNetConnection(ClientConnectionProxy* proxy, ConnectionId id, 
                                              const std::string& addr, uint16_t port) //{
 {
-    __logger->debug("call %s: [%s:%d]", FUNCNAME, addr.c_str(), port);
+    DEBUG("call %s: [%s:%d]", FUNCNAME, addr.c_str(), port);
 
     this->mp_proxy = proxy;
     this->m_id = id;
@@ -30,7 +33,7 @@ ServerToNetConnection::ServerToNetConnection(ClientConnectionProxy* proxy, Conne
 /** connect to server throught internet */
 void ServerToNetConnection::__connect() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     uint32_t ipv4_addr; // TODO support IPV6
     if(str_to_ip4(this->m_addr.c_str(), &ipv4_addr)) {
         struct addrinfo info;
@@ -60,7 +63,7 @@ void ServerToNetConnection::connect_to() {this->__connect();}
 /** [static] callback for uv_getaddrinfo() in @__connect() */
 void ServerToNetConnection::tcp2net_getaddrinfo_callback(struct addrinfo* res, void(*freeaddrinfo)(struct addrinfo*), int status, void* data) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     struct addrinfo *a;
     struct sockaddr_in* m;
 
@@ -108,7 +111,7 @@ void ServerToNetConnection::tcp2net_getaddrinfo_callback(struct addrinfo* res, v
 /** connect to server with #addr */
 void ServerToNetConnection::__connect_with_sockaddr(sockaddr* addr) //{
 {
-    __logger->debug("call %s: [address=%s, port=%d]", FUNCNAME, 
+    DEBUG("call %s: [address=%s, port=%d]", FUNCNAME, 
             ip4_to_str(((sockaddr_in*)addr)->sin_addr.s_addr), 
             k_ntohs(((sockaddr_in*)addr)->sin_port));
 
@@ -119,7 +122,7 @@ void ServerToNetConnection::__connect_with_sockaddr(sockaddr* addr) //{
 /** [static] callback for uv_tcp_connect() in @__connect_with_sockaddr() */
 void ServerToNetConnection::tcp2net_connect_callback(int status, void* data) //{ static
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     CBD::ServerToNetConnection$__connect_with_sockaddr$connect* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CBD::SBase*>(data));
 
@@ -142,19 +145,19 @@ void ServerToNetConnection::tcp2net_connect_callback(int status, void* data) //{
 /** traffic control */
 void ServerToNetConnection::__start_net_to_user() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     if(!this->in_read())
         this->start_read();
 } //}
 void ServerToNetConnection::__stop_net_to_user() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     if(this->in_read())
         this->stop_read();
 } //}
 void ServerToNetConnection::__start_user_to_net() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     if(!this->user_in_read()) {
         this->mp_proxy->send_connection_start_read(this->m_id, this);
         this->m_inform_client_stop_read = false;
@@ -162,7 +165,7 @@ void ServerToNetConnection::__start_user_to_net() //{
 } //}
 void ServerToNetConnection::__stop_user_to_net() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     if(this->user_in_read()) {
         this->mp_proxy->send_connection_stop_read(this->m_id, this);
         this->m_inform_client_stop_read = true;
@@ -172,7 +175,7 @@ void ServerToNetConnection::__stop_user_to_net() //{
 /** write data to user by pack as a packet */
 void ServerToNetConnection::_write_to_user(ROBuf buf) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->m_net_to_user_buffer += buf.size();
     auto ptr = new CBD::ServerToNetConnection$write_to_user$write(this);
     this->add_callback(ptr);
@@ -184,7 +187,7 @@ void ServerToNetConnection::_write_to_user(ROBuf buf) //{
 /** [static] callback for ClientConnecitonProxy::write() in @_write_to_user() */
 void ServerToNetConnection::write_to_user_callback(ROBuf buf, void* data, int status, bool run) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
 
     CBD::ServerToNetConnection$write_to_user$write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CBD::SBase*>(data));
@@ -227,7 +230,7 @@ void ServerToNetConnection::end_signal() //{
 /** push data from user to net */
 void ServerToNetConnection::PushData(ROBuf buf) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->m_user_to_net_buffer += buf.size();
     auto ptr = new CBD::ServerToNetConnection$PushData$write(this);
     this->add_callback(ptr);
@@ -240,7 +243,7 @@ void ServerToNetConnection::PushData(ROBuf buf) //{
 /** [static] callback for _write() in @PushData() */
 void ServerToNetConnection::tcp2net_write_callback(ROBuf buf, int status, void* data) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     CBD::ServerToNetConnection$PushData$write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CBD::SBase*>(data));
     assert(msg);
@@ -309,7 +312,7 @@ void ServerToNetConnection::end_signal_shutdown_callback(int status, void* data)
 /** close this object */
 void ServerToNetConnection::close() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->mp_proxy->remove_connection(this->m_id, this);
 } //}
 

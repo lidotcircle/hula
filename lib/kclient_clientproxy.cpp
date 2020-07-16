@@ -1,4 +1,8 @@
 #include "../include/kclient_clientproxy.h"
+#include "../include/ObjectFactory.hpp"
+
+
+#define DEBUG(all...) __logger->debug(all)
 
 
 NS_PROXY_CLIENT_START
@@ -8,230 +12,66 @@ NS_PROXY_CLIENT_START
 
 /** constructor of ClientConnection */
 ClientConnection::ClientConnection(Server* kserver, ProxyMultiplexerAbstraction* mproxy,
-                                   const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
+                                     const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
 
     this->mp_proxy = mproxy;
     this->mp_kserver = kserver;
-    this->m_closed = false;
 
-    this->m_write_to_client_buffer = 0;
-    this->m_write_to_server_buffer = 0;
-
-    this->m_client_start_read = false;
-    this->m_server_start_read = false;
-
-    this->m_id = this->mp_proxy->requireAnId(this);
     this->m_socks5 = socks5;
+    this->m_closed = false;
 
     this->m_addr = addr;
     this->m_port = port;
-} //}
 
-void ClientConnection::__start_relay() //{
-{
-    __logger->debug("call %s", FUNCNAME);
-    this->__relay_client_to_server();
-    this->__relay_server_to_client();
-} //}
-void ClientConnection::__relay_client_to_server() //{
-{
-    __logger->debug("call %s", FUNCNAME);
-    assert(!this->in_read_client_to_server());
-    this->start_read();
-    this->m_client_start_read = true;
-} //}
-void ClientConnection::__relay_server_to_client() //{
-{
-    __logger->debug("call %s", FUNCNAME);
-    assert(!this->in_read_server_to_client());
-    this->startServerRead();
-    this->m_server_start_read = true;
-} //}
-void ClientConnection::__stop_relay_client_to_server() //{
-{
-    assert(this->in_read_client_to_server());
-    this->stop_read();
-    this->m_client_start_read = false;
-} //}
-void ClientConnection::__stop_relay_server_to_client() //{
-{
-    assert(this->in_read_server_to_client());
-    this->stopServerRead();
-    this->m_server_start_read = false;
+    this->mp_proxy->register_clientConnection(this);
 } //}
 
 struct write_callback_data: public CallbackPointer {
     ClientConnection* _this;
     write_callback_data(ClientConnection* _this): _this(_this) {}
 };
-/** implement pure virtual method */
-void ClientConnection::read_callback(ROBuf buf, int status) //{
-{
-    __logger->debug("call %s", FUNCNAME);
-    if(status < 0) {
-        this->close();
-        return;
-    }
-    this->m_write_to_server_buffer += buf.size();
-    if(this->m_write_to_server_buffer > PROXY_MAX_BUFFER_SIZE &&
-       this->in_read_client_to_server())
-        __stop_relay_client_to_server();
-
-    auto ptr = new write_callback_data(this);
-    this->add_callback(ptr);
-    this->mp_proxy->write(this->m_id, this, buf, write_callback, ptr);
-} //}
-/** [static] */
-void ClientConnection::write_callback(ROBuf buf, int status, void* data) //{
-{
-    write_callback_data* msg = 
-        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
-    assert(msg);
-
-    auto _this = msg->_this;
-    auto run   = msg->CanRun();
-    delete msg;
-
-    if(!run) return;
-    _this->remove_callback(msg);
-
-    if(status < 0) {
-        _this->close();
-        return;
-    }
-
-    _this->m_write_to_server_buffer -= buf.size();
-    if(_this->m_write_to_server_buffer <= PROXY_MAX_BUFFER_SIZE &&
-       !_this->in_read_client_to_server())
-        _this->__relay_client_to_server();
-} //}
-void ClientConnection::end_signal() //{
-{
-    if(this->m_client_end) {
-        this->close();
-    } else {
-        this->sendServerEnd();
-        this->m_client_end = true;
-        if(this->m_server_end)
-            this->close();
-    }
-} //}
-
-void ClientConnection::sendServerEnd() //{
-{
-    this->mp_proxy->connectionEnd(this->m_id, this);
-} //}
-void ClientConnection::startServerRead() //{
-{
-    this->mp_proxy->sendStartConnectionRead(this->m_id);
-} //}
-void ClientConnection::stopServerRead() //{
-{
-    this->mp_proxy->sendStartConnectionRead(this->m_id);
-} //}
-
-struct __writecallbackstate: public CallbackPointer {
-    ClientConnection* _this;
-    inline __writecallbackstate(ClientConnection* _this): _this(_this) {}
-};
-void ClientConnection::pushData(ROBuf buf) //{
-{
-    __logger->debug("call %s", FUNCNAME);
-
-    auto save_size = this->m_write_to_client_buffer;
-    this->m_write_to_client_buffer += buf.size();
-    if(this->m_write_to_client_buffer > PROXY_MAX_BUFFER_SIZE &&
-       this->in_read_server_to_client())
-        this->__stop_relay_server_to_client();
-
-    auto ptr = new __writecallbackstate(this);
-    this->add_callback(ptr);
-    this->_write(buf, write_to_client_callback, ptr);
-} //}
-/** [static] */
-void ClientConnection::write_to_client_callback(ROBuf buf, int status, void* data) //{
-{
-    __logger->debug("call %s", FUNCNAME);
-    __writecallbackstate* msg = 
-        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
-    assert(msg);
-
-    ClientConnection* _this = msg->_this;
-    bool run                = msg->CanRun();
-    delete msg;
-
-    if(!run) return;
-    _this->remove_callback(msg);
-
-    _this->m_write_to_client_buffer -= buf.size();
-    if(!_this->in_read_server_to_client() &&
-       _this->m_write_to_client_buffer <= PROXY_MAX_BUFFER_SIZE)
-        _this->__relay_server_to_client();
-} //}
-
-static void dummy_shutdown_callback(int, void*) {}
-/** reciprocal function of end_signal() */
-void ClientConnection::serverEnd() //{
-{
-    if(this->m_server_end) {
-        this->close();
-    } else {
-        this->shutdown(dummy_shutdown_callback, nullptr);
-        this->m_server_end = true;
-        if(this->m_client_end)
-            this->close();
-    }
-} //}
-
-/** connect callback from ProxyMultiplexer */
-void ClientConnection::connectSuccess() //{
-{
-    __logger->debug("call %s", FUNCNAME);
-    if(this->m_socks5 == nullptr && this->m_state == INITIAL) {
-        this->mp_proxy->close();
-        return;
-    }
-    this->m_state = CONNECTING;
-    this->m_socks5->netAccept();
-    this->m_socks5 = nullptr;
-} //}
-void ClientConnection::connectFail(ConnectResult) //{
-{
-    __logger->debug("call %s", FUNCNAME);
-    if(this->m_socks5 == nullptr && this->m_state == INITIAL) {
-        this->mp_proxy->close();
-        return;
-    }
-    this->m_socks5->netReject(); // TODO
-    this->m_socks5 = nullptr;
-} //}
 
 /** socks5 object complete its task and transfer stream of client to this object */
 void ClientConnection::run(Socks5ServerAbstraction* socks5) //{
 {
-    __logger->debug("call %s", FUNCNAME);
-    assert(this->hasStreamObject() == false);
-    assert(this->m_state == CONNECTING);
+    DEBUG("call %s", FUNCNAME);
+    assert(this->StreamA() != nullptr);
+    assert(this->StreamB() == nullptr);
     assert(this->m_socks5 == nullptr);
 
     this->getStream(socks5->transferStream());
-    this->__start_relay();
+    this->start_relay();
 } //}
 void ClientConnection::getStream(void* stream) //{
 {
-    this->regain(stream);
+    DEBUG("call %s", FUNCNAME);
+    this->setStreamB(Factory::createUVStreamObject(RELAY_MAX_BUFFER_SIZE, stream));
 } //}
 
 /** close() */
 void ClientConnection::close() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_closed == false);
     this->m_closed = true;
 
-    this->mp_proxy->remove_clientConnection(this->m_id, this);
+    this->mp_proxy->remove_clientConnection(this);
+} //}
+void ClientConnection::__close() //{
+{
+    DEBUG("call %s", FUNCNAME);
+
+    decltype(this->m_socks5) socks5 = nullptr;
+    if(this->m_socks5 != nullptr) {
+        socks5 = this->m_socks5;
+        this->m_socks5 = nullptr;
+    }
+
+    this->close();
+
+    if(socks5 != nullptr) socks5->netReject();
 } //}
 
 struct __connect_callback_state: public CallbackPointer {
@@ -241,7 +81,7 @@ struct __connect_callback_state: public CallbackPointer {
 /** connect to @server:port */
 void ClientConnection::connectToAddr() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
 
     if(this->mp_proxy->uninit()) {
         auto ptr = new __connect_callback_state(this);
@@ -251,10 +91,10 @@ void ClientConnection::connectToAddr() //{
         this->__connect();
     }
 } //}
-/** [static] callback for CLientConnection::connect */
+/** [static] callback for ClientConnection::connect */
 void ClientConnection::multiplexer_connect_callback(int status, void* data) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     __connect_callback_state* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);
@@ -279,13 +119,32 @@ void ClientConnection::multiplexer_connect_callback(int status, void* data) //{
 /** send connect request */
 void ClientConnection::__connect() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     if(!this->mp_proxy->connected()) {
         this->m_socks5->netReject();
         this->m_socks5 = nullptr;
         return;
     };
-    this->mp_proxy->new_connection(this->m_id, this, this->m_addr, this->m_port, NEW_CONNECTION_TIMEOUT);
+    EBStreamObject* k = Factory::createKProxyMultiplexerStreamObject(PROXY_MAX_BUFFER_SIZE, this->mp_proxy->getProvider());
+    assert(k != nullptr);
+    this->setStreamA(k);
+    this->StreamA()->on("connect", connect_listener);
+    this->StreamA()->connectTo(this->m_addr, this->m_port);
+} //}
+/** [static] */
+void ClientConnection::connect_listener(EventEmitter* obj, const std::string& eventname, EventArgs::Base* arg) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    assert(eventname == "connect");
+    EBStreamObject* stream = dynamic_cast<decltype(stream)>(obj);
+    assert(stream);
+    StreamRelay* relay = static_cast<StreamRelay*>(stream->fetchPtr());
+    ClientConnection* _this = dynamic_cast<decltype(_this)>(relay);
+    assert(_this);
+    assert(_this->m_socks5 != nullptr);
+    auto socks5 = _this->m_socks5;
+    _this->m_socks5 = nullptr;
+    socks5->netAccept();
 } //}
 
 

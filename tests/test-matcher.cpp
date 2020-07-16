@@ -84,7 +84,7 @@ int main() {
     test_matcher1();
     test_matcher2();
     test_matcher3(&loop);
-    test_matcher4(&loop);
+//    test_matcher4(&loop);
 
     uv_run(&loop, UV_RUN_DEFAULT);
     uv_loop_close(&loop);

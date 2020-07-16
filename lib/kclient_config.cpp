@@ -3,6 +3,9 @@
 #include "../include/utils.h"
 
 
+#define DEBUG(all...) __logger->debug(all)
+
+
 //                      class SingleServerInfo             //{
 SingleServerInfo::SingleServerInfo(const std::string& addr,    uint16_t port, const std::string& server_name,
                                    const std::string& name, const std::string& pass,
@@ -264,7 +267,7 @@ struct __clientconfig_state: public CallbackPointer {
 };
 bool ClientConfig::from_json(const json& jsonx) //{
 {
-    __logger->debug("call ClientConfig::from_json()");
+    DEBUG("call ClientConfig::from_json()");
     if(!this->set_policy(jsonx))
         return false;
     if(!this->set_servers(jsonx))

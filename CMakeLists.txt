@@ -35,9 +35,7 @@ set(kproxy_lib_src
     lib/kclient_server.cpp
     lib/kclient_socks5.cpp
     lib/kclient_clientproxy.cpp
-    lib/kclient_clientproxy2.cpp
     lib/kclient_multiplexer.cpp
-    lib/kclient_multiplexer2.cpp
     lib/kclient_config.cpp
 
     lib/kpacket.cpp

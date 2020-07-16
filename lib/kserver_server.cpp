@@ -11,12 +11,16 @@
 
 #include <tuple>
 
+
+#define DEBUG(all...) __logger->debug(all)
+
+
 NS_PROXY_SERVER_START
 
 /** connection callback function */
 void Server::on_connection(void* connection) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     if(connection == nullptr) {
         __logger->warn("new connection error");
         return;
@@ -31,7 +35,7 @@ void Server::on_connection(void* connection) //{
 /** delete ConnectionProxyAbstraction object */
 void Server::remove_proxy(ConnectionProxyAbstraction* p) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_connection_list.find(p) != this->m_connection_list.end());
     this->m_connection_list.erase(this->m_connection_list.find(p));
     delete p;
@@ -46,7 +50,7 @@ void Server::read_callback(ROBuf buf, int status) //{
 /** constructor of Server*/
 Server::Server(std::shared_ptr<ServerConfig> config): m_connection_list() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->m_config = config;
     this->bind_addr = config->BindAddr();
     this->bind_port = config->BindPort();
@@ -55,7 +59,7 @@ Server::Server(std::shared_ptr<ServerConfig> config): m_connection_list() //{
 /** functions related with listen */
 int Server::trylisten() //{ 
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     sockaddr_in addr;
 
     uint32_t network_order_addr = k_htonl(this->bind_addr);
@@ -76,7 +80,7 @@ int Server::trylisten() //{
 /** release objects */
 void Server::close() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     auto connection_list_copy = this->m_connection_list;
     for(auto&x: connection_list_copy)
         x->close();

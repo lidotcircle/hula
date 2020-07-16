@@ -6,6 +6,9 @@
 #include <memory>
 
 
+#define DEBUG(all...) __logger->debug(all)
+
+
 struct uvfile_state: public CallbackPointer {
     UVFile* _this;
     void*   _cb;
@@ -550,9 +553,9 @@ bool UVFile::truncate(size_t size, TruncateCallback cb, void* data) //{
     if(cb == nullptr) {
         assert(data == nullptr);
         auto rv = uv_fs_ftruncate(this->mp_loop, req, this->m_fd, size, nullptr);
+        freereq(req);
         if(rv < 0) {
             this->m_error = true;
-            freereq(req);
             return false;
         }
         this->m_pos = 0;

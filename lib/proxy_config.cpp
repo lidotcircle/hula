@@ -31,6 +31,10 @@ bool ProxyConfig::fromROBuf(ROBuf buf) //{
     int start = 0;
     int success = 0;
     const char* base = buf.base();
+
+    ObjectChecker* checker = new ObjectChecker();
+    this->SetChecker(checker);
+
     for(int i=0; i<buf.size(); i++) {
         if(base[i] == '\0') break;
         if(base[i] == '\r' || base[i] == '\n') {
@@ -43,9 +47,13 @@ bool ProxyConfig::fromROBuf(ROBuf buf) //{
             }
             if(line.size() == 0)    continue;
             if(line.front() == '!') continue;
+            if(!checker->exist()) break;
             if(this->m_matcher.add(line)) success++;
         }
     }
+
+    if(checker->exist()) this->cleanChecker(checker);
+    delete checker;
     return true;
 } //}
 ROBuf ProxyConfig::toROBuf() //{

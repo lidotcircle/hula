@@ -21,7 +21,7 @@ namespace Factory {
                                                           uint8_t id, const std::string& addr, uint16_t port);
 
     EBStreamObject* createUVStreamObject(size_t max_write_buffer_size, void* connection);
-    EBStreamObject* createKProxyMultiplexerStreamObject(size_t max_write_buffer_size, void* provider);
+    EBStreamObject* createKProxyMultiplexerStreamObject(size_t max_write_buffer_size, KProxyMultiplexerStreamProvider* provider);
 
     namespace KProxyClient {
         using namespace ::KProxyClient;

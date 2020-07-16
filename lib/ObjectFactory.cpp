@@ -40,9 +40,6 @@ namespace Factory {
         ProxyMultiplexerAbstraction* createMultiplexer(Server* server, SingleServerInfo* config, void* connection) {
             return new KProxyClient::UVMultiplexer(server, config, (uv_tcp_t*)connection);
         }
-        ProxyMultiplexerAbstraction2* createMultiplexer2(Server* server, SingleServerInfo* config, void* connection) {
-            return new KProxyClient::UVMultiplexer2(server, config, (uv_tcp_t*)connection);
-        }
     };
 };
 

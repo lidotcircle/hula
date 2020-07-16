@@ -2,6 +2,9 @@
 #include "../include/callback_data.h"
 
 
+#define DEBUG(all...) __logger->debug(all)
+
+
 NS_PROXY_CLIENT_START
 
 /** @calss Socks5Auth 
@@ -10,7 +13,7 @@ NS_PROXY_CLIENT_START
 /** constructor of Socks5Auth */
 Socks5Auth::Socks5Auth(Server* server, std::shared_ptr<ClientConfig> config) //{
 {
-    __logger->debug("call %s: new socks5 authentication session", FUNCNAME);
+    DEBUG("call %s: new socks5 authentication session", FUNCNAME);
     this->mp_server = server;
 
     this->m_state = SOCKS5_INIT;
@@ -25,14 +28,14 @@ Socks5Auth::Socks5Auth(Server* server, std::shared_ptr<ClientConfig> config) //{
 /** recieve the socks5 request, forward this message to Server try to connect the request service */
 void Socks5Auth::try_to_build_connection() //{
 {
-    __logger->debug("call %s: try to build a connection to server", FUNCNAME);
+    DEBUG("call %s: try to build a connection to server", FUNCNAME);
     assert(this->m_state == SOCKS5_FINISH);
     this->mp_server->dispatchSocks5(this->m_servername, this->m_port, this);
 } //}
 /** transfer tcp connection to Server */
 void Socks5Auth::return_to_server() //{ 
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->stop_read();
     this->mp_server->socks5Transfer(this);
 } //}
@@ -40,7 +43,7 @@ void Socks5Auth::return_to_server() //{
 static void dummy_shutdown_callback(int status, void* data) {}
 void Socks5Auth::close_this_with_error() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->m_state = SOCKS5_ERROR;
     this->shutdown(dummy_shutdown_callback, nullptr);
     auto maybe_proxy = this->mp_server->getSock5ProxyObject(this);
@@ -66,7 +69,7 @@ void Socks5Auth::end_signal() //{
 /** dispatch data base on current state */
 void Socks5Auth::dispatch_data(ROBuf buf) //{
 {
-    __logger->debug("call %s = (buf.size()=%d)", FUNCNAME, buf.size());
+    DEBUG("call %s = (buf.size()=%d)", FUNCNAME, buf.size());
     switch (this->m_state) {
         case SOCKS5_INIT: {
             auto x = parse_client_hello(this->m_remain, buf);
@@ -150,7 +153,7 @@ void Socks5Auth::dispatch_data(ROBuf buf) //{
 /** send hello to socks5 client */
 void Socks5Auth::__send_selection_method(socks5_authentication_method method) //{
 {
-    __logger->debug("call %s: send selection mothod: %d", FUNCNAME, (uint8_t)method);
+    DEBUG("call %s: send selection mothod: %d", FUNCNAME, (uint8_t)method);
     __server_selection_msg* msg = (decltype(msg))malloc(sizeof(__server_selection_msg));
     msg->m_version = 0x5;
     msg->m_method = method;
@@ -164,7 +167,7 @@ void Socks5Auth::__send_selection_method(socks5_authentication_method method) //
 /** [static] */
 void Socks5Auth::write_callback_hello(ROBuf buf, int status, void* data) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     CBD::Socks5Auth$__send_selection_method$_write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CBD::CBase*>(data));
     assert(msg);
@@ -182,7 +185,7 @@ void Socks5Auth::write_callback_hello(ROBuf buf, int status, void* data) //{
 /** send authentication result */
 void Socks5Auth::__send_auth_status(uint8_t status) //{
 {
-    __logger->debug("call %s: send authenticate status: %d", FUNCNAME, status);
+    DEBUG("call %s: send authenticate status: %d", FUNCNAME, status);
     __socks5_user_authentication_reply* msg = (__socks5_user_authentication_reply*)malloc(sizeof(__socks5_user_authentication_reply));
     msg->m_version = 0x5;
     msg->m_status = status;
@@ -196,7 +199,7 @@ void Socks5Auth::__send_auth_status(uint8_t status) //{
 /** [static] */
 void Socks5Auth::write_callback_id(ROBuf buf, int status, void* data) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     CBD::Socks5Auth$__send_auth_status$_write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CBD::CBase*>(data));
     assert(msg);
@@ -214,7 +217,7 @@ void Socks5Auth::write_callback_id(ROBuf buf, int status, void* data) //{
 /** send reply */
 void Socks5Auth::__send_reply(uint8_t reply) //{
 {
-    __logger->debug("call %s, status: %d, remain_size: %d", FUNCNAME, reply, this->m_remain.size());
+    DEBUG("call %s, status: %d, remain_size: %d", FUNCNAME, reply, this->m_remain.size());
     __server_reply_msg msg;
     msg.m_version = 0x5;
     msg.m_reply = (socks5_reply_type)reply;
@@ -248,7 +251,7 @@ void Socks5Auth::__send_reply(uint8_t reply) //{
 /** [static] */
 void Socks5Auth::write_callback_reply(ROBuf buf, int status, void* data) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     CBD::Socks5Auth$__send_reply$_write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CBD::CBase*>(data));
     assert(msg);
@@ -268,12 +271,12 @@ void Socks5Auth::write_callback_reply(ROBuf buf, int status, void* data) //{
 
 void Socks5Auth::netAccept() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->__send_reply(SOCKS5_REPLY_SUCCEEDED);
 } //}
 void Socks5Auth::netReject() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->__send_reply(SOCKS5_REPLY_CONNECTION_REFUSED); // TODO
 } //}
 
@@ -289,7 +292,7 @@ void* Socks5Auth::transferStream() //{
 /** wrapper of @close_this_with_error() */
 void Socks5Auth::close() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->mp_server->remove_socks5(this);
 } //}
 

@@ -4,6 +4,9 @@
 #include "../include/config.h"
 
 
+#define DEBUG(all...) __logger->debug(all)
+
+
 NS_PROXY_CLIENT_START
 
 
@@ -14,7 +17,7 @@ NS_PROXY_CLIENT_START
 RelayConnection::RelayConnection(Server* kserver, Socks5ServerAbstraction* socks5, 
                                  const std::string& server, uint16_t port, void* server_connection) //{
 {
-    __logger->debug("call %s: relay connection to %s:%d", FUNCNAME, server.c_str(), port);
+    DEBUG("call %s: relay connection to %s:%d", FUNCNAME, server.c_str(), port);
     this->m_addr = server;
     this->m_port = port;
 
@@ -25,14 +28,14 @@ RelayConnection::RelayConnection(Server* kserver, Socks5ServerAbstraction* socks
 
     assert(server_connection != nullptr);
     this->setStreamA(Factory::createUVStreamObject(RELAY_MAX_BUFFER_SIZE, server_connection));
+    this->StreamA()->on("connect", server_connect_listener);
 }
 //}
 
 /** connect to tcp address that specified by socks5 request */
 void RelayConnection::connectToAddr() //{
 {
-    __logger->debug("call %s", FUNCNAME);
-    this->StreamA()->on("connect", server_connect_listener);
+    DEBUG("call %s", FUNCNAME);
     uint32_t addr_ipv4;
 
     if(str_to_ip4(this->m_addr.c_str(), &addr_ipv4)) {
@@ -59,13 +62,13 @@ void RelayConnection::server_connect_listener(EventEmitter* em, const std::strin
 
 void RelayConnection::getStream(void* connection) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->setStreamB(Factory::createUVStreamObject(RELAY_MAX_BUFFER_SIZE, connection));
 } //}
 /** transfer tcp connection from Socks5Auth object to this object */
 void RelayConnection::run(Socks5ServerAbstraction* socks5) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->mp_socks5 == nullptr);
     this->getStream(socks5->transferStream());
     socks5->close();
@@ -87,7 +90,7 @@ void RelayConnection::__close() //{
 /** close this object */
 void RelayConnection::close() //{
 {
-    __logger->debug("call %s = (this=0x%lx)", FUNCNAME, (long)this);
+    DEBUG("call %s = (this=0x%lx)", FUNCNAME, (long)this);
     assert(this->m_closed == false);
     this->m_closed = true;
 

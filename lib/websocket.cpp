@@ -1,5 +1,9 @@
 #include "../include/websocket.hpp"
 
+
+#define DEBUG(all...) __logger->debug(all)
+
+
 // class WebsocketCommon IMPLEMENTATION //{
 /** static */
 typename WebSocketCommon::ExtractReturnSingle WebSocketCommon::extractFrameFromData(ROBuf remain, ROBuf income) //{

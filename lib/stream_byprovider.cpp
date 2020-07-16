@@ -5,6 +5,9 @@
 #include <uv.h>
 
 
+#define DEBUG(all...) __logger->debug(all)
+
+
 struct __cb_state: public CallbackPointer {
     EBStreamByProvider* _this;
     inline __cb_state(decltype(_this)_this): _this(_this) {}
@@ -40,6 +43,7 @@ struct __write_cb_state: public __cb_state {
 };
 void EBStreamByProvider::_write(ROBuf buf, WriteCallback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     assert(this->m_info->m_send_end == false);
     auto ptr = new __write_cb_state(this, cb, data);
@@ -49,6 +53,7 @@ void EBStreamByProvider::_write(ROBuf buf, WriteCallback cb, void* data) //{
 /** [static] */
 void EBStreamByProvider::write_callback(ROBuf buf, int status, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     GETSTATE(__write_cb_state);
 
     if(!run) {
@@ -68,6 +73,7 @@ struct __connect_cb_state: public __cb_state {
 };
 bool EBStreamByProvider::connect(struct sockaddr* addr, ConnectCallback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     assert(this->m_info->m_send_end == false);
 
@@ -79,6 +85,7 @@ bool EBStreamByProvider::connect(struct sockaddr* addr, ConnectCallback cb, void
 } //}
 bool EBStreamByProvider::connect(uint32_t ipv4, uint16_t port, ConnectCallback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     assert(this->m_info->m_send_end == false);
 
@@ -90,6 +97,7 @@ bool EBStreamByProvider::connect(uint32_t ipv4, uint16_t port, ConnectCallback c
 } //}
 bool EBStreamByProvider::connect(uint8_t  ipv6[16],          uint16_t port, ConnectCallback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     assert(this->m_info->m_send_end == false);
 
@@ -101,10 +109,11 @@ bool EBStreamByProvider::connect(uint8_t  ipv6[16],          uint16_t port, Conn
 } //}
 bool EBStreamByProvider::connect(const std::string& domname, uint16_t port, ConnectCallback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     assert(this->m_info->m_send_end == false);
 
-    auto ptr = new __connect_cb_state(this, cb, data);
+    auto ptr = new __connect_cb_state(this, cb, data); // FIXME LOSS
     this->add_callback(ptr);
     this->m_info->mp_provider->connect(this->m_info->m_id, domname, port, connect_callback, ptr);
 
@@ -112,6 +121,7 @@ bool EBStreamByProvider::connect(const std::string& domname, uint16_t port, Conn
 } //}
 bool EBStreamByProvider::connectINet6(const std::string& domname, uint16_t port, ConnectCallback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     assert(this->m_info->m_send_end == false);
 
@@ -124,6 +134,7 @@ bool EBStreamByProvider::connectINet6(const std::string& domname, uint16_t port,
 /** [static] */
 void EBStreamByProvider::connect_callback(int status, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     GETSTATE(__connect_cb_state);
 
     if(!run) {
@@ -137,18 +148,21 @@ void EBStreamByProvider::connect_callback(int status, void* data) //{
 
 void EBStreamByProvider::stop_read() //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     this->m_info->mp_provider->stopRead(this->m_info->m_id);
     this->m_stream_read = false;
 } //}
 void EBStreamByProvider::start_read() //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     this->m_info->mp_provider->startRead(this->m_info->m_id);
     this->m_stream_read = true;
 } //}
 bool EBStreamByProvider::in_read() //{
 {
+    DEBUG("call %s", FUNCNAME);
     return this->m_stream_read;
 } //}
 
@@ -173,6 +187,7 @@ struct __getaddrinfoipv6_cb_state: public __cb_state {
 }; //}
 void EBStreamByProvider::getaddrinfo (const char* hostname, GetAddrInfoCallback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
 
     auto ptr = new __getaddrinfo_cb_state(this, cb, data);
@@ -181,6 +196,7 @@ void EBStreamByProvider::getaddrinfo (const char* hostname, GetAddrInfoCallback 
 } //}
 void EBStreamByProvider::getaddrinfoipv4 (const char* hostname, GetAddrInfoIPv4Callback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
 
     auto ptr = new __getaddrinfoipv4_cb_state(this, cb, data);
@@ -189,6 +205,7 @@ void EBStreamByProvider::getaddrinfoipv4 (const char* hostname, GetAddrInfoIPv4C
 } //}
 void EBStreamByProvider::getaddrinfoipv6 (const char* hostname, GetAddrInfoIPv6Callback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
 
     auto ptr = new __getaddrinfoipv6_cb_state(this, cb, data);
@@ -197,6 +214,7 @@ void EBStreamByProvider::getaddrinfoipv6 (const char* hostname, GetAddrInfoIPv6C
 } //}
 static void freeaddrinfo_k(struct addrinfo* ptr) //{
 {
+    DEBUG("call %s", FUNCNAME);
     while(ptr != nullptr) {
         auto n = ptr->ai_next;
         delete ptr;
@@ -205,6 +223,7 @@ static void freeaddrinfo_k(struct addrinfo* ptr) //{
 } //}
 void EBStreamByProvider::getaddrinfo_callback(std::vector<uint32_t> ipv4, std::vector<uint8_t[16]> ipv6, int status, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     GETSTATE(__getaddrinfo_cb_state);
 
     if(!run) {
@@ -237,6 +256,7 @@ void EBStreamByProvider::getaddrinfo_callback(std::vector<uint32_t> ipv4, std::v
 } //}
 void EBStreamByProvider::getaddrinfoipv4_callback(std::vector<uint32_t> ipv4, int status, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     GETSTATE(__getaddrinfoipv4_cb_state);
 
     if(!run) {
@@ -250,6 +270,7 @@ void EBStreamByProvider::getaddrinfoipv4_callback(std::vector<uint32_t> ipv4, in
 } //}
 void EBStreamByProvider::getaddrinfoipv6_callback(std::vector<uint8_t[16]> ipv6, int status, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     GETSTATE(__getaddrinfoipv6_cb_state);
 
     if(!run) {
@@ -265,17 +286,20 @@ void EBStreamByProvider::getaddrinfoipv6_callback(std::vector<uint8_t[16]> ipv6,
 struct __protect_ {StreamProvider* ppp;};
 void* EBStreamByProvider::newUnderlyStream() //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     return new __protect_ {this->m_info->mp_provider};
 } //}
 void  EBStreamByProvider::releaseUnderlyStream(void* stream) //{
 {
+    DEBUG("call %s", FUNCNAME);
     delete static_cast<__protect_*>(stream);
     return;
 } //}
 
 EBStreamByProvider::EBStreamByProvider(StreamProvider* provider) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->m_info = new std::remove_pointer_t<decltype(this->m_info)>();
     this->m_info->mp_provider = provider;
     this->m_info->m_id = this->m_info->mp_provider->init(this);
@@ -285,6 +309,7 @@ EBStreamByProvider::EBStreamByProvider(StreamProvider* provider) //{
 } //}
 EBStreamByProvider::~EBStreamByProvider() //{
 {
+    DEBUG("call %s", FUNCNAME);
     if(this->hasStreamObject())
         this->release();
 } //}
@@ -293,32 +318,38 @@ EBStreamByProvider::~EBStreamByProvider() //{
 /** [static] */
 void EBStreamByProvider::r_read_callback(EBStreamAbstraction* obj, ROBuf buf) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CASTTOTHIS();
     _this->read_callback(buf, 0);
 } //}
 void EBStreamByProvider::r_error_callback(EBStreamAbstraction* obj) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CASTTOTHIS();
     _this->read_callback(ROBuf(), -1);
 } //}
 void EBStreamByProvider::r_end_callback(EBStreamAbstraction* obj) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CASTTOTHIS();
     _this->end_signal();
 } //}
 void EBStreamByProvider::r_shouldstartwrite_callback(EBStreamAbstraction* obj) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CASTTOTHIS();
     _this->should_start_write();
 } //}
 void EBStreamByProvider::r_shouldstopwrite_callback(EBStreamAbstraction* obj) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CASTTOTHIS();
     _this->should_stop_write();
 } //}
 
 void EBStreamByProvider::register_callback() //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->m_info->mp_provider->registerReadCallback(this->m_info->m_id, r_read_callback);
     this->m_info->mp_provider->registerErrorCallback(this->m_info->m_id, r_error_callback);
     this->m_info->mp_provider->registerEndCallback(this->m_info->m_id, r_end_callback);
@@ -334,6 +365,7 @@ struct __end_cb_state: public __cb_state {
 };
 void EBStreamByProvider::shutdown(ShutdownCallback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     assert(this->m_info->m_send_end == false);
     this->m_info->m_send_end = true;
@@ -344,6 +376,7 @@ void EBStreamByProvider::shutdown(ShutdownCallback cb, void* data) //{
 /** [static] */
 void EBStreamByProvider::shutdown_callback(ROBuf buf, int status, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     GETSTATE(__end_cb_state);
 
     if(!run) {
@@ -357,6 +390,7 @@ void EBStreamByProvider::shutdown_callback(ROBuf buf, int status, void* data) //
 
 void* EBStreamByProvider::transfer() //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     this->stop_read();
     auto ret = this->m_info;
@@ -366,6 +400,7 @@ void* EBStreamByProvider::transfer() //{
 } //}
 void  EBStreamByProvider::regain(void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_info == nullptr);
     struct __info_type* info =
         dynamic_cast<decltype(info)>(static_cast<__virtualbase*>(data));
@@ -377,6 +412,7 @@ void  EBStreamByProvider::regain(void* data) //{
 
 void  EBStreamByProvider::release() //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     this->m_info->mp_provider->closeStream(this->m_info->m_id);
     delete this->m_info;
@@ -384,11 +420,13 @@ void  EBStreamByProvider::release() //{
 } //}
 bool  EBStreamByProvider::hasStreamObject() //{
 {
+    DEBUG("call %s", FUNCNAME);
     return this->m_info != nullptr;
 } //}
 
 void EBStreamByProvider::timeout(TimeoutCallback cb, void* data, int time) //{
 {
+    DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     this->m_info->mp_provider->timeout(cb, data, time);
 } //}

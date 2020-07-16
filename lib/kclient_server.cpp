@@ -2,6 +2,9 @@
 #include "../include/ObjectFactory.hpp"
 
 
+#define DEBUG(all...) __logger->debug(all)
+
+
 NS_PROXY_CLIENT_START
 
 /** @class Server
@@ -10,7 +13,7 @@ NS_PROXY_CLIENT_START
 /** constructor of Server */
 Server::Server(std::shared_ptr<ClientConfig> config) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->m_config = config;
     this->m_closed = false;
 
@@ -21,7 +24,7 @@ Server::Server(std::shared_ptr<ClientConfig> config) //{
 /** implement pure virtual function */
 void Server::on_connection(void* connection) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
 
     if(connection == nullptr) {
         __logger->info("bad connection");
@@ -36,7 +39,9 @@ void Server::on_connection(void* connection) //{
 /** dispatch socks5 request from Socks5Auth */
 void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
+    this->dispatch_proxy(addr, port, socks5);
+    return;
     if(this->m_config->AdMatch(addr, port)) {
         socks5->netAccept();
         return;
@@ -49,7 +54,7 @@ void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks
 } //}
 void Server::dispatch_bypass(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     RelayAbstraction* relay = Factory::KProxyClient::createRelay(this, socks5, addr, port, this->newUnderlyStream());
     this->m_socks5_handler.insert(relay);
     this->m_auths[socks5] = relay; // FIXME
@@ -57,7 +62,7 @@ void Server::dispatch_bypass(const std::string& addr, uint16_t port, Socks5Serve
 } //}
 void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
-    __logger->debug("call %s = (%s, %d, 0x%lx)", FUNCNAME, addr.c_str(), port, (long)socks5);
+    DEBUG("call %s = (%s, %d, 0x%lx)", FUNCNAME, addr.c_str(), port, (long)socks5);
     ProxyMultiplexerAbstraction* pp = nullptr;
     for(auto& m: this->m_proxy) {
         if(!m->full() && m->connected()) {
@@ -91,7 +96,7 @@ void Server::dispatchSocks5(const std::string& addr, uint16_t port, Socks5Server
 /** transfer tcp connection from Socks5Auth to RelayConnection or Proxy */
 void Server::socks5Transfer(Socks5ServerAbstraction* socks5) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_socks5.find(socks5) != this->m_socks5.end());
 
     auto ff = this->m_auths.find(socks5);
@@ -114,7 +119,7 @@ void Server::socks5Transfer(Socks5ServerAbstraction* socks5) //{
 /** select a remote server base on some strategies */
 SingleServerInfo* Server::select_remote_serever() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     for(auto& x: this->m_config->Servers()) {
         __logger->info("select server: %s", x.name().c_str());
         return &x;
@@ -126,14 +131,14 @@ SingleServerInfo* Server::select_remote_serever() //{
 /** deallocate Socks5ServerAbstraction, Socks5RequestProxy* and ProxyMultiplexerAbstraction */
 void Server::remove_socks5(Socks5ServerAbstraction* socks5) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_socks5.find(socks5) != this->m_socks5.end());
     this->m_socks5.erase(this->m_socks5.find(socks5));
     delete socks5;
 } //}
 void Server::remove_socks5_handler(Socks5RequestProxy* handler) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_socks5_handler.find(handler) != this->m_socks5_handler.end());
     this->m_socks5_handler.erase(this->m_socks5_handler.find(handler));
     if(this->m_auths.find(handler) != this->m_auths.end())
@@ -142,7 +147,7 @@ void Server::remove_socks5_handler(Socks5RequestProxy* handler) //{
 } //}
 void Server::remove_proxy(ProxyMultiplexerAbstraction* proxy) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_proxy.find(proxy) != this->m_proxy.end());
     this->m_proxy.erase(this->m_proxy.find(proxy));
     delete proxy;
@@ -150,7 +155,7 @@ void Server::remove_proxy(ProxyMultiplexerAbstraction* proxy) //{
 
 int Server::trylisten() //{ 
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     sockaddr_in addr;
 
     uint32_t network_order_addr = k_htonl(this->bind_addr);
@@ -180,7 +185,7 @@ Socks5RequestProxy* Server::getSock5ProxyObject(Socks5ServerAbstraction* socks5)
 /** close */
 void Server::close() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_closed == false);
     this->m_closed = true;
 

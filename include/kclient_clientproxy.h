@@ -1,22 +1,18 @@
 #pragma once
 
 #include "kclient.h"
+#include "StreamRelay.h"
 
 NS_PROXY_CLIENT_START
 
 /**
  * @class represent a socks5 connection */
-class ClientConnection: public ClientProxyAbstraction //{
+class ClientConnection: public ClientProxyAbstraction, public StreamRelay  //{
 {
     private:
         ProxyMultiplexerAbstraction* mp_proxy;
 
-        bool m_client_start_read;
-        bool m_server_start_read;
-
         Server* mp_kserver;
-        uint8_t m_id;
-
         Socks5ServerAbstraction* m_socks5;
 
         std::string m_addr;
@@ -24,36 +20,10 @@ class ClientConnection: public ClientProxyAbstraction //{
 
         bool m_closed;
 
-        size_t m_write_to_client_buffer;
-        size_t m_write_to_server_buffer;
-
-        bool m_client_end;
-        bool m_server_end;
-
-        void __start_relay();
-        void __relay_client_to_server();
-        void __relay_server_to_client();
-        void __stop_relay_client_to_server();
-        void __stop_relay_server_to_client();
-
-        inline bool in_read_server_to_client() {return this->m_server_start_read;}
-        inline bool in_read_client_to_server() {return this->m_client_start_read;}
-
-        static void write_to_client_callback(ROBuf buf, int status, void* data);
         static void multiplexer_connect_callback(int status, void* data);
-
-        static void write_callback(ROBuf buf, int status, void* data);
+        static void connect_listener(EventEmitter* obj, const std::string& eventname, EventArgs::Base* args);
 
         void __connect();
-
-
-    protected:
-        void read_callback(ROBuf buf, int status) override;
-        void end_signal() override;
-
-        void sendServerEnd() override;
-        void startServerRead() override;
-        void stopServerRead() override;
 
 
     public:
@@ -70,11 +40,8 @@ class ClientConnection: public ClientProxyAbstraction //{
         void run(Socks5ServerAbstraction*) override;
         void getStream(void*) override;
 
-        void pushData(ROBuf buf) override;
-        void serverEnd() override;
-
-        void connectSuccess() override;
-        void connectFail(ConnectResult) override;
+        void __close() override;
 }; //}
 
 NS_PROXY_CLIENT_END
+

@@ -69,6 +69,8 @@ class KProxyMultiplexerStreamProvider: public virtual StreamProvider, protected 
 
 
     public:
+        KProxyMultiplexerStreamProvider();
+
         void connect(StreamId id, struct sockaddr*, ConnectCallback cb, void* data) override;
         void connect(StreamId id, uint32_t ipv4,    uint16_t port, ConnectCallback cb, void* data) override;
         void connect(StreamId id, uint8_t ipv6[16], uint16_t port, ConnectCallback cb, void* data) override;

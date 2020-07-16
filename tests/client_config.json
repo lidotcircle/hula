@@ -18,7 +18,7 @@
         {
             "server_name": "beybey",
             "address": "www.example.com",
-            "port": 3344,
+            "port": 7700,
             "certificate": "fake certificate",
             "cipher": "chacha20",
             "username": "admin",

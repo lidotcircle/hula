@@ -3,10 +3,9 @@
 #include "kclient_server.h"
 #include "kclient_socks5.h"
 #include "kclient_multiplexer.h"
-#include "kclient_multiplexer2.h"
 #include "kclient_relay.h"
 #include "kclient_clientproxy.h"
-#include "kclient_clientproxy2.h"
+
 
 NS_PROXY_CLIENT_START
 
@@ -25,11 +24,6 @@ class UVMultiplexer: protected EBStreamUV, public ConnectionProxy {
     inline UVMultiplexer(Server* server, SingleServerInfo* config, uv_tcp_t* connection):
         ConnectionProxy(server, config), EBStreamUV(connection) {}
 };
-class UVMultiplexer2: protected EBStreamUV, public ConnectionProxy2 {
-    public:
-    inline UVMultiplexer2(Server* server, SingleServerInfo* config, uv_tcp_t* connection):
-        ConnectionProxy2(server, config), EBStreamUV(connection) {}
-};
 class UVRelay: public RelayConnection {
     public:
     inline UVRelay(Server* server, Socks5ServerAbstraction* socks5,
@@ -42,13 +36,6 @@ class UVClientConnection: protected EBStreamUV, public ClientConnection {
                               const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5,
                               uv_tcp_t* connection):
         ClientConnection(server, mgr, addr, port, socks5), EBStreamUV(connection) {}
-};
-class UVClientConnection2: protected EBStreamUV, public ClientConnection2 {
-    public:
-    inline UVClientConnection2(Server* server, ProxyMultiplexerAbstraction2* mgr, 
-                              const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5,
-                              uv_tcp_t* connection):
-        ClientConnection2(server, mgr, addr, port, socks5), EBStreamUV(connection) {}
 };
 
 NS_PROXY_CLIENT_END

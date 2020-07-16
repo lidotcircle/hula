@@ -11,6 +11,8 @@
 #define __MAX(a, b) a > b ? a : b
 #define __MIN(a, b) a > b ? b : a
 
+#define DEBUG(all...) __logger->debug(all)
+
 
 /**
  * @param {ROBuf} remain unfinished buffer

@@ -9,6 +9,9 @@
 
 #define DEFAULT_BACKLOG 100
 
+#define DEBUG(all...) __logger->debug(all)
+
+
 /** malloc callback for uv_read */
 static void malloc_cb(uv_handle_t*, size_t suggested_size, uv_buf_t* buf) //{
 {
@@ -21,6 +24,7 @@ static void delete_closed_handle(uv_handle_t* h) {delete static_cast<T>(static_c
 
 void EBStreamUV::_write(ROBuf buf, WriteCallback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(cb != nullptr);
     uv_buf_t* uv_buf = new uv_buf_t();
     uv_buf->base = buf.__base();
@@ -35,6 +39,7 @@ void EBStreamUV::_write(ROBuf buf, WriteCallback cb, void* data) //{
 /** [static] */
 void EBStreamUV::uv_write_callback(uv_write_t* req, int status) //{
 {
+    DEBUG("call %s", FUNCNAME);
     EBStreamUV$_write$uv_write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<UVARG*>(uv_req_get_data((uv_req_t*)req)));
     assert(msg);
@@ -54,17 +59,20 @@ void EBStreamUV::uv_write_callback(uv_write_t* req, int status) //{
 
 bool EBStreamUV::bind(struct sockaddr* addr) //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->mp_tcp != nullptr);
     return uv_tcp_bind(this->mp_tcp, addr, 0) < 0 ? false : true;
 } //}
 bool EBStreamUV::listen() //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->mp_tcp != nullptr);
     return uv_listen((uv_stream_t*)this->mp_tcp, DEFAULT_BACKLOG, uv_connection_callback) < 0 ? false : true;
 } //}
 /** [static] */
 void EBStreamUV::uv_connection_callback(uv_stream_t* stream, int status) //{
 {
+    DEBUG("call %s", FUNCNAME);
     EBStreamUV* _this = static_cast<decltype(_this)>(uv_handle_get_data((uv_handle_t*)stream));
     if(status < 0) {
         _this->on_connection(nullptr);
@@ -97,6 +105,7 @@ bool EBStreamUV::connect(struct sockaddr* addr, ConnectCallback cb, void* data) 
 /** [static] */
 void EBStreamUV::uv_connect_callback(uv_connect_t* req, int status) //{
 {
+    DEBUG("call %s", FUNCNAME);
     EBStreamUV$connect$uv_connect* msg =
         dynamic_cast<decltype(msg)>(static_cast<UVARG*>(uv_req_get_data((uv_req_t*)req)));
     assert(msg);
@@ -139,6 +148,7 @@ struct __ppp: public CallbackPointer {
 };
 void EBStreamUV::getaddrinfo_callback(struct addrinfo* res, void(*__freeaddrinfoint)(struct addrinfo*), int status, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     struct addrinfo *a = nullptr;
     struct sockaddr* m = nullptr;
 
@@ -221,12 +231,14 @@ bool EBStreamUV::connectINet6(const std::string& addr, uint16_t port, ConnectCal
 /** wrapper of uv_read_start() and uv_read_stop() */
 void EBStreamUV::stop_read() //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_stream_read == true);
     uv_read_stop((uv_stream_t*)this->mp_tcp);
     this->m_stream_read = false;
 } //}
 void EBStreamUV::start_read() //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_stream_read == false);
     uv_read_start((uv_stream_t*)this->mp_tcp, malloc_cb, EBStreamUV::uv_stream_read_callback);
     this->m_stream_read = true;
@@ -234,6 +246,7 @@ void EBStreamUV::start_read() //{
 /** [static] */
 void EBStreamUV::uv_stream_read_callback(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) //{
 {
+    DEBUG("call %s", FUNCNAME);
     EBStreamUV* _this = static_cast<decltype(_this)>(uv_handle_get_data((uv_handle_t*)stream));
 
     if(nread <= 0) {
@@ -250,11 +263,13 @@ void EBStreamUV::uv_stream_read_callback(uv_stream_t* stream, ssize_t nread, con
 /** read state of the stream */
 bool EBStreamUV::in_read() //{
 {
+    DEBUG("call %s", FUNCNAME);
     return this->m_stream_read;
 } //}
 
 void EBStreamUV::getaddrinfo (const char* hostname, GetAddrInfoCallback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     auto ptr = new EBStreamUV$getaddrinfo$uv_getaddrinfo(this, cb, data);
     uv_getaddrinfo_t* req = new uv_getaddrinfo_t();
     uv_req_set_data((uv_req_t*)req, ptr);
@@ -271,6 +286,7 @@ void EBStreamUV::getaddrinfo (const char* hostname, GetAddrInfoCallback cb, void
 /** [static] */
 void EBStreamUV::uv_getaddrinfo_callback(uv_getaddrinfo_t* req, int status, struct addrinfo* res) //{
 {
+    DEBUG("call %s", FUNCNAME);
     EBStreamUV$getaddrinfo$uv_getaddrinfo* msg =
         dynamic_cast<decltype(msg)>(static_cast<UVARG*>(uv_req_get_data((uv_req_t*)req)));
     assert(msg);
@@ -287,12 +303,14 @@ void EBStreamUV::uv_getaddrinfo_callback(uv_getaddrinfo_t* req, int status, stru
 /** [static] */
 void EBStreamUV::__freeaddrinfo(struct addrinfo* addr) //{
 {
+    DEBUG("call %s", FUNCNAME);
     uv_freeaddrinfo(addr);
 } //}
 
 /** dns utils */
 static void getaddrinfo_callback_for_getaddrinfoipv4(struct addrinfo* res, void(*__freeaddrinfo)(struct addrinfo*), int status, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     struct addrinfo *a;
     struct sockaddr_in* m;
 
@@ -325,10 +343,12 @@ static void getaddrinfo_callback_for_getaddrinfoipv4(struct addrinfo* res, void(
 } //}
 void EBStreamUV::getaddrinfoipv4 (const char* hostname, GetAddrInfoIPv4Callback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->getaddrinfo(hostname, getaddrinfo_callback_for_getaddrinfoipv4, new std::pair<GetAddrInfoIPv4Callback, void*>(cb, data));
 } //}
 static void getaddrinfo_callback_for_getaddrinfoipv6(struct addrinfo* res, void(*__freeaddrinfo)(struct addrinfo*), int status, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     struct addrinfo *a;
     struct sockaddr_in6* m;
 
@@ -362,11 +382,13 @@ static void getaddrinfo_callback_for_getaddrinfoipv6(struct addrinfo* res, void(
 } //}
 void EBStreamUV::getaddrinfoipv6 (const char* hostname, GetAddrInfoIPv6Callback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->getaddrinfo(hostname, getaddrinfo_callback_for_getaddrinfoipv6, new std::pair<GetAddrInfoIPv6Callback, void*>(cb, data));
 } //}
 
 void* EBStreamUV::newUnderlyStream() //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->mp_tcp != nullptr);
     uv_loop_t* loop = uv_handle_get_loop((uv_handle_t*)this->mp_tcp);
     uv_tcp_t* ret = new uv_tcp_t();
@@ -375,11 +397,13 @@ void* EBStreamUV::newUnderlyStream() //{
 } //}
 void  EBStreamUV::releaseUnderlyStream(void* ptr) //{
 {
+    DEBUG("call %s", FUNCNAME);
     uv_tcp_t* tcp = static_cast<decltype(tcp)>(ptr);
     uv_close((uv_handle_t*)tcp, delete_closed_handle<decltype(tcp)>);
 } //}
 bool  EBStreamUV::accept(void* listen, void* stream) //{
 {
+    DEBUG("call %s", FUNCNAME);
     return uv_accept(static_cast<uv_stream_t*>(listen), static_cast<uv_stream_t*>(stream)) < 0 ?
         false :
         true;
@@ -387,6 +411,7 @@ bool  EBStreamUV::accept(void* listen, void* stream) //{
 
 EBStreamUV::EBStreamUV(uv_tcp_t* tcp) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->mp_tcp = tcp;
     if(this->mp_tcp != nullptr)
         uv_handle_set_data((uv_handle_t*)this->mp_tcp, this);
@@ -394,6 +419,7 @@ EBStreamUV::EBStreamUV(uv_tcp_t* tcp) //{
 } //}
 EBStreamUV::~EBStreamUV() //{
 {
+    DEBUG("call %s", FUNCNAME);
     if(this->mp_tcp != nullptr)
         this->release();
 } //}
@@ -406,6 +432,7 @@ struct EBStreamUV$shutdown$uv_shutdown {
 };
 static void shutdown_callback(uv_shutdown_t* req, int status) //{
 {
+    DEBUG("call %s", FUNCNAME);
     EBStreamUV$shutdown$uv_shutdown* msg = 
         static_cast<decltype(msg)>(uv_req_get_data((uv_req_t*)req));
     delete req;
@@ -416,6 +443,7 @@ static void shutdown_callback(uv_shutdown_t* req, int status) //{
 } //}
 void EBStreamUV::shutdown(ShutdownCallback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     uv_shutdown_t* req = new uv_shutdown_t();
     auto ptr = new EBStreamUV$shutdown$uv_shutdown(cb, data);
     uv_req_set_data((uv_req_t*)req, ptr);
@@ -424,10 +452,12 @@ void EBStreamUV::shutdown(ShutdownCallback cb, void* data) //{
 
 bool  EBStreamUV::hasStreamObject() //{
 {
+    DEBUG("call %s", FUNCNAME);
     return this->mp_tcp != nullptr;
 } //}
 void EBStreamUV::release() //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->mp_tcp != nullptr);
     if(this->in_read()) this->stop_read();
     uv_close((uv_handle_t*)this->mp_tcp, delete_closed_handle<decltype(this->mp_tcp)>);
@@ -436,6 +466,7 @@ void EBStreamUV::release() //{
 
 void* EBStreamUV::transfer() //{
 {
+    DEBUG("call %s", FUNCNAME);
     if(this->in_read()) this->stop_read();
     auto ret = this->mp_tcp;
     this->mp_tcp = nullptr;
@@ -443,6 +474,7 @@ void* EBStreamUV::transfer() //{
 } //}
 void  EBStreamUV::regain(void* ptr) //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->in_read() == false);
     this->mp_tcp = static_cast<decltype(this->mp_tcp)>(ptr);
     uv_handle_set_data((uv_handle_t*)this->mp_tcp, this);
@@ -455,6 +487,7 @@ struct __uv_timeout_state__ {
 };
 static void __uv_timeout_callback(uv_timer_t* timer) //{
 {
+    DEBUG("call %s", FUNCNAME);
     __uv_timeout_state__* msg = static_cast<decltype(msg)>(uv_handle_get_data((uv_handle_t*)timer));
     uv_timer_stop(timer);
     auto cb = msg->_cb;
@@ -467,6 +500,7 @@ static void __uv_timeout_callback(uv_timer_t* timer) //{
 } //}
 void EBStreamUV::timeout(TimeoutCallback cb, void* data, int time_ms) //{
 {
+    DEBUG("call %s", FUNCNAME);
     uv_loop_t* loop = uv_handle_get_loop((uv_handle_t*)this->mp_tcp);
     uv_timer_t* timer = new uv_timer_t();
     uv_timer_init(loop, timer);

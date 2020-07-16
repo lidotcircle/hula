@@ -1,4 +1,6 @@
 #pragma once
+#include "stream.hpp"
+#include "StreamProvider_KProxyMultiplexer.h"
 
 #include "kclient.h"
 
@@ -6,20 +8,18 @@ NS_PROXY_CLIENT_START
 
 /**
  * @class ConnectionProxy Multiplexing a single ssl/tls connection to multiple tcp connection */
-class ConnectionProxy: public ProxyMultiplexerAbstraction //{
+class ConnectionProxy: public ProxyMultiplexerAbstraction, 
+    virtual protected EBStreamAbstraction, protected KProxyMultiplexerStreamProvider //{
 {
     public:
-        // this callback should delete buf
-        using WriteCallback = void (*)(int status, ROBuf* buf, void* data);
-        using ConnectCallback = void (*)(int status, void* data);
+        using ConnectCallback = ProxyMultiplexerAbstraction::ConnectCallback;
 
 
    private:
-        std::map<uint8_t, ClientProxyAbstraction*> m_map;
-        std::set<uint8_t> m_wait_new_connection;
-
         Server*    mp_server;
         SingleServerInfo* mp_server_info;
+
+        set<ClientProxyAbstraction*> m_proxyrelays;
 
         ROBuf m_remain;
 
@@ -49,8 +49,6 @@ class ConnectionProxy: public ProxyMultiplexerAbstraction //{
 
 
     private:
-        uint8_t get_id();
-
         void __connectToServer(ConnectCallback cb, void* data);
         static void connect_to_remote_server_callback(int status, void* data);
 
@@ -58,15 +56,12 @@ class ConnectionProxy: public ProxyMultiplexerAbstraction //{
         static void on_authentication_write(ROBuf buf, int status, void* data);
 
         void authenticate(ROBuf buf);
-        void dispatch_data(ROBuf buf);
 
-        static void new_connection_write_callback(ROBuf buf, int status, void* data);
-        static void new_connection_timer_callback(void* data);
 
-        void send_close_connection(uint8_t id);
-
-        static void __startstop_read_write_callback(ROBuf buf, int status, void* data);
-        static void __send_close_connection_callback(ROBuf buf, int status, void* data);
+    protected:
+        void prm_error_handle() override;
+        void prm_write(ROBuf buf, KProxyMultiplexerStreamProvider::WriteCallback cb, void* data) override;
+        void prm_timeout(KProxyMultiplexerStreamProvider::TimeoutCallback cb, void* data, int ms) override;
 
 
    public:
@@ -78,23 +73,22 @@ class ConnectionProxy: public ProxyMultiplexerAbstraction //{
         ConnectionProxy& operator=(const ConnectionProxy&) = delete;
 
         void connectToServer(ConnectCallback cb, void* data) override;
-        void new_connection(uint8_t id, ClientProxyAbstraction* obj, 
-                            const std::string& addr, uint16_t port, int timeout_ms) override;
-        void remove_clientConnection(uint8_t, ClientProxyAbstraction* obj) override;
-
-        void sendStartConnectionRead(uint8_t) override;
-        void sendStopConnectionRead (uint8_t) override;
-        void connectionEnd(uint8_t id, ClientProxyAbstraction* obj) override;
-
-        void write(uint8_t id, ClientProxyAbstraction* obj, ROBuf buf, WriteCallbackMM cb, void* data) override;
+        void remove_clientConnection(ClientProxyAbstraction* obj) override;
+        void register_clientConnection(ClientProxyAbstraction* obj) override;
 
         uint8_t getConnectionNumbers() override;
         bool    connected() override;
         bool    full() override;
-        uint8_t requireAnId(ClientProxyAbstraction*) override;
         bool    uninit() override;
 
+        KProxyMultiplexerStreamProvider* getProvider() override;
+
         void close() override;
+
+        void CreateNewConnection(StreamId, const std::string& addr, uint8_t port) override;
+        void CreateConnectionSuccess(StreamId) override;
+        void CreateConnectionFail   (StreamId, uint8_t reason) override;
+
         ~ConnectionProxy();
 }; //}
 

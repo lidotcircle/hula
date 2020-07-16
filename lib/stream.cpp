@@ -5,9 +5,12 @@
 #include "../include/config.h"
 
 
+#define DEBUG(all...) __logger->debug(all)
+
+
 void EBStreamObject::read_callback(ROBuf buf, int status) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     if(status == 0) {
         this->emit("data", new DataArgs(buf));
     } else {
@@ -16,25 +19,25 @@ void EBStreamObject::read_callback(ROBuf buf, int status) //{
 } //}
 void EBStreamObject::end_signal() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->emit("end", new EndArgs());
 } //}
 
 void EBStreamObject::should_start_write() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->emit("shouldStartWrite", new ShouldStartWriteArgs());
 } //}
 void EBStreamObject::should_stop_write() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->emit("shouldStopWrite", new ShouldStopWriteArgs());
 } //}
 
 
 EBStreamObject::EBStreamObject(size_t m) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->m_max_write_buffer_size = m;
     this->m_writed_size = 0;
     this->m_closed = false;
@@ -48,7 +51,7 @@ struct EBStreamObject$write$_write: public CallbackPointer {
 };
 int EBStreamObject::write(ROBuf buf) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false);
     this->m_writed_size += buf.size();
     auto ptr = new EBStreamObject$write$_write(this);
@@ -59,7 +62,7 @@ int EBStreamObject::write(ROBuf buf) //{
 /** [static] */
 void EBStreamObject::write_callback(ROBuf buf, int status, void* data) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     EBStreamObject$write$_write* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);
@@ -95,7 +98,7 @@ struct EBStreamObject$connectWith_sockaddr$connect: public CallbackPointer {
 };
 bool EBStreamObject::connectTo(struct sockaddr* addr) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false);
     auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
     this->add_callback(ptr);
@@ -103,15 +106,15 @@ bool EBStreamObject::connectTo(struct sockaddr* addr) //{
 } //}
 bool EBStreamObject::connectTo(const std::string& addr, uint16_t port) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false);
-    auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
+    auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this); // FIXME LOSS
     this->add_callback(ptr);
     return this->connect(addr, port, connect_callback, ptr);
 } //}
 bool EBStreamObject::connectTo(uint32_t ipv4, uint16_t port) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false);
     auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
     this->add_callback(ptr);
@@ -119,7 +122,7 @@ bool EBStreamObject::connectTo(uint32_t ipv4, uint16_t port) //{
 } //}
 bool EBStreamObject::connectTo(uint8_t ipv6[16], uint16_t port) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false);
     auto ptr = new EBStreamObject$connectWith_sockaddr$connect(this);
     this->add_callback(ptr);
@@ -128,7 +131,7 @@ bool EBStreamObject::connectTo(uint8_t ipv6[16], uint16_t port) //{
 /** [static] */
 void EBStreamObject::connect_callback(int status, void* data) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
    EBStreamObject$connectWith_sockaddr$connect* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);
@@ -136,7 +139,7 @@ void EBStreamObject::connect_callback(int status, void* data) //{
     auto run   = msg->CanRun();
     delete msg;
 
-    if(!run) return; // FIXME invalid read
+    if(!run) return;
     _this->remove_callback(msg);
 
     if(status < 0) {
@@ -149,27 +152,27 @@ void EBStreamObject::connect_callback(int status, void* data) //{
 
 void EBStreamObject::getDNS(const std::string& addr, GetAddrInfoCallback cb, void* data) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_closed == false);
     this->getaddrinfo(addr.c_str(), cb, data);
 } //}
 
 void EBStreamObject::startRead() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false); 
     this->start_read();
 } //}
 void EBStreamObject::stopRead()  //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false); 
     this->stop_read();
 } //}
 static void dummy_end_callback(int, void*) {}
 void EBStreamObject::end()       //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_end == false && this->m_closed == false); 
     this->m_end = true; 
     this->shutdown(dummy_end_callback, nullptr);
@@ -177,7 +180,7 @@ void EBStreamObject::end()       //{
 
 void EBStreamObject::close() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_closed == false);
     this->m_closed = true;
     this->emit("close", new CloseArgs());

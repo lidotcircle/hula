@@ -3,6 +3,11 @@
 #include "../include/kpacket.h"
 
 
+#define DEBUG(all...) __logger->debug(all)
+
+
+KProxyMultiplexerStreamProvider::KProxyMultiplexerStreamProvider(): m_remain(), m_allocator(), m_wait_connection() {}
+
 struct __multiplexer_state: public CallbackPointer {
     KProxyMultiplexerStreamProvider* _this;
     inline __multiplexer_state(decltype(_this)_this): _this(_this) {}
@@ -11,20 +16,23 @@ struct __multiplexer_state: public CallbackPointer {
 KProxyMultiplexerStreamProvider::StreamId 
     KProxyMultiplexerStreamProvider::createStreamID(bool* runlock, void (*freef)(void*), EBStreamAbstraction* stream) //{
 {
+    DEBUG("call %s", FUNCNAME);
     if(this->m_allocator.size() == SINGLE_MULTIPLEXER_MAX_CONNECTION)
         return StreamId(nullptr);
 
-    int i = -1;
+    int i = 0;
     for(;i<SINGLE_MULTIPLEXER_MAX_CONNECTION;i++)
         if(this->m_allocator.find(i) == this->m_allocator.end()) break;
-    assert(i >= 0 && "what ???");
+    assert(i != SINGLE_MULTIPLEXER_MAX_CONNECTION && "what ???");
 
-    return StreamId(new __KMStreamID(runlock, freef, i, stream));
+    auto id = StreamId(new __KMStreamID(runlock, freef, i, stream));
+    this->m_allocator[i] = id;
+    return id;
 } //}
 
 
 struct __multiplexer_writecb_state: public __multiplexer_state {
-    KProxyMultiplexerStreamProvider* _this;
+//    KProxyMultiplexerStreamProvider* _this;  STUPID ME
     KProxyMultiplexerStreamProvider::WriteCallback _cb;
     void* _data;
     inline __multiplexer_writecb_state(KProxyMultiplexerStreamProvider* _this, decltype(_cb) cb, void* data): 
@@ -32,12 +40,14 @@ struct __multiplexer_writecb_state: public __multiplexer_state {
 };
 void KProxyMultiplexerStreamProvider::write_header(ROBuf header) //{
 {
+    DEBUG("call %s", FUNCNAME);
     auto ptr1 = new __multiplexer_state(this);
     this->add_callback(ptr1);
     this->prm_write(header, header_write_callback, ptr1);
 } //}
 void KProxyMultiplexerStreamProvider::write_buffer(ROBuf buf, WriteCallback cb, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     auto ptr2 = new __multiplexer_writecb_state(this, cb, data);
     this->add_callback(ptr2);
     this->prm_write(buf, buffer_write_callback, ptr2);
@@ -45,6 +55,7 @@ void KProxyMultiplexerStreamProvider::write_buffer(ROBuf buf, WriteCallback cb, 
 
 
 #define GETKID() \
+    DEBUG("call %s", FUNCNAME); \
     const __KMStreamID* kid = dynamic_cast<decltype(kid)>(id.get()); \
     assert(kid); \
     assert(this->m_allocator.find(kid->m_id)->second == id)
@@ -112,7 +123,7 @@ void KProxyMultiplexerStreamProvider::connect(StreamId id, const std::string& ad
 /** [static] */
 void KProxyMultiplexerStreamProvider::new_connection_write_callback(ROBuf buf, int status, void* data) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     __new_connection_write_state* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);
@@ -137,7 +148,7 @@ void KProxyMultiplexerStreamProvider::new_connection_write_callback(ROBuf buf, i
 /** [static] */
 void KProxyMultiplexerStreamProvider::new_connection_timeout_callback(void* data) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     __new_connection_write_state* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);
@@ -154,8 +165,10 @@ void KProxyMultiplexerStreamProvider::new_connection_timeout_callback(void* data
         return;
 
     auto state = _this->m_wait_connection[id];
+    auto _cb = state.cb;
+    auto _data = state.data;
     _this->m_wait_connection.erase(_this->m_wait_connection.find(id));
-    state.cb(-1, state.data);
+    _cb(-1, _data);
     return;
 } //}
 
@@ -185,6 +198,7 @@ void KProxyMultiplexerStreamProvider::write(StreamId id, ROBuf buf, WriteCallbac
 /** [static] */
 void KProxyMultiplexerStreamProvider::header_write_callback(ROBuf buf, int status, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     __multiplexer_state* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);
@@ -200,6 +214,7 @@ void KProxyMultiplexerStreamProvider::header_write_callback(ROBuf buf, int statu
 /** [static] */
 void KProxyMultiplexerStreamProvider::buffer_write_callback(ROBuf buf, int status, void* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     __multiplexer_writecb_state* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);
@@ -249,40 +264,52 @@ void KProxyMultiplexerStreamProvider::closeStream(StreamId id) //{
     GETKID();
     this->finish(kid->m_stream);
 
+    if(this->m_wait_connection.find(kid->m_id) != this->m_wait_connection.end()) {
+        auto state = this->m_wait_connection[kid->m_id];
+        this->m_wait_connection.erase(this->m_wait_connection.find(kid->m_id));
+        state.cb(-1, state.data);
+    }
     this->m_allocator.erase(this->m_allocator.find(kid->m_id));
 }//}
 void KProxyMultiplexerStreamProvider::timeout(TimeoutCallback cb, void* data, int time_ms) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->prm_timeout(cb, data, time_ms);
 }//}
 
 
 void KProxyMultiplexerStreamProvider::registerReadCallback(StreamId id, RegisterReadCallback cb) //{
 {
+    DEBUG("call %s", FUNCNAME);
     __KMStreamID* kid = dynamic_cast<decltype(kid)>(id.get()); assert(kid);
+    assert(this->m_allocator.find(kid->m_id) != this->m_allocator.end());
     assert(this->m_allocator.find(kid->m_id)->second == id);
     kid->m_read_callback = cb;
 } //}
 void KProxyMultiplexerStreamProvider::registerErrorCallback(StreamId id, RegisterErrorCallback cb) //{
 {
+    DEBUG("call %s", FUNCNAME);
     __KMStreamID* kid = dynamic_cast<decltype(kid)>(id.get()); assert(kid);
     assert(this->m_allocator.find(kid->m_id)->second == id);
     kid->m_error_callback = cb;
 } //}
 void KProxyMultiplexerStreamProvider::registerEndCallback(StreamId id, RegisterEndCallback cb) //{
 {
+    DEBUG("call %s", FUNCNAME);
     __KMStreamID* kid = dynamic_cast<decltype(kid)>(id.get()); assert(kid);
     assert(this->m_allocator.find(kid->m_id)->second == id);
     kid->m_end_callback = cb;
 } //}
 void KProxyMultiplexerStreamProvider::registerShouldStartWriteCallback(StreamId id, RegisterShouldStartWriteCallback cb) //{
 {
+    DEBUG("call %s", FUNCNAME);
     __KMStreamID* kid = dynamic_cast<decltype(kid)>(id.get()); assert(kid);
     assert(this->m_allocator.find(kid->m_id)->second == id);
     kid->m_start_read_callback = cb;
 } //}
 void KProxyMultiplexerStreamProvider::registerShouldStopWriteCallback(StreamId id, RegisterShouldStopWriteCallback cb) //{
 {
+    DEBUG("call %s", FUNCNAME);
     __KMStreamID* kid = dynamic_cast<decltype(kid)>(id.get()); assert(kid);
     assert(this->m_allocator.find(kid->m_id)->second == id);
     kid->m_stop_read_callback = cb;
@@ -291,7 +318,7 @@ void KProxyMultiplexerStreamProvider::registerShouldStopWriteCallback(StreamId i
 
 void KProxyMultiplexerStreamProvider::dispatch_data(ROBuf buf) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     std::tuple<bool, std::vector<std::tuple<ROBuf, PACKET_OPCODE, uint8_t>>, ROBuf> mm = 
         decode_all_packet(this->m_remain, buf);
     bool noerror;
@@ -383,12 +410,13 @@ void KProxyMultiplexerStreamProvider::dispatch_data(ROBuf buf) //{
 
 void KProxyMultiplexerStreamProvider::prm_read_callback(ROBuf buf) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->dispatch_data(buf);
 } //}
 
 void KProxyMultiplexerStreamProvider::create_new_connection(ROBuf buf, uint8_t nid) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     if(this->m_allocator.find(nid) != this->m_allocator.end()) {
         __logger->warn("bad NEW_CONNECTION opcode, which already allocated to other stream");
         this->prm_error_handle();

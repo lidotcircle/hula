@@ -2,6 +2,9 @@
 #include "../include/utils.h"
 
 
+#define DEBUG(all...) __logger->debug(all)
+
+
 ServerConfig::ServerConfig() //{
 {
     this->m_bind_addr = 0;

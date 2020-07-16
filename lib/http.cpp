@@ -7,6 +7,10 @@
 #include <ctype.h>
 #include <stdio.h>
 
+
+#define DEBUG(all...) __logger->debug(all)
+
+
 //       << class Http >>      //{
 Http::Http(const std::unordered_map<std::string, std::string>& default_response_header) //{
 {
@@ -75,7 +79,7 @@ void Http::response_write(ROBuf buf, WriteCallback cb, void* data) //{
 /** static */
 int Http::http_on_message_begin(http_parser* parser) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     Http* _this = static_cast<decltype(_this)>(parser->data);
     assert(_this->m_state == HttpState::FINISH_PREV || _this->m_state == HttpState::MESSAGE_COMPLETE);
     _this->m_state = HttpState::MESSAGE_BEGIN;
@@ -83,7 +87,7 @@ int Http::http_on_message_begin(http_parser* parser) //{
 } //}
 int Http::http_on_url(http_parser* parser, const char* data, size_t len) //{
 {
-    __logger->debug("call %s, url=%s", FUNCNAME, std::string(data, data + len).c_str());
+    DEBUG("call %s, url=%s", FUNCNAME, std::string(data, data + len).c_str());
     Http* _this = static_cast<decltype(_this)>(parser->data);
     if(_this->m_state == HttpState::URL) {
         _this->m_url += std::string(data, data + len);
@@ -98,7 +102,7 @@ int Http::http_on_url(http_parser* parser, const char* data, size_t len) //{
 } //}
 int Http::http_on_status(http_parser* parser, const char* data, size_t len) //{
 {
-    __logger->debug("call %s, status=%s", FUNCNAME, std::string(data, data + len).c_str());
+    DEBUG("call %s, status=%s", FUNCNAME, std::string(data, data + len).c_str());
     Http* _this = static_cast<decltype(_this)>(parser->data);
     _this->emit("error", new HttpArg::ErrorArgs("http request error"));
     __logger->warn("recieve a response ... OR FIXME");
@@ -106,7 +110,7 @@ int Http::http_on_status(http_parser* parser, const char* data, size_t len) //{
 } //}
 int Http::http_on_field(http_parser* parser, const char* data, size_t len) //{
 {
-    __logger->debug("call %s, field=%s", FUNCNAME, std::string(data, data + len).c_str());
+    DEBUG("call %s, field=%s", FUNCNAME, std::string(data, data + len).c_str());
     Http* _this = static_cast<decltype(_this)>(parser->data);
     if(_this->m_state == HttpState::FIELD) {
         _this->m_prev_field += std::string(data, data + len);
@@ -120,7 +124,7 @@ int Http::http_on_field(http_parser* parser, const char* data, size_t len) //{
 } //}
 int Http::http_on_value(http_parser* parser, const char* data, size_t len) //{
 {
-    __logger->debug("call %s, value=%s", FUNCNAME, std::string(data, data + len).c_str());
+    DEBUG("call %s, value=%s", FUNCNAME, std::string(data, data + len).c_str());
     Http* _this = static_cast<decltype(_this)>(parser->data);
     if(_this->m_state == HttpState::VALUE) {
         _this->m_request_header[_this->m_prev_field] += std::string(data, data + len);
@@ -134,7 +138,7 @@ int Http::http_on_value(http_parser* parser, const char* data, size_t len) //{
 } //}
 int Http::http_on_header_complete(http_parser* parser) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     Http* _this = static_cast<decltype(_this)>(parser->data);
     assert(_this->m_state == HttpState::VALUE);
     _this->m_state = HttpState::HEADER_COMPLETE;
@@ -142,7 +146,7 @@ int Http::http_on_header_complete(http_parser* parser) //{
 } //}
 int Http::http_on_body(http_parser* parser, const char* data, size_t len) //{
 { 
-    __logger->debug("call %s, body=%s", FUNCNAME, std::string(data, data + len).c_str());
+    DEBUG("call %s, body=%s", FUNCNAME, std::string(data, data + len).c_str());
     Http* _this = static_cast<decltype(_this)>(parser->data);
     if(_this->m_state == HttpState::BODY) {
         char* ddd = (char*)malloc(len);
@@ -159,7 +163,7 @@ int Http::http_on_body(http_parser* parser, const char* data, size_t len) //{
 } //}
 int Http::http_on_message_complete(http_parser* parser) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     Http* _this = static_cast<decltype(_this)>(parser->data);
     assert(_this->m_state == HttpState::BODY || 
             _this->m_state == HttpState::HEADER_COMPLETE);
@@ -169,7 +173,7 @@ int Http::http_on_message_complete(http_parser* parser) //{
 } //}
 int Http::http_on_chunk_header(http_parser* parser) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     Http* _this = static_cast<decltype(_this)>(parser->data);
     _this->m_chunk = true;
     __logger->error("TODO"); // TODO
@@ -177,7 +181,7 @@ int Http::http_on_chunk_header(http_parser* parser) //{
 } //}
 int Http::http_on_chunk_complete(http_parser* parser) //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     Http* _this = static_cast<decltype(_this)>(parser->data);
     __logger->error("TODO"); // TODO
     return -1;

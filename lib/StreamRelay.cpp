@@ -2,8 +2,11 @@
 #include "../include/config.h"
 
 #include <random>
-std::default_random_engine random_engine;
-std::uniform_int_distribution<int> random_dist;
+static std::default_random_engine random_engine;
+static std::uniform_int_distribution<int> random_dist;
+
+
+#define DEBUG(all...) __logger->debug(all)
 
 
 struct _stream_realy_state: public CallbackPointer {
@@ -15,7 +18,7 @@ struct _stream_realy_state: public CallbackPointer {
 /** constructor of StreamRelay */
 StreamRelay::StreamRelay(): m_a_drain_listener_reg(), m_b_drain_listener_reg() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->mp_stream_a = nullptr;
     this->mp_stream_b = nullptr;
     this->m_a_start_read = false;
@@ -27,7 +30,7 @@ StreamRelay::StreamRelay(): m_a_drain_listener_reg(), m_b_drain_listener_reg() /
 
 void StreamRelay::register_a_listener() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->mp_stream_a != nullptr);
     this->mp_stream_a->on("data", a_data_listener);
     this->mp_stream_a->on("end", a_end_listener);
@@ -40,7 +43,7 @@ void StreamRelay::register_a_listener() //{
 } //}
 void StreamRelay::register_b_listener() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     this->mp_stream_b->on("data", b_data_listener);
     this->mp_stream_b->on("end", b_end_listener);
     this->mp_stream_b->on("error", b_error_listener);
@@ -53,7 +56,7 @@ void StreamRelay::register_b_listener() //{
 
 #define EVENTARGS EventEmitter*obj, const std::string& event, EventArgs::Base* aaa
 #define DOIT(ename, dt) \
-                        __logger->debug("call %s", FUNCNAME); \
+                        DEBUG("call %s", FUNCNAME); \
                         EBStreamObject* _streamobj = dynamic_cast<decltype(_streamobj)>(obj); assert(_streamobj); \
                         StreamRelay* _this     = static_cast<decltype(_this)>(_streamobj->fetchPtr()); assert(_this); \
                         EBStreamObject::dt *args   = dynamic_cast<decltype(args)>(aaa);  assert(args); \
@@ -93,14 +96,14 @@ void StreamRelay::b_drain_listener(EVENTARGS) //{
 
 void StreamRelay::a_shouldstartwrite_listener(EVENTARGS) //{
 {
-    DOIT("shouldStartWrite", ShouldStopWriteArgs);
+    DOIT("shouldStartWrite", ShouldStartWriteArgs);
 
     if(!_this->m_b_start_read)
         _this->__relay_b_to_a();
 } //}
 void StreamRelay::b_shouldstartwrite_listener(EVENTARGS) //{
 {
-    DOIT("shouldStartWrite", ShouldStopWriteArgs);
+    DOIT("shouldStartWrite", ShouldStartWriteArgs);
 
     if(!_this->m_a_start_read)
         _this->__relay_a_to_b();
@@ -215,7 +218,7 @@ void StreamRelay::__wait_b_start_read(void* data) //{
 /** start dual direction tcp relay */
 void StreamRelay::start_relay() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->mp_stream_a != nullptr);
     assert(this->mp_stream_b != nullptr);
     this->register_a_listener();
@@ -227,7 +230,7 @@ void StreamRelay::start_relay() //{
 /** As name suggested */
 void StreamRelay::__relay_a_to_b() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_a_start_read == false);
     this->mp_stream_a->startRead();
     this->m_a_start_read = true;
@@ -235,7 +238,7 @@ void StreamRelay::__relay_a_to_b() //{
 } //}
 void StreamRelay::__relay_b_to_a() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_b_start_read == false);
     this->mp_stream_b->startRead();
     this->m_b_start_read = true;
@@ -243,7 +246,7 @@ void StreamRelay::__relay_b_to_a() //{
 } //}
 void StreamRelay::__stop_a_to_b() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_a_start_read);
     this->mp_stream_a->stopRead();
     this->m_a_start_read = false;
@@ -251,7 +254,7 @@ void StreamRelay::__stop_a_to_b() //{
 } //}
 void StreamRelay::__stop_b_to_a() //{
 {
-    __logger->debug("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_b_start_read);
     this->mp_stream_b->stopRead();
     this->m_b_start_read = false;
