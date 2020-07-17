@@ -35,6 +35,7 @@ Http::Http(const std::unordered_map<std::string, std::string>& default_response_
     this->m_parser.data = this;
 } //}
 
+/** implement virtual methods */
 void Http::read_callback(ROBuf buf, int status) //{
 {
     if(status < 0) return;
@@ -47,10 +48,21 @@ void Http::read_callback(ROBuf buf, int status) //{
     }
     http_parser_execute(&this->m_parser, &this->m_parser_setting, merge.base(), merge.size());
 } //}
+void Http::end_signal() //{
+{
+} //}
+
+void Http::should_start_write() //{
+{
+} //}
+void Http::should_stop_write() //{
+{
+} //}
 
 void Http::start_request() //{
 {
-    this->stop_read();
+    if(this->in_read())
+        this->stop_read();
     assert(this->m_current_request == nullptr);
     assert(this->m_state == HttpState::MESSAGE_COMPLETE);
     assert(this->m_upgrade == false);
@@ -76,7 +88,7 @@ void Http::response_write(ROBuf buf, WriteCallback cb, void* data) //{
     this->_write(buf, cb, data);
 } //}
 
-/** static */
+/** [static] */
 int Http::http_on_message_begin(http_parser* parser) //{
 {
     DEBUG("call %s", FUNCNAME);
@@ -193,6 +205,7 @@ void Http::FinishRequest(HttpRequest* req) //{
     assert(this->m_upgrade == false);
     this->m_current_request = nullptr;
     delete req;
+    assert(!this->in_read());
     this->start_read();
     http_parser_init(&this->m_parser, http_parser_type::HTTP_REQUEST);
 } //}
@@ -262,6 +275,12 @@ void HttpRequest::writeHeader() //{
     this->write(buf, nullptr);
     this->m_chunk = chunk;
 } //}
+
+struct ResponseWriteData: public CallbackPointer {
+    HttpRequest* _this;
+    HttpRequest::WriteCallback _cb;
+    inline ResponseWriteData(HttpRequest* _this, HttpRequest::WriteCallback cb): _cb(cb), _this(_this) {}
+};
 int  HttpRequest::write(ROBuf buf, WriteCallback cb) //{
 {
     assert(this->m_end == false);
@@ -278,34 +297,33 @@ int  HttpRequest::write(ROBuf buf, WriteCallback cb) //{
     if(this->m_write_size > HTTP_MAX_WRITE_BUFFER_SIZE) {
         ret = this->m_write_size - HTTP_MAX_WRITE_BUFFER_SIZE;
     }
-    auto ptr = new ResponseWriteData(cb, this);
+    auto ptr = new ResponseWriteData(this, cb);
     this->add_callback(ptr);
     this->m_http->response_write(buf, response_write_callback, ptr);
     return ret;
 } //}
-/** static */
-void HttpRequest::response_write_callback(EventEmitter* obj, ROBuf buf, int status, void* data) //{
+/** [static] */
+void HttpRequest::response_write_callback(ROBuf buf, int status, void* data) //{
 { 
-    ResponseWriteData* ddd = 
-        dynamic_cast<decltype(ddd)>(static_cast<CallbackPointer*>(data));
-    assert(ddd);
-    WriteCallback cb = ddd->_cb;
-    HttpRequest* req = ddd->_req;
-    delete ddd;
-    if(obj != nullptr) {
-        req->remove_callback(ddd);
-        req->m_write_size -= buf.size();
-        if(status == 0 && req->m_write_size < HTTP_MAX_WRITE_BUFFER_SIZE && 
-                (req->m_write_size + buf.size()) > HTTP_MAX_WRITE_BUFFER_SIZE) {
-            req->emit("drain", nullptr);
-        }
-    } else {
-        req = nullptr;
-    }
-    if(cb == nullptr)  return;
+    ResponseWriteData* msg = 
+        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
+    assert(msg);
 
-    if(obj == nullptr) return cb(nullptr, status);
-    return cb(req, status);
+    auto _this = msg->_this;
+    auto cb = msg->_cb;
+    auto run = msg->CanRun();
+    delete msg;
+
+    if(!run) return;
+    _this->remove_callback(msg);
+
+    _this->m_write_size -= buf.size();
+    if(status == 0 && _this->m_write_size < HTTP_MAX_WRITE_BUFFER_SIZE && 
+            (_this->m_write_size + buf.size()) > HTTP_MAX_WRITE_BUFFER_SIZE) {
+        _this->emit("drain", nullptr);
+    }
+
+    if(cb != nullptr) return cb(_this, status);
 } //}
 void HttpRequest::end() //{
 {

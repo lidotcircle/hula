@@ -38,16 +38,32 @@ bool EBMemStream::connect(struct sockaddr* addr, ConnectCallback cb, void* data)
     cb(0, data);
     return true;
 } //}
-
-void EBMemStream::stop_read() //{
+bool EBMemStream::connect(uint32_t ipv4,              uint16_t port, ConnectCallback cb, void* data) //{
 {
-    assert(this->m_stream_read == true);
-    this->m_stream_read = false;
+    return false;
 } //}
+bool EBMemStream::connect(uint8_t  ipv6[16],          uint16_t port, ConnectCallback cb, void* data) //{
+{
+    return false;
+} //}
+bool EBMemStream::connect(const std::string& domname, uint16_t port, ConnectCallback cb, void* data) //{
+{
+    return false;
+} //}
+bool EBMemStream::connectINet6(const std::string& domname, uint16_t port, ConnectCallback cb, void* data) //{
+{
+    return false;
+} //}
+
 void EBMemStream::start_read() //{
 {
     assert(this->m_stream_read == false);
     this->m_stream_read = true;
+} //}
+void EBMemStream::stop_read() //{
+{
+    assert(this->m_stream_read == true);
+    this->m_stream_read = false;
 } //}
 bool EBMemStream::in_read() //{
 {
@@ -112,4 +128,6 @@ ROBuf EBMemStream::buffer()         {return this->m_write_buffer;}
 
 bool EBMemStream::hasStreamObject() {return true;}
 void EBMemStream::release() {}
+
+bool EBMemStream::timeout(TimeoutCallback cb, void* data, int time_ms) {return false;}
 

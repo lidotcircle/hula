@@ -4,8 +4,12 @@
 #define DEBUG(all...) __logger->debug(all)
 
 
-// class WebsocketCommon IMPLEMENTATION //{
-/** static */
+struct websocket_callback_state: public CallbackPointer {
+    WebSocketCommon* _this;
+    inline websocket_callback_state(WebSocketCommon* _this): _this(_this) {}
+};
+
+/** [static] */
 typename WebSocketCommon::ExtractReturnSingle WebSocketCommon::extractFrameFromData(ROBuf remain, ROBuf income) //{
 {
     ExtractReturnSingle ret;
@@ -117,7 +121,7 @@ typename WebSocketCommon::ExtractReturnSingle WebSocketCommon::extractFrameFromD
 
     return ret;
 } //}
-/** static */
+/** [static] */
 std::tuple<std::vector<typename WebSocketCommon::ExtractReturn>, ROBuf> WebSocketCommon::extractMultiFrameFromData(ROBuf remain, ROBuf income) //{
 {
     std::vector<ExtractReturn> first;
@@ -133,7 +137,7 @@ std::tuple<std::vector<typename WebSocketCommon::ExtractReturn>, ROBuf> WebSocke
 
     return std::make_tuple(first, remain);
 } //}
-/** static */
+/** [static] */
 ROBuf WebSocketCommon::formFrameHeader(bool fin, WebsocketOPCode opcode, bool mask, ROBuf message, 
                                        bool rsv1, bool rsv2, bool rsv3) //{
 {
@@ -195,25 +199,43 @@ WebSocketCommon::WebSocketCommon(bool masked, bool save_fragment) //{
 
     this->m_state = WebsocketState::OPEN;
 } //}
+
 int WebSocketCommon::write_wrapper(ROBuf buf) //{
 {
     this->m_write_buffer_size += buf.size();
-    this->_write(buf, write_callback, nullptr);
+    auto ptr = new websocket_callback_state(this);
+    this->add_callback(ptr);
+    this->_write(buf, write_callback, ptr);
     if(this->m_write_buffer_size > WS_MAX_WRITE_BUFFER_SIZE)
         return (this->m_write_buffer_size - WS_MAX_WRITE_BUFFER_SIZE);
     else
         return 0;
 } //}
-void WebSocketCommon::write_callback(WebSocketCommon* obj, ROBuf buf, int status, void* data) //{
+void WebSocketCommon::write_callback(ROBuf buf, int status, void* data) //{
 {
-    if(obj == nullptr) return;
-    obj->m_write_buffer_size -= buf.size();
-    if(status < 0) 
-        obj->emit("error", new WSEventError(obj, WebsocketError("websocket write error")));
-    if(obj->m_write_buffer_size + buf.size() > WS_MAX_WRITE_BUFFER_SIZE && 
-       obj->m_write_buffer_size < WS_MAX_WRITE_BUFFER_SIZE)
-        obj->emit("drain", new WSEventDrain(obj));
+    websocket_callback_state* msg = 
+        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
+    assert(msg);
+
+    auto _this = msg->_this;
+    auto run   = msg->CanRun();
+    delete msg;
+
+    if(!run) return;
+    _this->remove_callback(msg);
+
+    _this->m_write_buffer_size -= buf.size();
+    if(status < 0) {
+        _this->emit("error", new WSEventError(_this, WebsocketError("websocket write error")));
+        return;
+    }
+    if(_this->m_write_buffer_size + buf.size() > WS_MAX_WRITE_BUFFER_SIZE && 
+       _this->m_write_buffer_size < WS_MAX_WRITE_BUFFER_SIZE)
+        _this->emit("drain", new WSEventDrain(_this));
 } //}
+
+
+/** implement virtual methods */
 void WebSocketCommon::read_callback(ROBuf buf, int status) //{
 {
     this->m_read_buffer_size += buf.size();
@@ -327,6 +349,18 @@ void WebSocketCommon::read_callback(ROBuf buf, int status) //{
         }
     }
 } //}
+void WebSocketCommon::end_signal() //{
+{
+} //}
+
+void WebSocketCommon::should_start_write() //{
+{
+} //}
+void WebSocketCommon::should_stop_write () //{
+{
+} //}
+
+
 int WebSocketCommon::send(ROBuf buf) //{
 {
     assert(this->m_state == WebsocketState::OPEN || 
@@ -385,7 +419,6 @@ void WebSocketCommon::close() //{
     return;
 } //}
 WebSocketCommon::~WebSocketCommon() {}
-//}
 
 WebSocketServer::WebSocketServer(bool save_fragment): WebSocketCommon(false, save_fragment) {}
 

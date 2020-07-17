@@ -1,9 +1,9 @@
 #pragma once
 
-#include "tcpabstraction.h"
 #include "events.h"
 #include "config.h"
 #include "object_manager.h"
+#include "stream.hpp"
 
 #include <http_parser.h>
 
@@ -47,12 +47,7 @@ class HttpRequest: virtual public CallbackManager, public EventEmitter //{
 
         bool m_writeHeader;
 
-        struct ResponseWriteData: public CallbackPointer {
-            WriteCallback _cb;
-            HttpRequest* _req;
-            inline ResponseWriteData(WriteCallback cb, HttpRequest* req): _cb(cb), _req(req) {}
-        };
-        static void response_write_callback(EventEmitter* obj, ROBuf buf, int status, void* data);
+        static void response_write_callback(ROBuf buf, int status, void* data);
 
     public:
         HttpRequest(Http* http, const std::unordered_map<std::string, std::string>& default_header, 
@@ -112,7 +107,7 @@ struct ErrorArgs: public EventArgs::Base {
     inline ErrorArgs(const std::string& error): m_error(error) {}
 };
 }
-class Http: virtual public TCPAbstractConnectionEventBase, virtual public EventEmitter //{
+class Http: virtual public EBStreamAbstraction //{
 {
     private:
         std::unordered_map<std::string, std::string> m_default_response_header;
@@ -132,7 +127,11 @@ class Http: virtual public TCPAbstractConnectionEventBase, virtual public EventE
         bool m_chunk;
         bool m_upgrade;
 
-        void read_callback(ROBuf buf, int status);
+        void read_callback(ROBuf buf, int status) override;
+        void end_signal() override;
+
+        void should_start_write() override;
+        void should_stop_write() override;
 
         static int http_on_message_begin(http_parser* parser);
         static int http_on_url(http_parser* parser, const char* data, size_t len);

@@ -12,7 +12,7 @@
 #include "robuf.h"
 #include "kpacket.h"
 #include "utils.h"
-#include "tcpabstraction.h"
+#include "stream.hpp"
 
 #define __MIN2(x, y) (x < y ? x : y)
 #define __MAX2(x, y) (x > y ? x : y)
@@ -153,7 +153,7 @@ struct WSEventClose: public WSEventArgvBase {
  *     @param (clean: boolean) indicates whether websocket is closed cleanly
  *///}
 
-class WebSocketCommon: public EventEmitter, public TCPAbstractConnection<WebSocketCommon> //{
+class WebSocketCommon: virtual public EBStreamAbstraction //{
 {
     private:
         WebsocketState m_state;
@@ -186,11 +186,16 @@ class WebSocketCommon: public EventEmitter, public TCPAbstractConnection<WebSock
         static ROBuf formFrameHeader(bool fin, WebsocketOPCode opcode, bool mask, ROBuf message,
                                      bool rsv1 = false, bool rsv2 = false, bool rsv3 = false);
 
-        static void write_callback(WebSocketCommon* obj, ROBuf buf, int status, void* data);
+        static void write_callback(ROBuf buf, int status, void* data);
         int  write_wrapper(ROBuf buf);
 
     protected:
-        void read_callback(ROBuf buf, int status);
+        void read_callback(ROBuf buf, int status) override;
+        void end_signal() override;
+
+        void should_start_write() override;
+        void should_stop_write () override;
+ 
 
     public:
         WebSocketCommon(bool masked, bool save_fragment);
@@ -207,10 +212,12 @@ class WebSocketCommon: public EventEmitter, public TCPAbstractConnection<WebSock
 
 class WebSocketServer: public WebSocketCommon //{
 {
+    public:
         WebSocketServer(bool save_fragment);
 }; //}
 class WebSocketClient: public WebSocketCommon //{
 {
+    public:
         WebSocketClient(bool save_fragment);
 }; //}
 

@@ -87,6 +87,9 @@ void connect_to(uv_loop_t* loop) {
 }
 
 int main() {
+    Logger::logger_init_stdout();
+    __logger->enable();
+
     uv_loop_t loop;
     uv_loop_init(&loop);
 

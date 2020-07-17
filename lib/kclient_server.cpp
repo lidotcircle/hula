@@ -40,8 +40,8 @@ void Server::on_connection(void* connection) //{
 void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
     DEBUG("call %s", FUNCNAME);
-//    this->dispatch_proxy(addr, port, socks5); // TODO
-//    return;
+    this->dispatch_proxy(addr, port, socks5); // TODO
+    return;
     if(this->m_config->AdMatch(addr, port)) {
         socks5->netAccept();
         return;

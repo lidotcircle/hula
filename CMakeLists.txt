@@ -52,7 +52,6 @@ set(kproxy_lib_src
     lib/utils_hideuv.cpp
     lib/libuv_utils.cpp
 
-    lib/tcpabstraction.cpp
     lib/websocket.cpp
     lib/websocket_libuv.cpp
     lib/http.cpp

@@ -1,8 +1,9 @@
 #include "../include/http.hpp"
+#include "../include/stream_memory.h"
 
-class HttpMemory: virtual public Http, virtual public MemoryTCPAbstractConnection {
+class HttpMemory: public Http, public EBMemStream {
     public:
-        HttpMemory(): Http(std::unordered_map<std::string, std::string>{{"Host", "www.baidu.com"}}), MemoryTCPAbstractConnection() {}
+        HttpMemory(): Http(std::unordered_map<std::string, std::string>{{"Host", "www.baidu.com"}}), EBMemStream() {}
 };
 
 int http_on_field(http_parser* parser, const char* c, size_t len) {
@@ -10,6 +11,7 @@ int http_on_field(http_parser* parser, const char* c, size_t len) {
     std::cout << s << std::endl;
     return 0;
 }
+
 
 void test_http_parser() {
     const char* nnn = 
@@ -84,3 +86,4 @@ int main() {
 
     return 0;
 }
+
