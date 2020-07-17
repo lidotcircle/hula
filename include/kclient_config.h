@@ -76,6 +76,10 @@ class SingleServerInfo //{
         std::string   m_server_name;
 
         size_t m_current_connection = 0;
+        size_t m_failure = 0;
+        size_t m_success = 0;
+
+        size_t m_prefer_this = 0;
 
     public:
         SingleServerInfo(const std::string& addr, uint16_t port, 
@@ -85,8 +89,18 @@ class SingleServerInfo //{
                 const std::string& cert,
                 const std::string& cipher);
 
-        inline void increase() {this->m_current_connection++;}
-        inline void decrease() {this->m_current_connection--;}
+        inline void   increase() {this->m_current_connection++;}
+        inline void   decrease() {this->m_current_connection--;}
+        inline size_t connections_counter() {return this->m_current_connection;}
+        inline void   connect_fail   () {this->m_failure++;}
+        inline void   connect_success() {this->m_success++;}
+        inline size_t failure_counter() {return this->m_failure;}
+        inline size_t success_counter() {return this->m_success;}
+
+        inline size_t get_prefer() {return this->m_prefer_this;}
+        inline void   set_prefer(size_t pre) {this->m_prefer_this = pre;}
+        inline void   prefer()   {this->set_prefer(2000);}
+        inline void   unprefer() {this->set_prefer(0);}
 
         inline void new_addr(const std::string& addr){this->m_addr = addr;}
         inline void new_port(uint16_t port){this->m_port = port;}

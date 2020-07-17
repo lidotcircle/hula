@@ -123,7 +123,7 @@ void EBStreamUV::uv_connect_callback(uv_connect_t* req, int status) //{
 /** wrappers of connect */
 bool EBStreamUV::connect(uint32_t ipv4, uint16_t port, ConnectCallback cb, void* data) //{
 {
-    __logger->info("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     sockaddr_in addr;
     addr.sin_family      = AF_INET;
     addr.sin_addr.s_addr = htonl(ipv4);
@@ -132,7 +132,7 @@ bool EBStreamUV::connect(uint32_t ipv4, uint16_t port, ConnectCallback cb, void*
 } //}
 bool EBStreamUV::connect(uint8_t ipv6[16], uint16_t port, ConnectCallback cb, void* data) //{
 {
-    __logger->info("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     sockaddr_in6 addr;
     addr.sin6_family      = AF_INET6;
     memcpy(&addr.sin6_addr, ipv6, sizeof(*ipv6));
@@ -210,7 +210,7 @@ void EBStreamUV::getaddrinfo_callback(struct addrinfo* res, void(*__freeaddrinfo
 } //}
 bool EBStreamUV::connect(const std::string& addr, uint16_t port, ConnectCallback cb, void* data) //{
 {
-    __logger->info("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     auto ptr = new __ppp(this, cb, data, port);
     ptr->_force_ipv6 = false;
     this->add_callback(ptr);
@@ -220,7 +220,7 @@ bool EBStreamUV::connect(const std::string& addr, uint16_t port, ConnectCallback
 } //}
 bool EBStreamUV::connectINet6(const std::string& addr, uint16_t port, ConnectCallback cb, void* data) //{
 {
-    __logger->info("call %s", FUNCNAME);
+    DEBUG("call %s", FUNCNAME);
     auto ptr = new __ppp(this, cb, data, port);
     ptr->_force_ipv6 = true;
     this->add_callback(ptr);

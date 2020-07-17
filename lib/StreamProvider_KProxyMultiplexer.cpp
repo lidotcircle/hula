@@ -2,6 +2,10 @@
 #include "../include/config.h"
 #include "../include/kpacket.h"
 
+#include <random>
+static std::default_random_engine random_engine;
+static std::uniform_int_distribution<size_t> random_dist;
+
 
 #define DEBUG(all...) __logger->debug(all)
 
@@ -20,14 +24,20 @@ KProxyMultiplexerStreamProvider::StreamId
     if(this->m_allocator.size() == SINGLE_MULTIPLEXER_MAX_CONNECTION)
         return StreamId(nullptr);
 
-    int i = 0;
+    uint8_t i = 0;
     if(this->m_next_id != SINGLE_MULTIPLEXER_MAX_CONNECTION) {
         i = this->m_next_id;
         this->m_next_id = SINGLE_MULTIPLEXER_MAX_CONNECTION;
     } else {
-        for(;i<SINGLE_MULTIPLEXER_MAX_CONNECTION;i++)
-            if(this->m_allocator.find(i) == this->m_allocator.end()) break;
-        assert(i != SINGLE_MULTIPLEXER_MAX_CONNECTION && "what ???");
+        std::vector<uint8_t> all__;
+        for(;i<SINGLE_MULTIPLEXER_MAX_CONNECTION;i++) {
+            if(this->m_allocator.find(i) == this->m_allocator.end()) {
+                all__.push_back(i);
+            }
+        }
+        assert(all__.size() > 0 && "what ???");
+        size_t k = random_dist(random_engine) % all__.size();
+        i = all__[k];
     }
 
     auto id = StreamId(new __KMStreamID(runlock, freef, i, stream));
@@ -112,6 +122,7 @@ void KProxyMultiplexerStreamProvider::connect(StreamId id, const std::string& ad
     memcpy(buf.__base(), addr.c_str(), addr.size());
     *(uint16_t*)(&buf.__base()[addr.size()]) = k_htons(port);
     ROBuf send_buf = encode_packet(PACKET_OP_CREATE_CONNECTION, kid->m_id, buf);
+    DEBUG("create new connection, opcode: %s, id: %d", packet_opcode_name(PACKET_OP_CREATE_CONNECTION), kid->m_id);
 
     assert(this->m_client_wait_connection.find(kid->m_id) == this->m_client_wait_connection.end());
     this->m_client_wait_connection[kid->m_id] = __connect_state {cb, data};
@@ -244,44 +255,40 @@ void KProxyMultiplexerStreamProvider::buffer_write_callback(ROBuf buf, int statu
     if(_cb != nullptr) _cb(buf, 0, _data);
 } //}
 
-void KProxyMultiplexerStreamProvider::startRead(StreamId id) //{
+void KProxyMultiplexerStreamProvider::send_zero_packet(StreamId id, uint8_t opcode) //{
 {
     GETKID();
-    ROBuf header = encode_packet_header(PACKET_OPCODE::PACKET_OP_START_READ, kid->m_id, 0);
+    DEBUG("send packet with {opcode: %s, description: %s, id: %d}", 
+                    packet_opcode_name((PACKET_OPCODE)opcode), packet_opcode_description((PACKET_OPCODE)opcode), kid->m_id);
+    ROBuf header = encode_packet_header((PACKET_OPCODE)opcode, kid->m_id, 0);
     this->write_header(header);
+}//}
+
+void KProxyMultiplexerStreamProvider::startRead(StreamId id) //{
+{
+    this->send_zero_packet(id, PACKET_OPCODE::PACKET_OP_START_READ);
 }//}
 void KProxyMultiplexerStreamProvider::stopRead (StreamId id) //{
 {
-    GETKID();
-    ROBuf header = encode_packet_header(PACKET_OPCODE::PACKET_OP_STOP_READ, kid->m_id, 0);
-    this->write_header(header);
+    this->send_zero_packet(id, PACKET_OPCODE::PACKET_OP_STOP_READ);
 }//}
 void KProxyMultiplexerStreamProvider::closeOtherEnd(StreamId id) //{
 {
-    GETKID();
-
-    ROBuf header = encode_packet_header(PACKET_OPCODE::PACKET_OP_CLOSE_CONNECTION, kid->m_id, 0);
-    this->write_header(header);
+    this->send_zero_packet(id, PACKET_OPCODE::PACKET_OP_CLOSE_CONNECTION);
 }//}
 
 void KProxyMultiplexerStreamProvider::accept_connection(StreamId id) //{
 {
-    GETKID();
-    ROBuf header = encode_packet_header(PACKET_OPCODE::PACKET_OP_ACCEPT_CONNECTION, kid->m_id, 0);
-    this->write_header(header);
+    this->send_zero_packet(id, PACKET_OPCODE::PACKET_OP_ACCEPT_CONNECTION);
 }//}
 void KProxyMultiplexerStreamProvider::reject_connection(StreamId id, uint8_t reason) //{
 {
-    GETKID();
-    ROBuf header = encode_packet_header(PACKET_OPCODE::PACKET_OP_REJECT_CONNECTION, kid->m_id, 0);
-    this->write_header(header);
+    this->send_zero_packet(id, PACKET_OPCODE::PACKET_OP_REJECT_CONNECTION);
 }//}
 
 void KProxyMultiplexerStreamProvider::end(StreamId id, EndCallback cb, void* data) //{
 {
-    GETKID();
-    ROBuf header = encode_packet_header(PACKET_OPCODE::PACKET_OP_END_CONNECTION, kid->m_id, 0);
-    this->write_buffer(header, cb, data);
+    this->send_zero_packet(id, PACKET_OPCODE::PACKET_OP_END_CONNECTION);
 }//}
 
 void KProxyMultiplexerStreamProvider::closeStream(StreamId id) //{
@@ -375,8 +382,11 @@ void KProxyMultiplexerStreamProvider::dispatch_data(ROBuf buf) //{
         uint8_t id;
         std::tie(frame, opcode, id) = p;
 
+        DEBUG("multiplexer: 0x%lx\nopcode: %s -> %s\nid: %d", this, 
+                        packet_opcode_name(opcode), packet_opcode_description(opcode), id);
+
         if(!checker->exist()) {
-            __logger->warn("object checker fail");
+            __logger->warn("object checker failure");
             break;
         }
 
@@ -398,32 +408,26 @@ void KProxyMultiplexerStreamProvider::dispatch_data(ROBuf buf) //{
 
         switch (opcode) {
             case PACKET_OP_WRITE:
-                __logger->info("opcode write");
                 if(id_info == nullptr) break;
                 id_info->m_read_callback(id_info->m_stream, frame);
                 break;
             case PACKET_OP_END_CONNECTION:
-                __logger->info("opcode end");
                 if(id_info == nullptr) break;
                 id_info->m_end_callback(id_info->m_stream);
                 break;
             case PACKET_OP_START_READ:
-                __logger->info("opcode startread");
                 if(id_info == nullptr) break;
                 id_info->m_start_read_callback(id_info->m_stream);
                 break;
             case PACKET_OP_STOP_READ:
-                __logger->info("opcode stopread");
                 if(id_info == nullptr) break;
                 id_info->m_stop_read_callback(id_info->m_stream);
                 break;
             case PACKET_OP_CLOSE_CONNECTION:
-                __logger->info("opcode close");
                 if(id_info == nullptr) break;
                 id_info->m_close_callback(id_info->m_stream);
                 break;
             case PACKET_OP_ACCEPT_CONNECTION:
-                __logger->info("opcode accept");
                 if(this->m_client_wait_connection.find(id) == this->m_client_wait_connection.end()) {
                     __logger->warn("KProxyMultiplexerStreamProvider： unexpected ACCEPT_CONNECTION");
                 } else {
@@ -434,7 +438,6 @@ void KProxyMultiplexerStreamProvider::dispatch_data(ROBuf buf) //{
                 }
                 break;
             case PACKET_OP_REJECT_CONNECTION:
-                __logger->info("opcode reject");
                 if(this->m_client_wait_connection.find(id) == this->m_client_wait_connection.end()) {
                     __logger->warn("KProxyMultiplexerStreamProvider： unexpected REJECT_CONNECTION");
                 } else {
@@ -445,7 +448,6 @@ void KProxyMultiplexerStreamProvider::dispatch_data(ROBuf buf) //{
                 }
                 break;
             case PACKET_OP_CREATE_CONNECTION:
-                __logger->info("opcode create");
                 this->create_new_connection(frame ,id);
                 break;
             case PACKET_OP_RESERVED:
@@ -480,15 +482,16 @@ void KProxyMultiplexerStreamProvider::create_new_connection(ROBuf buf, uint8_t n
     if(this->m_allocator.find(nid) != this->m_allocator.end()) {
         __logger->warn("bad NEW_CONNECTION opcode, which already allocated to other stream, %d, total=%d", 
                         nid, this->m_allocator.size());
-        for(auto& x: this->m_allocator)
-            __logger->error("%d -> %lx", x.first, x.second.get());
-        this->prm_error_handle();
+        this->reject_connection(this->m_allocator[nid], 0x02); // TODO
+        __KMStreamID* id_info = dynamic_cast<decltype(id_info)>(this->m_allocator[nid].get());
+        assert(id_info);
+        id_info->m_close_callback(id_info->m_stream);
         return;
     }
 
     if(buf.size() < 4) {
         logger->warn("bad new connection request");
-        this->prm_error_handle();
+        this->reject_connection(this->m_allocator[nid], 0x03); // TODO
         return;
     }
 
@@ -525,6 +528,6 @@ void KProxyMultiplexerStreamProvider::CreateConnectionFail(StreamId id, uint8_t 
     this->reject_connection(id, reason);
 } //}
 
-bool KProxyMultiplexerStreamProvider::__full() {return this->m_allocator.size() == SINGLE_MULTIPLEXER_MAX_CONNECTION;}
+bool KProxyMultiplexerStreamProvider::__full() {return this->m_allocator.size() >= (SINGLE_MULTIPLEXER_MAX_CONNECTION / 2);}
 uint8_t KProxyMultiplexerStreamProvider::__getConnectionNumbers() {return this->m_allocator.size();}
 

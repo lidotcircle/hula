@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include <vector>
+#include <map>
 
 #define __MAX(a, b) a > b ? a : b
 #define __MIN(a, b) a > b ? b : a
@@ -166,5 +167,32 @@ ROBuf encode_packet(PACKET_OPCODE op, ConnectionId id, ROBuf buf) //{
 {
     ROBuf header = encode_packet_header(op, id, buf.size());
     return header + buf;
+} //}
+
+
+#define GET_DESCRIPTION(code, desc) {code, desc},
+static std::map<PACKET_OPCODE, std::string> opcode_descriptioin = {
+    OPCODE_INFO(GET_DESCRIPTION)
+};
+#undef  GET_DESCRIPTION
+const char* packet_opcode_description(PACKET_OPCODE op) //{
+{
+    if(opcode_descriptioin.find(op) != opcode_descriptioin.end())
+        return opcode_descriptioin[op].c_str();
+    else
+        return "unknown opcode";
+} //}
+
+#define GET_NAME(code, desc) {code, #code},
+static std::map<PACKET_OPCODE, std::string> opcode_name = {
+    OPCODE_INFO(GET_NAME)
+};
+#undef  GET_NAME
+const char* packet_opcode_name(PACKET_OPCODE op) //{
+{
+    if(opcode_name.find(op) != opcode_name.end())
+        return opcode_name[op].c_str();
+    else
+        return "unknown opcode";
 } //}
 

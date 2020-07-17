@@ -40,8 +40,8 @@ void Server::on_connection(void* connection) //{
 void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
     DEBUG("call %s", FUNCNAME);
-    this->dispatch_proxy(addr, port, socks5);
-    return;
+//    this->dispatch_proxy(addr, port, socks5); // TODO
+//    return;
     if(this->m_config->AdMatch(addr, port)) {
         socks5->netAccept();
         return;
@@ -64,12 +64,14 @@ void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5Server
 {
     DEBUG("call %s = (%s, %d, 0x%lx)", FUNCNAME, addr.c_str(), port, (long)socks5);
     ProxyMultiplexerAbstraction* pp = nullptr;
+    std::multimap<uint8_t , ProxyMultiplexerAbstraction*> all__;
     for(auto& m: this->m_proxy) {
-        if(!m->full() && m->connected()) {
-            pp = m;
-            break;
-        }
+        if(!m->full() && m->connected())
+            all__.insert(std::make_pair(m->getConnectionNumbers(), m));
     }
+
+    if(all__.size() != 0)
+        pp = all__.begin()->second;
 
     if(pp == nullptr) {
         auto c = this->select_remote_serever();
@@ -116,16 +118,34 @@ void Server::socks5Transfer(Socks5ServerAbstraction* socks5) //{
     }
 } //}
 
+static double calculate_point(double prefer, int failure, int success, int current) //{
+{
+    double ans = 1;
+    if(failure <= 0) failure = 1;
+    if(success <= 0) success = 1;
+    if(current <= 0) current = 1;
+    ans += prefer;
+    ans *= (success / failure);
+    ans *= (4.0 / current);
+    return ans;
+} //}
 /** select a remote server base on some strategies */
 SingleServerInfo* Server::select_remote_serever() //{
 {
     DEBUG("call %s", FUNCNAME);
+    std::multimap<double, SingleServerInfo*> avails;
     for(auto& x: this->m_config->Servers()) {
-        __logger->info("select server: %s", x.name().c_str());
-        return &x;
+        auto point = calculate_point(x.get_prefer(), x.failure_counter(), x.success_counter(), x.connections_counter());
+        avails.insert(std::make_pair(point, &x));
     }
-    __logger->warn("no server avaliable");
-    return nullptr;
+    if(avails.size() == 0) {
+        __logger->warn("no server avaliable");
+        return nullptr;
+    }
+
+    auto selected = avails.rbegin()->second;
+    __logger->info("selecte server: %s at %s:%d", selected->name().c_str(), selected->addr().c_str(), selected->port());
+    return selected;
 } //}
 
 /** deallocate Socks5ServerAbstraction, Socks5RequestProxy* and ProxyMultiplexerAbstraction */

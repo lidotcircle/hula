@@ -48,8 +48,8 @@ void StreamRelay::register_b_listener() //{
     this->mp_stream_b->on("end", b_end_listener);
     this->mp_stream_b->on("error", b_error_listener);
 
-    this->mp_stream_a->on("shouldStartWrite", b_shouldstartwrite_listener);
-    this->mp_stream_a->on("shouldStopWrite",  b_shouldstopwrite_listener);
+    this->mp_stream_b->on("shouldStartWrite", b_shouldstartwrite_listener);
+    this->mp_stream_b->on("shouldStopWrite",  b_shouldstopwrite_listener);
 
     this->m_b_drain_listener_reg = this->mp_stream_b->on("drain", b_drain_listener);
 } //}

@@ -27,23 +27,27 @@
 #define PACK( __Declaration__ ) __pragma( pack(push, 1) ) __Declaration__ __pragma( pack(pop))
 #endif
 
+#define OPCODE_INFO(FUNC) \
+    FUNC(PACKET_OP_WRITE,             "write back") \
+    FUNC(PACKET_OP_CREATE_CONNECTION, "request a new connection") \
+    FUNC(PACKET_OP_ACCEPT_CONNECTION, "accept request of new connection") \
+    FUNC(PACKET_OP_REJECT_CONNECTION, "reject request of new connection") \
+    FUNC(PACKET_OP_CLOSE_CONNECTION,  "close a connection and release the id") \
+    FUNC(PACKET_OP_END_CONNECTION,    "equivalent to finish flag of tcp") \
+    FUNC(PACKET_OP_START_READ,        "inform the other end start writing") \
+    FUNC(PACKET_OP_STOP_READ,         "inform the other end stop writing") \
+    FUNC(PACKET_OP_RESERVED,          "reserved opcode")
 
+
+#define OPCODE_ENUM(op, desc) op, 
 enum PACKET_OPCODE: uint8_t {
-    PACKET_OP_WRITE = 0,          // c s
-
-    PACKET_OP_CREATE_CONNECTION,  // c
-    PACKET_OP_ACCEPT_CONNECTION,  //   s
-    PACKET_OP_REJECT_CONNECTION,  //   s
-
-    PACKET_OP_CLOSE_CONNECTION,   // c s
-
-    PACKET_OP_END_CONNECTION,     // c s
-
-    PACKET_OP_START_READ,         // c s
-    PACKET_OP_STOP_READ,          // c s
-
-    PACKET_OP_RESERVED
+    OPCODE_INFO(OPCODE_ENUM)
 };
+#undef OPCODE_ENUM
+
+const char* packet_opcode_description(PACKET_OPCODE op);
+const char* packet_opcode_name(PACKET_OPCODE op);
+
 
 enum NEW_CONNECTION_REPLY: uint8_t {
     SUCCESS = 0,
@@ -51,6 +55,7 @@ enum NEW_CONNECTION_REPLY: uint8_t {
     GET_DNS_FAIL,
     CONNECT_FAIL
 };
+
 
 typedef uint8_t ConnectionId;
 

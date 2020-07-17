@@ -23,6 +23,7 @@ ConnectionProxy::ConnectionProxy(Server* server, SingleServerInfo* server_info) 
     this->mp_server = server;
 
     this->mp_server_info = server_info;
+    this->mp_server_info->increase();
 
     this->m_state = __State::STATE_INITIAL;
 
@@ -102,8 +103,6 @@ void ConnectionProxy::__connectToServer(ConnectCallback cb, void* data) //{
     this->m_connect_cb = cb;
     this->m_connect_cb_data = data;
 
-    this->mp_server_info->increase();
-
     auto ptr = new __connect_to_server_callback_state(this);
     this->add_callback(ptr);
 
@@ -130,6 +129,7 @@ void ConnectionProxy::connect_to_remote_server_callback(int status, void* data) 
     _this->remove_callback(msg);
 
     if(status < 0) {
+        _this->mp_server_info->connect_fail();
         _this->close();
         return;
     }
@@ -178,6 +178,7 @@ void ConnectionProxy::on_authentication_write(ROBuf buf, int status, void* data)
     _this->remove_callback(msg);
 
     if(status < 0) {
+        _this->mp_server_info->connect_fail();
         _this->close();
         return;
     }
@@ -197,6 +198,7 @@ void ConnectionProxy::authenticate(ROBuf buf) //{
     if((uint8_t)buf.base()[0] != 0xFF ||
        (uint8_t)buf.base()[1] != 0x00) {
         __logger->warn("AUTHENTICATION FAIL");
+        this->mp_server_info->connect_fail();
         this->close();
         return;
     }
@@ -207,6 +209,7 @@ void ConnectionProxy::authenticate(ROBuf buf) //{
     this->m_connect_cb(0, this->m_connect_cb_data);
     this->m_connect_cb = nullptr;
     this->m_connect_cb_data = nullptr;
+    this->mp_server_info->connect_success();
     return;
 } //}
 
@@ -244,6 +247,7 @@ void ConnectionProxy::close() //{
     for(auto& x: proxyrelay_copy)
         x->close();
 
+    this->mp_server_info->decrease();
     this->mp_server->remove_proxy(this);
 } //}
 
