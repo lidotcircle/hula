@@ -1,6 +1,7 @@
 #include "../include/ObjectFactory.h"
 #include "../include/kserver_libuv.h"
 #include "../include/kclient_libuv.h"
+#include "../include/stream_object_libuv.h"
 #include "../include/stream_byprovider.h"
 
 

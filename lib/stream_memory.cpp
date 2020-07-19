@@ -92,7 +92,7 @@ void  EBMemStream::releaseUnderlyStream(UNST) //{
 {
     return;
 } //}
-bool  EBMemStream::accept(UNST listen, UNST stream) //{
+bool  EBMemStream::accept(UNST stream) //{
 {
     assert(false && "unimplemented");
     return true;

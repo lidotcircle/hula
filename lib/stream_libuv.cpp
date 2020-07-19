@@ -409,14 +409,20 @@ void EBStreamUV::releaseUnderlyStream(UNST ptr) //{
     uv_tcp_t* tcp = pp->getStream();
     uv_close((uv_handle_t*)tcp, delete_closed_handle<decltype(tcp)>);
 } //}
-bool  EBStreamUV::accept(UNST listen, UNST stream) //{
+bool  EBStreamUV::accept(UNST stream) //{
 {
     DEBUG("call %s", FUNCNAME);
-    __UnderlyingStreamUV* listen__ = dynamic_cast<decltype(listen__)>(listen.get()); assert(listen__);
     __UnderlyingStreamUV* stream__ = dynamic_cast<decltype(stream__)>(stream.get()); assert(stream__);
-    assert(listen__->getType() == this->getType());
     assert(stream__->getType() == this->getType());
-    return uv_accept((uv_stream_t*)(listen__->getStream()), (uv_stream_t*)(stream__->getStream())) < 0 ?
+    return uv_accept((uv_stream_t*)(this->mp_tcp), (uv_stream_t*)(stream__->getStream())) < 0 ?
+        false :
+        true;
+} //}
+bool  EBStreamUV::accept(EBStreamUV* stream) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    assert(this->mp_tcp); assert(stream && stream->mp_tcp);
+    return uv_accept((uv_stream_t*)(this->mp_tcp), (uv_stream_t*)(stream->mp_tcp)) < 0 ?
         false :
         true;
 } //}
@@ -605,13 +611,5 @@ bool EBStreamUV::timeout(TimeoutCallback cb, void* data, int time_ms) //{
     uv_handle_set_data((uv_handle_t*)timer, new __uv_timeout_state__(cb, data));
     uv_timer_start(timer, __uv_timeout_callback, time_ms, 0);
     return true;
-} //}
-
-
-
-EBStreamObject* EBStreamObjectUV::NewStreamObject() //{
-{
-    auto new_underlying = this->newUnderlyStream();
-    return new EBStreamObjectUV(new_underlying, NEW_STREAM_OBJECT_BUFFER_SIZE);
 } //}
 

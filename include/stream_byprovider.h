@@ -71,7 +71,7 @@ class EBStreamByProvider: public virtual EBStreamAbstraction //{
 
         UNST newUnderlyStream() override;
         void  releaseUnderlyStream(UNST) override;
-        bool  accept(UNST listen, UNST stream) override;
+        bool  accept(UNST stream) override;
 
         EBStreamByProvider(StreamProvider* tcp);
         ~EBStreamByProvider();
@@ -96,5 +96,6 @@ class EBStreamObjectKProxyMultiplexerProvider: public EBStreamByProvider, public
 
         StreamType getType() override;
         EBStreamObject* NewStreamObject() override;
+        bool accept(EBStreamObject*) override;
 }; //}
 

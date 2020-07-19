@@ -28,7 +28,7 @@ void NotImplement() {assert(false && "not implement");}
 
 bool EBStreamByProvider::bind(struct sockaddr* addr) {NotImplement(); return false;}
 bool EBStreamByProvider::listen() {NotImplement(); return false;}
-bool EBStreamByProvider::accept(UNST, UNST) {NotImplement(); return false;}
+bool EBStreamByProvider::accept(UNST) {NotImplement(); return false;}
 
 #define CHECK_SOCKET() \
     assert(this->m_info != nullptr); \
@@ -469,4 +469,5 @@ EBStreamObject* EBStreamObjectKProxyMultiplexerProvider::NewStreamObject() //{
 {
     return new EBStreamObjectKProxyMultiplexerProvider(this->getProvider(), NEW_STREAM_OBJECT_BUFFER_SIZE); // TODO
 } //}
+bool EBStreamObjectKProxyMultiplexerProvider::accept(EBStreamObject*) {NotImplement(); return false;}
 

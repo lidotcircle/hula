@@ -32,6 +32,7 @@ class EBStreamUV: virtual public EBStreamAbstraction //{
 
         static void getaddrinfo_callback(struct addrinfo* res, void(*__freeaddrinfoint)(struct addrinfo*), int status, void* data);
 
+        bool accept(EBStreamUV* stream);
 
     public:
         bool bind(struct sockaddr* addr) override;
@@ -53,7 +54,7 @@ class EBStreamUV: virtual public EBStreamAbstraction //{
 
         UNST newUnderlyStream() override;
         void releaseUnderlyStream(UNST) override;
-        bool accept(UNST listen, UNST stream) override;
+        bool accept(UNST stream) override;
 
         EBStreamUV(uv_tcp_t* tcp);
         EBStreamUV(UNST      tcp);
@@ -76,18 +77,5 @@ class EBStreamUV: virtual public EBStreamAbstraction //{
         static uv_tcp_t* getStreamFromWrapper(UNST wstream);
 
         bool timeout(TimeoutCallback cb, void* data, int time) override;
-}; //}
-
-
-#include "StreamObject.h"
-class EBStreamObjectUV: public EBStreamUV, public EBStreamObject //{
-{
-    public:
-        inline EBStreamObjectUV(uv_tcp_t* connection, size_t max): 
-            EBStreamUV(connection), EBStreamObject(max) {}
-        inline EBStreamObjectUV(UNST connection, size_t max): 
-            EBStreamUV(connection), EBStreamObject(max) {}
-
-        EBStreamObject* NewStreamObject() override;
 }; //}
 

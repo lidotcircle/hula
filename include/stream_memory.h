@@ -47,7 +47,7 @@ class EBMemStream: virtual public EBStreamAbstraction
 
         UNST newUnderlyStream() override;
         void releaseUnderlyStream(UNST) override;
-        bool accept(UNST listen, UNST stream) override;
+        bool accept(UNST stream) override;
 
         template<typename T>
         EBMemStream& operator<<(const T& value) //{
