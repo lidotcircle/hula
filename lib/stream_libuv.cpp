@@ -1,4 +1,4 @@
-#include "../include/stream_libuv.hpp"
+#include "../include/stream_libuv.h"
 #include "../include/config.h"
 #include "../include/logger.h"
 
@@ -84,9 +84,9 @@ void EBStreamUV::uv_connection_callback(uv_stream_t* stream, int status) //{
     uv_tcp_init(loop, newcon);
     if(uv_accept((uv_stream_t*)stream, (uv_stream_t*)newcon) < 0) {
         uv_close((uv_handle_t*)newcon, delete_closed_handle<decltype(newcon)>);
-        _this->on_connection(nullptr);
+        _this->on_connection(UNST(nullptr));
     } else {
-        _this->on_connection(newcon);
+        _this->on_connection(UNST(new __UnderlyingStreamUV(_this->getType(), newcon)));
     }
 } //}
 
@@ -392,25 +392,31 @@ void EBStreamUV::getaddrinfoipv6 (const char* hostname, GetAddrInfoIPv6Callback 
     this->getaddrinfo(hostname, getaddrinfo_callback_for_getaddrinfoipv6, new std::pair<GetAddrInfoIPv6Callback, void*>(cb, data));
 } //}
 
-void* EBStreamUV::newUnderlyStream() //{
+EBStreamAbstraction::UNST EBStreamUV::newUnderlyStream() //{
 {
     DEBUG("call %s", FUNCNAME);
     assert(this->mp_tcp != nullptr);
     uv_loop_t* loop = uv_handle_get_loop((uv_handle_t*)this->mp_tcp);
-    uv_tcp_t* ret = new uv_tcp_t();
-    uv_tcp_init(loop, ret);
-    return ret;
+    uv_tcp_t* stream = new uv_tcp_t();
+    uv_tcp_init(loop, stream);
+    return UNST(new __UnderlyingStreamUV(this->getType(), stream));
 } //}
-void  EBStreamUV::releaseUnderlyStream(void* ptr) //{
+void EBStreamUV::releaseUnderlyStream(UNST ptr) //{
 {
     DEBUG("call %s", FUNCNAME);
-    uv_tcp_t* tcp = static_cast<decltype(tcp)>(ptr);
+    __UnderlyingStreamUV* pp = dynamic_cast<decltype(pp)>(ptr.get());
+    assert(pp); assert(pp->getType() == this->getType());
+    uv_tcp_t* tcp = pp->getStream();
     uv_close((uv_handle_t*)tcp, delete_closed_handle<decltype(tcp)>);
 } //}
-bool  EBStreamUV::accept(void* listen, void* stream) //{
+bool  EBStreamUV::accept(UNST listen, UNST stream) //{
 {
     DEBUG("call %s", FUNCNAME);
-    return uv_accept(static_cast<uv_stream_t*>(listen), static_cast<uv_stream_t*>(stream)) < 0 ?
+    __UnderlyingStreamUV* listen__ = dynamic_cast<decltype(listen__)>(listen.get()); assert(listen__);
+    __UnderlyingStreamUV* stream__ = dynamic_cast<decltype(stream__)>(stream.get()); assert(stream__);
+    assert(listen__->getType() == this->getType());
+    assert(stream__->getType() == this->getType());
+    return uv_accept((uv_stream_t*)(listen__->getStream()), (uv_stream_t*)(stream__->getStream())) < 0 ?
         false :
         true;
 } //}
@@ -419,6 +425,17 @@ EBStreamUV::EBStreamUV(uv_tcp_t* tcp) //{
 {
     DEBUG("call %s", FUNCNAME);
     this->mp_tcp = tcp;
+    if(this->mp_tcp != nullptr)
+        uv_handle_set_data((uv_handle_t*)this->mp_tcp, this);
+    this->m_stream_read = false;
+
+    this->recalculatespeed();
+} //}
+EBStreamUV::EBStreamUV(UNST tcp) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    assert(tcp->getType() == StreamType::LIBUV);
+    this->mp_tcp = EBStreamUV::getStreamFromWrapper(tcp);
     if(this->mp_tcp != nullptr)
         uv_handle_set_data((uv_handle_t*)this->mp_tcp, this);
     this->m_stream_read = false;
@@ -472,19 +489,22 @@ void EBStreamUV::release() //{
     this->mp_tcp = nullptr;
 } //}
 
-void* EBStreamUV::transfer() //{
+EBStreamAbstraction::UNST EBStreamUV::transfer() //{
 {
     DEBUG("call %s", FUNCNAME);
     if(this->in_read()) this->stop_read();
-    auto ret = this->mp_tcp;
+    auto stream = this->mp_tcp;
     this->mp_tcp = nullptr;
-    return ret;
+    return UNST(new __UnderlyingStreamUV(this->getType(), stream));
 } //}
-void  EBStreamUV::regain(void* ptr) //{
+void  EBStreamUV::regain(UNST stream) //{
 {
     DEBUG("call %s", FUNCNAME);
     assert(this->in_read() == false);
-    this->mp_tcp = static_cast<decltype(this->mp_tcp)>(ptr);
+    assert(this->mp_tcp == nullptr);
+    assert(stream->getType() == this->getType());
+    __UnderlyingStreamUV* ss = dynamic_cast<decltype(ss)>(stream.get()); assert(ss);
+    this->mp_tcp = static_cast<decltype(this->mp_tcp)>(ss->getStream());
     uv_handle_set_data((uv_handle_t*)this->mp_tcp, this);
 } //}
 
@@ -546,6 +566,16 @@ uint16_t EBStreamUV::local_port() //{
     }
 } //}
 
+StreamType EBStreamUV::getType() {return StreamType::LIBUV;}
+
+/** [static] */
+uv_tcp_t* EBStreamUV::getStreamFromWrapper(UNST wstream) //{
+{
+    assert(wstream->getType() == StreamType::LIBUV);
+    __UnderlyingStreamUV* stream = dynamic_cast<decltype(stream)>(wstream.get());
+    assert(stream);
+    return stream->getStream();
+} //}
 
 struct __uv_timeout_state__ {
     EBStreamAbstraction::TimeoutCallback _cb;
@@ -575,5 +605,13 @@ bool EBStreamUV::timeout(TimeoutCallback cb, void* data, int time_ms) //{
     uv_handle_set_data((uv_handle_t*)timer, new __uv_timeout_state__(cb, data));
     uv_timer_start(timer, __uv_timeout_callback, time_ms, 0);
     return true;
+} //}
+
+
+
+EBStreamObject* EBStreamObjectUV::NewStreamObject() //{
+{
+    auto new_underlying = this->newUnderlyStream();
+    return new EBStreamObjectUV(new_underlying, NEW_STREAM_OBJECT_BUFFER_SIZE);
 } //}
 

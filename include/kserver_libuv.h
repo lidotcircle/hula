@@ -5,8 +5,8 @@
 #include "kserver_multiplexer.h"
 #include "kserver_server2net.h"
 
-#include "stream.hpp"
-#include "stream_libuv.hpp"
+#include "stream.h"
+#include "stream_libuv.h"
 
 NS_PROXY_SERVER_START
 
@@ -25,9 +25,11 @@ class UVMultiplexer: virtual public EBStreamUV, public ClientConnectionProxy {
 
 class UVToNet: public ServerToNetConnection {
     public:
-        inline UVToNet(ClientConnectionProxy* proxy, EBStreamObject* obj, uv_tcp_t* connection, 
+        inline UVToNet(ClientConnectionProxy* proxy, EBStreamObject* obj, EBStreamAbstraction::UNST connection, 
                        StreamProvider::StreamId id, const std::string& addr, uint16_t port):
-            ServerToNetConnection(proxy, obj, connection, id, addr, port) {}
+            ServerToNetConnection(proxy, obj, connection, id, addr, port) {
+                assert(connection->getType() == StreamType::LIBUV);
+            }
 };
 
 

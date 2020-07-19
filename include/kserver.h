@@ -6,7 +6,7 @@
 #include "kserver_config.h"
 #include "config.h"
 #include "object_manager.h"
-#include "stream.hpp"
+#include "stream.h"
 #include "StreamRelay.h"
 
 #define DEFAULT_BACKLOG 100

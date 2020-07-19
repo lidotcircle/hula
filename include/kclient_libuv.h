@@ -1,4 +1,4 @@
-#include "stream_libuv.hpp"
+#include "stream_libuv.h"
 
 #include "kclient_server.h"
 #include "kclient_socks5.h"
@@ -11,6 +11,8 @@ NS_PROXY_CLIENT_START
 
 class UVServer: protected EBStreamUV, public Server {
     public:
+    inline UVServer(std::shared_ptr<ClientConfig> config, UNST connection):
+        Server(config), EBStreamUV(connection) {assert(connection->getType() == StreamType::LIBUV);}
     inline UVServer(std::shared_ptr<ClientConfig> config, uv_tcp_t* connection):
         Server(config), EBStreamUV(connection) {}
 };
@@ -27,8 +29,8 @@ class UVMultiplexer: protected EBStreamUV, public ConnectionProxy {
 class UVRelay: public RelayConnection {
     public:
     inline UVRelay(Server* server, Socks5ServerAbstraction* socks5,
-            const std::string& addr, uint16_t port, uv_tcp_t* connection):
-        RelayConnection(server, socks5, addr, port, connection) {}
+            const std::string& addr, uint16_t port, EBStreamAbstraction::UNST connection):
+        RelayConnection(server, socks5, addr, port, connection) {assert(connection->getType() == StreamType::LIBUV);}
 };
 class UVClientConnection: public ClientConnection {
     public:

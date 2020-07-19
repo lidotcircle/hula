@@ -1,7 +1,9 @@
 #pragma once
 
-#include "stream.hpp"
+#include "stream.h"
+#include "robuf.h"
 
+#include <sstream>
 
 class EBMemStream: virtual public EBStreamAbstraction
 {
@@ -9,6 +11,10 @@ class EBMemStream: virtual public EBStreamAbstraction
         bool  m_stream_read;
         bool  m_shutdown;
         ROBuf m_write_buffer;
+        class __UnderlyingStreamMem: public __UnderlyingStream {
+            public:
+            inline __UnderlyingStreamMem(StreamType type): __UnderlyingStream(type) {}
+        };
 
 
     protected:
@@ -39,9 +45,9 @@ class EBMemStream: virtual public EBStreamAbstraction
         void getaddrinfoipv4 (const char* hostname, GetAddrInfoIPv4Callback cb, void* data) override;
         void getaddrinfoipv6 (const char* hostname, GetAddrInfoIPv6Callback cb, void* data) override;
 
-        void* newUnderlyStream() override;
-        void  releaseUnderlyStream(void*) override;
-        bool  accept(void* listen, void* stream) override;
+        UNST newUnderlyStream() override;
+        void releaseUnderlyStream(UNST) override;
+        bool accept(UNST listen, UNST stream) override;
 
         template<typename T>
         EBMemStream& operator<<(const T& value) //{
@@ -76,14 +82,16 @@ class EBMemStream: virtual public EBStreamAbstraction
 
         void shutdown(ShutdownCallback cb, void* data) override;
 
-        void* transfer() override;
-        void  regain(void*) override;
+        UNST transfer() override;
+        void regain(UNST) override;
 
         void  reply(ROBuf buf);
         ROBuf buffer();
 
         bool hasStreamObject() override;
         void release() override;
+
+        StreamType getType() override;
 
         bool timeout(TimeoutCallback cb, void* data, int time_ms) override;
 };

@@ -69,7 +69,6 @@ void test_server_config2(uv_loop_t* loop) //{
 
 int main() //{
 {
-    Logger::logger_init_stdout();
     uv_loop_t loop;
     uv_loop_init(&loop);
 

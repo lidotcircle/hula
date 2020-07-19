@@ -1,5 +1,5 @@
 #include "../include/kclient_clientproxy.h"
-#include "../include/ObjectFactory.hpp"
+#include "../include/ObjectFactory.h"
 
 
 #define DEBUG(all...) __logger->debug(all)
@@ -44,7 +44,7 @@ void ClientConnection::run(Socks5ServerAbstraction* socks5) //{
     this->getStream(socks5->transferStream());
     this->start_relay();
 } //}
-void ClientConnection::getStream(void* stream) //{
+void ClientConnection::getStream(EBStreamAbstraction::UNST stream) //{
 {
     DEBUG("call %s", FUNCNAME);
     this->setStreamB(Factory::createUVStreamObject(RELAY_MAX_BUFFER_SIZE, stream));

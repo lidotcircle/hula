@@ -38,7 +38,7 @@ class ClientConnection: public ClientProxyAbstraction, public StreamRelay  //{
         void close() override;
         void connectToAddr() override;
         void run(Socks5ServerAbstraction*) override;
-        void getStream(void*) override;
+        void getStream(EBStreamAbstraction::UNST) override;
 
         void __close() override;
 }; //}

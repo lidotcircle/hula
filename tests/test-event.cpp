@@ -105,7 +105,6 @@ void test_dlink() //{
 
 int main()
 {
-    Logger::logger_init_stdout();
     Logger::logger->disable();
 
     test_dlink();

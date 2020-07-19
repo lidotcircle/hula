@@ -3,7 +3,7 @@
 #include "../include/utils.h"
 #include "../include/config.h"
 #include "../include/config_file.h"
-#include "../include/ObjectFactory.hpp"
+#include "../include/ObjectFactory.h"
 
 
 #include <stdlib.h>
@@ -18,7 +18,7 @@
 NS_PROXY_SERVER_START
 
 /** connection callback function */
-void Server::on_connection(void* connection) //{
+void Server::on_connection(UNST connection) //{
 {
     DEBUG("call %s", FUNCNAME);
     if(connection == nullptr) {

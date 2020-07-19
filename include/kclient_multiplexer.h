@@ -1,5 +1,5 @@
 #pragma once
-#include "stream.hpp"
+#include "stream.h"
 #include "StreamProvider_KProxyMultiplexer.h"
 
 #include "kclient.h"

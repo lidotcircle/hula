@@ -1,4 +1,4 @@
-#include "../include/websocket.hpp"
+#include "../include/websocket.h"
 
 
 #define DEBUG(all...) __logger->debug(all)

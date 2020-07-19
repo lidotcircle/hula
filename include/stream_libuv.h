@@ -1,7 +1,8 @@
 #pragma once
 
-#include "stream.hpp"
+#include "stream.h"
 #include "object_manager.h"
+#include "robuf.h"
 
 #include <uv.h>
 
@@ -12,6 +13,12 @@ class EBStreamUV: virtual public EBStreamAbstraction //{
         uv_tcp_t* mp_tcp;
         bool m_stream_read;
         static void __freeaddrinfo(struct addrinfo*);
+        class __UnderlyingStreamUV: public __UnderlyingStream {
+            uv_tcp_t* uv_tcp;
+            public:
+            inline __UnderlyingStreamUV(StreamType type, uv_tcp_t* tcp): __UnderlyingStream(type), uv_tcp(tcp) {}
+            inline uv_tcp_t* getStream() {return this->uv_tcp;}
+        };
 
 
     protected:
@@ -44,17 +51,18 @@ class EBStreamUV: virtual public EBStreamAbstraction //{
         void getaddrinfoipv4 (const char* hostname, GetAddrInfoIPv4Callback cb, void* data) override;
         void getaddrinfoipv6 (const char* hostname, GetAddrInfoIPv6Callback cb, void* data) override;
 
-        void* newUnderlyStream() override;
-        void  releaseUnderlyStream(void*) override;
-        bool  accept(void* listen, void* stream) override;
+        UNST newUnderlyStream() override;
+        void releaseUnderlyStream(UNST) override;
+        bool accept(UNST listen, UNST stream) override;
 
         EBStreamUV(uv_tcp_t* tcp);
+        EBStreamUV(UNST      tcp);
         ~EBStreamUV();
 
         void shutdown(ShutdownCallback cb, void* data) override;
 
-        void* transfer() override;
-        void  regain(void*) override;
+        UNST transfer() override;
+        void regain(UNST) override;
 
         void  release() override;
         bool  hasStreamObject() override;
@@ -63,6 +71,9 @@ class EBStreamUV: virtual public EBStreamAbstraction //{
         uint16_t remote_port()    override;        // remote port
         std::string local_addr()  override;        // local address
         uint16_t local_port()     override;        // local port
+
+        StreamType getType() override;
+        static uv_tcp_t* getStreamFromWrapper(UNST wstream);
 
         bool timeout(TimeoutCallback cb, void* data, int time) override;
 }; //}
@@ -74,5 +85,9 @@ class EBStreamObjectUV: public EBStreamUV, public EBStreamObject //{
     public:
         inline EBStreamObjectUV(uv_tcp_t* connection, size_t max): 
             EBStreamUV(connection), EBStreamObject(max) {}
+        inline EBStreamObjectUV(UNST connection, size_t max): 
+            EBStreamUV(connection), EBStreamObject(max) {}
+
+        EBStreamObject* NewStreamObject() override;
 }; //}
 

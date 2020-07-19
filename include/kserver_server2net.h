@@ -23,7 +23,7 @@ class ServerToNetConnection: public ToNetAbstraction, public StreamRelay //{
 
     public:
         ServerToNetConnection(ClientConnectionProxy* proxy, EBStreamObject* obj, 
-                              void* connection, StreamProvider::StreamId id, 
+                              EBStreamAbstraction::UNST connection, StreamProvider::StreamId id, 
                               const std::string& addr, uint16_t port);
 
         ServerToNetConnection(const ServerToNetConnection&) = delete;

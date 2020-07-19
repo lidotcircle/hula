@@ -1,4 +1,4 @@
-#include "../include/http.hpp"
+#include "../include/http.h"
 #include "../include/stream_memory.h"
 
 class HttpMemory: public Http, public EBMemStream {
@@ -63,10 +63,6 @@ void on_upgrade(EventEmitter* target, const std::string& event, EventArgs::Base*
 }
 
 int main() {
-    Logger::logger_init_stdout();
-
-//    test_http_parser();
-//    return 0;
     HttpMemory hhh;
     hhh.on("request", on_request);
     hhh.on("upgrade", on_upgrade);

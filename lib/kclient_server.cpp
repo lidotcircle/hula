@@ -1,5 +1,5 @@
 #include "../include/kclient_server.h"
-#include "../include/ObjectFactory.hpp"
+#include "../include/ObjectFactory.h"
 
 
 #define DEBUG(all...) __logger->debug(all)
@@ -22,16 +22,16 @@ Server::Server(std::shared_ptr<ClientConfig> config) //{
 } //}
 
 /** implement pure virtual function */
-void Server::on_connection(void* connection) //{
+void Server::on_connection(UNST connection) //{
 {
     DEBUG("call %s", FUNCNAME);
 
-    if(connection == nullptr) {
+    if(!connection) {
         __logger->info("bad connection");
         return;
     }
 
-    Socks5ServerAbstraction* auth = Factory::KProxyClient::createSocks5Server(this, this->m_config, connection); // FIXME object leak
+    Socks5ServerAbstraction* auth = Factory::KProxyClient::createSocks5Server(this, this->m_config, connection);
     this->m_socks5.insert(auth);
     auth->start();
 } //}
@@ -79,7 +79,7 @@ void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5Server
             socks5->netReject();
             return;
         }
-        void* newcon = this->newUnderlyStream();
+        UNST newcon = this->newUnderlyStream();
         pp = Factory::KProxyClient::createMultiplexer(this, c, newcon);
         this->m_proxy.insert(pp);
     }

@@ -13,7 +13,7 @@ std::tuple<bool, struct __client_selection_msg, ROBuf> parse_client_hello(ROBuf 
     if(merge.size() < i + 2) return std::make_tuple(false, msg, ROBuf());
     for(int j = 2; i > 0; i--, j++)
         msg.m_methods.push_back(merge.base()[j]);
-    return std::make_tuple(true, msg, merge + 2 + msg.m_methods.size());
+    return std::make_tuple(true, msg, merge.increaseOffset(2 + msg.m_methods.size()));
 } //}
 
 std::tuple<bool, struct __client_request_msg, ROBuf, bool> parse_client_request(ROBuf remain, ROBuf income) //{
@@ -70,7 +70,7 @@ std::tuple<bool, struct __client_request_msg, ROBuf, bool> parse_client_request(
         inc += 2;
     }
 __RETURN:
-    return std::make_tuple(result, msg, merge + inc, packet_error);
+    return std::make_tuple(result, msg, merge.increaseOffset(inc), packet_error);
 } //}
 
 std::tuple<bool, struct __socks5_username_password, ROBuf> parse_username_authentication(ROBuf remain, ROBuf income) //{
@@ -110,6 +110,6 @@ std::tuple<bool, struct __socks5_username_password, ROBuf> parse_username_authen
     }
 
 __RETURN:
-    return std::make_tuple(result, pair, merge + inc);
+    return std::make_tuple(result, pair, merge.increaseOffset(inc));
 } //}
 

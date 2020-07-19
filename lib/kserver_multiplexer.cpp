@@ -1,7 +1,7 @@
 #include "../include/kserver.h"
 #include "../include/kserver_multiplexer.h"
 #include "../include/callback_data.h"
-#include "../include/ObjectFactory.hpp"
+#include "../include/ObjectFactory.h"
 #include "../include/config.h"
 
 
@@ -105,7 +105,7 @@ void ClientConnectionProxy::dispatch_authentication_data(ROBuf buf) //{
     this->add_callback(ptr);
     if(authenticate_pass) {
         __logger->info("Authentication success");
-        this->m_remains = buf + (username_len + password_len + 2);
+        this->m_remains = buf.increaseOffset(username_len + password_len + 2);
         this->_write(ROBuf((char*)"\xff\x00", 2), authentication_write_callback, ptr);
     } else {
         __logger->warn("Authentication fail");

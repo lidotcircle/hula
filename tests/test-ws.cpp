@@ -1,4 +1,5 @@
 #include "../include/websocket_libuv.h"
+#include "../include/config.h"
 
 void echo_textMessage(EventEmitter* server, const std::string& event, EventArgs::Base* argv) {
     UVWebsocketCommon* _this = dynamic_cast<decltype(_this)>(server);
@@ -87,7 +88,6 @@ void connect_to(uv_loop_t* loop) {
 }
 
 int main() {
-    Logger::logger_init_stdout();
     __logger->enable();
 
     uv_loop_t loop;

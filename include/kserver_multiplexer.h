@@ -2,7 +2,7 @@
 
 #include "kserver.h"
 #include "kserver_server.h"
-#include "stream.hpp"
+#include "stream.h"
 #include "StreamProvider_KProxyMultiplexer.h"
 
 NS_PROXY_SERVER_START

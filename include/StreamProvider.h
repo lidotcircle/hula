@@ -1,6 +1,7 @@
 #pragma once
 
-#include "stream.hpp"
+#include "stream.h"
+#include "robuf.h"
 
 #include <vector>
 #include <assert.h>
@@ -90,6 +91,8 @@ class StreamProvider //{
         virtual void registerEndCallback(StreamId, RegisterEndCallback) = 0;
         virtual void registerShouldStartWriteCallback(StreamId, RegisterShouldStartWriteCallback) = 0;
         virtual void registerShouldStopWriteCallback(StreamId, RegisterShouldStopWriteCallback) = 0;
+
+        virtual void changeOwner(StreamId, EBStreamAbstraction*) = 0;
 
         virtual ~StreamProvider();
 }; //}

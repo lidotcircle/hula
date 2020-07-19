@@ -1,6 +1,6 @@
 #pragma once
 
-#include "stream.hpp"
+#include "stream.h"
 #include "config_file.h"
 #include "kclient.h"
 
@@ -28,7 +28,7 @@ class Server: virtual protected EBStreamAbstraction //{
 
 
     protected:
-        void on_connection(void* connection) override;
+        void on_connection(UNST connection) override;
 
 
     private:

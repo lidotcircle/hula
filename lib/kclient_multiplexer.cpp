@@ -1,5 +1,6 @@
 #include "../include/kclient_multiplexer.h"
 #include "../include/kclient_server.h"
+#include "../include/config.h"
 
 
 #define DEBUG(all...) __logger->debug(all)
@@ -205,7 +206,7 @@ void ConnectionProxy::authenticate(ROBuf buf) //{
 
     __logger->info("AUTHENTICATION SUCCESS");
     this->m_state = __State::STATE_BUILD;
-    this->m_remain = buf + 2;
+    this->m_remain = buf.increaseOffset(2);
     this->m_connect_cb(0, this->m_connect_cb_data);
     this->m_connect_cb = nullptr;
     this->m_connect_cb_data = nullptr;

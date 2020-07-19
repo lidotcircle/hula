@@ -284,7 +284,7 @@ void Socks5Auth::start() //{
 {
     this->start_read();
 } //}
-void* Socks5Auth::transferStream() //{
+EBStreamAbstraction::UNST Socks5Auth::transferStream() //{
 {
     return this->transfer();
 } //}

@@ -27,13 +27,13 @@ class RelayConnection: public RelayAbstraction, public StreamRelay //{
 
     public:
         RelayConnection(Server* kserver, Socks5ServerAbstraction* socks5, 
-                        const std::string& server, uint16_t port, void* server_connection);
+                        const std::string& server, uint16_t port, EBStreamAbstraction::UNST server_connection);
 
         void run(Socks5ServerAbstraction* socks5) override;
         void connectToAddr() override;
         void close() override;
 
-        void getStream(void*) override;
+        void getStream(EBStreamAbstraction::UNST) override;
 
         ~RelayConnection();
 }; //}

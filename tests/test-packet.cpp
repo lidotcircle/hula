@@ -44,8 +44,6 @@ void packet_encode_test(PACKET_OPCODE op, uint8_t id, ROBuf buf) //{
 
 int main() //{
 {
-    Logger::logger_init_stdout();
-
     packet_decode_test(ROBuf(), ROBuf((char*)"\xff\xee\01\x33", 4),
             1, 0, 0xff, 0xee);
     packet_decode_test(ROBuf(), ROBuf((char*)"\xff\xee\02\x33\x33", 5), 

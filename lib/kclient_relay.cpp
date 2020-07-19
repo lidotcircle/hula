@@ -1,6 +1,6 @@
 #include "../include/kclient_relay.h"
 #include "../include/kclient_server.h"
-#include "../include/ObjectFactory.hpp"
+#include "../include/ObjectFactory.h"
 #include "../include/config.h"
 
 
@@ -15,7 +15,7 @@ NS_PROXY_CLIENT_START
 
 /** constructor of RelayConnection */
 RelayConnection::RelayConnection(Server* kserver, Socks5ServerAbstraction* socks5, 
-                                 const std::string& server, uint16_t port, void* server_connection) //{
+                                 const std::string& server, uint16_t port, EBStreamAbstraction::UNST server_connection) //{
 {
     DEBUG("call %s: relay connection to %s:%d", FUNCNAME, server.c_str(), port);
     this->m_addr = server;
@@ -60,7 +60,7 @@ void RelayConnection::server_connect_listener(EventEmitter* em, const std::strin
     pp->netAccept();
 } //}
 
-void RelayConnection::getStream(void* connection) //{
+void RelayConnection::getStream(EBStreamAbstraction::UNST connection) //{
 {
     DEBUG("call %s", FUNCNAME);
     this->setStreamB(Factory::createUVStreamObject(RELAY_MAX_BUFFER_SIZE, connection));

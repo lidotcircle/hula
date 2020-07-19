@@ -1,7 +1,7 @@
 #pragma once
 
-#include "websocket.hpp"
-#include "stream_libuv.hpp"
+#include "websocket.h"
+#include "stream_libuv.h"
 
 #include <set>
 

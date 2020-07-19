@@ -1,5 +1,5 @@
 #include "../include/proxyrule.h"
-#include "../include/http.hpp"
+#include "../include/http.h"
 
 #include <assert.h>
 

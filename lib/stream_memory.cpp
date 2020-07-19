@@ -84,15 +84,15 @@ void EBMemStream::getaddrinfoipv6(const char* hostname, GetAddrInfoIPv6Callback 
     cb(0, -1, data);
 } //}
 
-void* EBMemStream::newUnderlyStream() //{
+EBStreamAbstraction::UNST EBMemStream::newUnderlyStream() //{
 {
-    return nullptr;
+    return UNST(new __UnderlyingStreamMem(this->getType()));
 } //}
-void  EBMemStream::releaseUnderlyStream(void*) //{
+void  EBMemStream::releaseUnderlyStream(UNST) //{
 {
     return;
 } //}
-bool  EBMemStream::accept(void* listen, void* stream) //{
+bool  EBMemStream::accept(UNST listen, UNST stream) //{
 {
     assert(false && "unimplemented");
     return true;
@@ -111,12 +111,12 @@ void EBMemStream::shutdown(ShutdownCallback cb, void* data) //{
     cb(0, data);
 } //}
 
-void* EBMemStream::transfer()      {
+EBStreamAbstraction::UNST EBMemStream::transfer()      {
     assert(this->m_state != CONNECTION_STATE::GIVEUP);
     this->m_state = CONNECTION_STATE::GIVEUP;
     return nullptr;
 }
-void  EBMemStream::regain(void*)   {
+void  EBMemStream::regain(UNST)   {
     assert(this->m_state == CONNECTION_STATE::UNINITIAL ||
            this->m_state == CONNECTION_STATE::GIVEUP);
     this->m_state = CONNECTION_STATE::CONNECT;
@@ -128,6 +128,8 @@ ROBuf EBMemStream::buffer()         {return this->m_write_buffer;}
 
 bool EBMemStream::hasStreamObject() {return true;}
 void EBMemStream::release() {}
+
+StreamType EBMemStream::getType() {return StreamType::Memory;}
 
 bool EBMemStream::timeout(TimeoutCallback cb, void* data, int time_ms) {return false;}
 

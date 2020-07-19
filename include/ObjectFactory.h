@@ -14,26 +14,27 @@ class ToNetAbstraction;
 NS_PROXY_SERVER_END
 
 class ServerConfig;
+using UNST = EBStreamAbstraction::UNST;
 
 namespace Factory {
-    KProxyServer::Server*                     createServer(std::shared_ptr<ServerConfig> config, void* connection);
-    KProxyServer::ConnectionProxyAbstraction* createConnectionProxy(KProxyServer::Server* server, void* connection);
+    KProxyServer::Server*                     createServer(std::shared_ptr<ServerConfig> config, UNST connection);
+    KProxyServer::ConnectionProxyAbstraction* createConnectionProxy(KProxyServer::Server* server, UNST connection);
     KProxyServer::ToNetAbstraction*           createToNet(KProxyServer::ClientConnectionProxy* proxy, EBStreamObject* stream, 
-                                                          void* connection, StreamProvider::StreamId id, 
+                                                          UNST connection, StreamProvider::StreamId id, 
                                                           const std::string& addr, uint16_t port);
 
-    EBStreamObject* createUVStreamObject(size_t max_write_buffer_size, void* connection);
+    EBStreamObject* createUVStreamObject(size_t max_write_buffer_size, UNST connection);
     EBStreamObject* createKProxyMultiplexerStreamObject(size_t max_write_buffer_size, KProxyMultiplexerStreamProvider* provider);
 
     namespace KProxyClient {
         using namespace ::KProxyClient;
-        Server*                      createServer(std::shared_ptr<ClientConfig> config, void* connection);
-        Socks5ServerAbstraction*     createSocks5Server(Server* server, std::shared_ptr<ClientConfig> config, void* connection);
+        Server*                      createServer(std::shared_ptr<ClientConfig> config, UNST connection);
+        Socks5ServerAbstraction*     createSocks5Server(Server* server, std::shared_ptr<ClientConfig> config, UNST connection);
         RelayAbstraction*            createRelay(Server* server, Socks5ServerAbstraction* socks5,
-                                                 const std::string& addr, uint16_t port, void* connection);
+                                                 const std::string& addr, uint16_t port, UNST connection);
         ClientProxyAbstraction*      createProxy(Server* server, ProxyMultiplexerAbstraction* mgr, 
                                                  const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5);
-        ProxyMultiplexerAbstraction* createMultiplexer(Server* server, SingleServerInfo* config, void* connection);
+        ProxyMultiplexerAbstraction* createMultiplexer(Server* server, SingleServerInfo* config, UNST connection);
     };
 };
 

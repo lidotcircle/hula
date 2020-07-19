@@ -12,7 +12,7 @@
 #include "robuf.h"
 #include "kpacket.h"
 #include "utils.h"
-#include "stream.hpp"
+#include "stream.h"
 
 #define __MIN2(x, y) (x < y ? x : y)
 #define __MAX2(x, y) (x > y ? x : y)

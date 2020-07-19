@@ -1,4 +1,5 @@
 #include "../include/stream_byprovider.h"
+#include "../include/config.h"
 
 #include <type_traits>
 
@@ -27,7 +28,7 @@ void NotImplement() {assert(false && "not implement");}
 
 bool EBStreamByProvider::bind(struct sockaddr* addr) {NotImplement(); return false;}
 bool EBStreamByProvider::listen() {NotImplement(); return false;}
-bool EBStreamByProvider::accept(void*, void*) {NotImplement(); return false;}
+bool EBStreamByProvider::accept(UNST, UNST) {NotImplement(); return false;}
 
 #define CHECK_SOCKET() \
     assert(this->m_info != nullptr); \
@@ -64,6 +65,12 @@ void EBStreamByProvider::write_callback(ROBuf buf, int status, void* data) //{
     _this->remove_callback(msg);
 
     _cb(buf, status, _data);
+} //}
+
+StreamProvider* EBStreamByProvider::getProvider() //{
+{
+    if(this->m_info == nullptr) return nullptr;
+    return this->m_info->mp_provider;
 } //}
 
 struct __connect_cb_state: public __cb_state {
@@ -284,17 +291,24 @@ void EBStreamByProvider::getaddrinfoipv6_callback(std::vector<uint8_t[16]> ipv6,
     else _cb(ipv6.front(), status, _data);
 } //}
 
-struct __protect_ {StreamProvider* ppp;};
-void* EBStreamByProvider::newUnderlyStream() //{
+EBStreamAbstraction::UNST EBStreamByProvider::newUnderlyStream() //{
 {
     DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
-    return new __protect_ {this->m_info->mp_provider};
+    __info_type* wrapper = new __info_type();
+    auto id = this->m_info->mp_provider->init(nullptr); // TODO
+    wrapper->mp_provider = this->m_info->mp_provider;
+    wrapper->m_id = id;
+    wrapper->m_send_end = false;
+    return UNST(new __UnderlyingStreamProvider(this->getType(), wrapper));
 } //}
-void  EBStreamByProvider::releaseUnderlyStream(void* stream) //{
+void  EBStreamByProvider::releaseUnderlyStream(UNST stream) //{
 {
     DEBUG("call %s", FUNCNAME);
-    delete static_cast<__protect_*>(stream);
+    assert(stream->getType() == this->getType());
+    __UnderlyingStreamProvider* ptr =  dynamic_cast<decltype(ptr)>(stream.get()); assert(ptr);
+    auto info = ptr->getStream();
+    info->mp_provider->closeStream(info->m_id);
     return;
 } //}
 
@@ -397,22 +411,28 @@ void EBStreamByProvider::shutdown_callback(ROBuf buf, int status, void* data) //
     _cb(status, _data);
 } //}
 
-void* EBStreamByProvider::transfer() //{
+EBStreamAbstraction::UNST EBStreamByProvider::transfer() //{
 {
     DEBUG("call %s", FUNCNAME);
     CHECK_SOCKET();
     this->stop_read();
-    auto ret = this->m_info;
+    auto stream = this->m_info;
     this->m_info = nullptr;
 
-    return ret;
+    stream->mp_provider->changeOwner(stream->m_id, nullptr);
+    return UNST(new __UnderlyingStreamProvider(this->getType(), stream));
 } //}
-void  EBStreamByProvider::regain(void* data) //{
+void  EBStreamByProvider::regain(UNST stream) //{
 {
     DEBUG("call %s", FUNCNAME);
+    assert(stream->getType() == this->getType());
+    __UnderlyingStreamProvider* msg =
+        dynamic_cast<decltype(msg)>(stream.get());
+    assert(msg);
+
     assert(this->m_info == nullptr);
-    struct __info_type* info =
-        dynamic_cast<decltype(info)>(static_cast<__virtualbase*>(data));
+    struct __info_type* info = msg->getStream();
+    info->mp_provider->changeOwner(info->m_id, this);
     assert(info);
 
     this->m_info = info;
@@ -440,5 +460,13 @@ bool EBStreamByProvider::timeout(TimeoutCallback cb, void* data, int time) //{
     CHECK_SOCKET();
     this->m_info->mp_provider->timeout(cb, data, time);
     return true;
+} //}
+
+
+
+StreamType EBStreamObjectKProxyMultiplexerProvider::getType() {return StreamType::KPROXY_MULTIPLEXER;}
+EBStreamObject* EBStreamObjectKProxyMultiplexerProvider::NewStreamObject() //{
+{
+    return new EBStreamObjectKProxyMultiplexerProvider(this->getProvider(), NEW_STREAM_OBJECT_BUFFER_SIZE); // TODO
 } //}
 

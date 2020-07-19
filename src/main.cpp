@@ -31,7 +31,6 @@ static void interrupt_handle(int sig) //{
 
 int main() //{
 {
-    Logger::logger_init_stdout();
     __logger->Level = Logger::LoggerLevel::LOGGER_INFO;
     uv_loop_t loop;
     uv_loop_init(&loop);

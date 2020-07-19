@@ -10,3 +10,6 @@
 [submodule "third_party/http-parser"]
 	path = third_party/http-parser
 	url = https://github.com/nodejs/http-parser
+[submodule "libevltls"]
+	path = third_party/libevtls
+	url = https://github.com/analyman/libevltls.git

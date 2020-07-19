@@ -11,12 +11,11 @@
 #include "utils.h"
 #include "events.h"
 #include "kclient_config.h"
-#include "dlinkedlist.hpp"
 #include "socks5.h"
 #include "object_manager.h"
 #include "StreamProvider_KProxyMultiplexer.h"
 
-#include "stream.hpp"
+#include "stream.h"
 
 #define SINGLE_TSL_MAX_CONNECTION (1 << 6)
 
@@ -49,7 +48,7 @@ class Socks5ServerAbstraction {
 
         virtual void start() = 0;
 
-        virtual void* transferStream() = 0;
+        virtual EBStreamAbstraction::UNST transferStream() = 0;
 
         virtual void close() = 0;
         inline virtual ~Socks5ServerAbstraction() {}
@@ -61,7 +60,7 @@ class Socks5RequestProxy {
         virtual void connectToAddr() = 0;
         virtual void run(Socks5ServerAbstraction*) = 0;
 
-        virtual void getStream(void*) = 0;
+        virtual void getStream(EBStreamAbstraction::UNST) = 0;
 
         inline virtual ~Socks5RequestProxy() {}
 };

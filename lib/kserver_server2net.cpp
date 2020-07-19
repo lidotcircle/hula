@@ -1,7 +1,6 @@
 #include "../include/kserver_server2net.h"
-#include "../include/ObjectFactory.hpp"
 #include "../include/config.h"
-#include "../include/ObjectFactory.hpp"
+#include "../include/ObjectFactory.h"
 #include "../include/callback_data.h"
 #include "../include/utils.h"
 
@@ -12,7 +11,7 @@
 NS_PROXY_SERVER_START
 
 ServerToNetConnection::ServerToNetConnection(ClientConnectionProxy* proxy, EBStreamObject* obj, 
-                                             void* connection, StreamProvider::StreamId id, 
+                                             EBStreamAbstraction::UNST connection, StreamProvider::StreamId id, 
                                              const std::string& addr, uint16_t port) //{
 {
     DEBUG("call %s", FUNCNAME);

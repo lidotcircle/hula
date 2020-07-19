@@ -75,6 +75,13 @@ void KProxyMultiplexerStreamProvider::write_buffer(ROBuf buf, WriteCallback cb, 
     assert(kid); \
     assert(this->m_allocator.find(kid->m_id)->second == id)
 
+#define GETKID__() \
+    DEBUG("call %s", FUNCNAME); \
+    __KMStreamID* kid = dynamic_cast<decltype(kid)>(id.get()); \
+    assert(kid); \
+    assert(this->m_allocator.find(kid->m_id)->second == id)
+
+
 struct __new_connection_write_state: public CallbackPointer {
     KProxyMultiplexerStreamProvider* _this;
     uint8_t                          _id;
@@ -475,7 +482,7 @@ void KProxyMultiplexerStreamProvider::lock_nextID_with(typename decltype(m_alloc
     this->m_next_id = new_id;
 } //}
 
-#include "ObjectFactory.hpp"
+#include "ObjectFactory.h"
 void KProxyMultiplexerStreamProvider::create_new_connection(ROBuf buf, uint8_t nid) //{
 {
     DEBUG("call %s", FUNCNAME);
@@ -511,6 +518,12 @@ void KProxyMultiplexerStreamProvider::create_new_connection(ROBuf buf, uint8_t n
 
     free(addr);
     return;
+} //}
+
+void KProxyMultiplexerStreamProvider::changeOwner(StreamId id, EBStreamAbstraction* obj) //{
+{
+    GETKID__();
+    kid->m_stream = obj;
 } //}
 
 void KProxyMultiplexerStreamProvider::CreateConnectionSuccess(StreamId id) //{

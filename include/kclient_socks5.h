@@ -56,7 +56,7 @@ class Socks5Auth: public Socks5ServerAbstraction, virtual protected EBStreamAbst
         void netAccept() override;
         void netReject() override;
         void start() override;
-        void* transferStream() override;
+        EBStreamAbstraction::UNST transferStream() override;
 
         void close() override;
 }; //}

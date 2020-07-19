@@ -1,7 +1,7 @@
 #pragma once
 
 #include "kserver.h"
-#include "stream.hpp"
+#include "stream.h"
 
 #include <memory>
 #include <unordered_set>
@@ -33,7 +33,7 @@ class Server: virtual protected EBStreamAbstraction //{
         void remove_proxy(ConnectionProxyAbstraction* p);
 
         void read_callback(ROBuf buf, int status) override;
-        void on_connection(void* connection) override;
+        void on_connection(UNST connection) override;
 
     public:
         Server(std::shared_ptr<ServerConfig> config);

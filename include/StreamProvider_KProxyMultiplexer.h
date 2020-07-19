@@ -104,6 +104,8 @@ class KProxyMultiplexerStreamProvider: public virtual StreamProvider, virtual pr
         void registerShouldStartWriteCallback(StreamId, RegisterShouldStartWriteCallback) override;
         void registerShouldStopWriteCallback(StreamId, RegisterShouldStopWriteCallback) override;
 
+        void changeOwner(StreamId, EBStreamAbstraction*) override;
+
         void CreateConnectionSuccess(StreamId) override;
         void CreateConnectionFail   (StreamId, uint8_t reason) override;
 }; //}

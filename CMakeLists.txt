@@ -17,8 +17,6 @@ set(kproxy_lib_src
     lib/kserver_multiplexer.cpp
     lib/kserver_config.cpp
 
-    lib/stream.cpp
-    lib/StreamObject.cpp
     lib/stream_libuv.cpp
     lib/stream_memory.cpp
     lib/StreamRelay.cpp
@@ -41,12 +39,7 @@ set(kproxy_lib_src
     lib/kpacket.cpp
     lib/socks5.cpp
 
-    lib/logger.cpp
-
-    lib/events.cpp
-    lib/readonly_buf.cpp
     lib/ObjectFactory.cpp
-    lib/object_manager.cpp
 
     lib/utils.cpp
     lib/utils_hideuv.cpp
@@ -74,6 +67,7 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 #}
 
 add_subdirectory(./third_party/libuv)
+add_subdirectory(./third_party/libevtls)
 
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 add_subdirectory(./third_party/json)
@@ -86,9 +80,11 @@ add_library(${kproxy_lib} STATIC ${kproxy_lib_src})
 
 add_dependencies(${kproxy_lib} uv_a)
 add_dependencies(${kproxy_lib} nlohmann_json)
+add_dependencies(${kproxy_lib} evtls)
 add_dependencies(${kproxy_lib} ${HTTP_PARSER_LIB})
 target_link_libraries(${kproxy_lib} uv_a)
 target_link_libraries(${kproxy_lib} nlohmann_json)
+target_link_libraries(${kproxy_lib} evtls)
 target_link_libraries(${kproxy_lib} ${OPENSSL_CRYPTO_LIBRARY})
 target_link_libraries(${kproxy_lib} ${OPENSSL_SSL_LIBRARY})
 target_link_libraries(${kproxy_lib} ${HTTP_PARSER_LIB})

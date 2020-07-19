@@ -1,6 +1,6 @@
 #pragma once
 
-#include "stream.hpp"
+#include "stream.h"
 #include "StreamObject.h"
 #include "StreamProvider.h"
 
@@ -15,6 +15,13 @@ class EBStreamByProvider: public virtual EBStreamAbstraction //{
             bool m_send_end = false;
         }* m_info;
         bool m_stream_read;
+
+        class __UnderlyingStreamProvider: public __UnderlyingStream {
+            __info_type* msg;
+            public:
+            inline __UnderlyingStreamProvider(StreamType type, __info_type* msg): __UnderlyingStream(type), msg(msg) {}
+            inline __info_type* getStream() {return msg;}
+        };
 
         std::string m_stat_remote_address;
         std::string m_stat_local_address;
@@ -41,6 +48,7 @@ class EBStreamByProvider: public virtual EBStreamAbstraction //{
 
     protected:
         void _write(ROBuf buf, WriteCallback cb, void* data) override;
+        StreamProvider* getProvider();
 
 
     public:
@@ -61,17 +69,17 @@ class EBStreamByProvider: public virtual EBStreamAbstraction //{
         void getaddrinfoipv4 (const char* hostname, GetAddrInfoIPv4Callback cb, void* data) override;
         void getaddrinfoipv6 (const char* hostname, GetAddrInfoIPv6Callback cb, void* data) override;
 
-        void* newUnderlyStream() override;
-        void  releaseUnderlyStream(void*) override;
-        bool  accept(void* listen, void* stream) override;
+        UNST newUnderlyStream() override;
+        void  releaseUnderlyStream(UNST) override;
+        bool  accept(UNST listen, UNST stream) override;
 
         EBStreamByProvider(StreamProvider* tcp);
         ~EBStreamByProvider();
 
         void shutdown(ShutdownCallback cb, void* data) override;
 
-        void* transfer() override;
-        void  regain(void*) override;
+        UNST transfer() override;
+        void regain(UNST) override;
 
         void  release() override;
         bool  hasStreamObject() override;
@@ -85,5 +93,8 @@ class EBStreamObjectKProxyMultiplexerProvider: public EBStreamByProvider, public
     public:
         inline EBStreamObjectKProxyMultiplexerProvider(StreamProvider* connection, size_t max): 
             EBStreamByProvider(connection), EBStreamObject(max) {}
+
+        StreamType getType() override;
+        EBStreamObject* NewStreamObject() override;
 }; //}
 

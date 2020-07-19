@@ -1,4 +1,5 @@
 #include "../include/StreamProvider.h"
+#include "../include/config.h"
 
 #include <assert.h>
 

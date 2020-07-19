@@ -10,6 +10,8 @@
 #define RELAY_MAX_BUFFER_SIZE (1)               // maximum write buffer size in directed relay connection
 #define PROXY_MAX_BUFFER_SIZE (1)               // maximum write buffer size in proxy
 
+#define NEW_STREAM_OBJECT_BUFFER_SIZE (1024 * 1024 * 2)
+
 /** maximum connection per multiplexer */
 #define SINGLE_PROXY_MAX_CONNECTION (1 << 6)
 #define SINGLE_MULTIPLEXER_MAX_CONNECTION (1 << 6)

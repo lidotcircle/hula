@@ -3,7 +3,8 @@
 #include "events.h"
 #include "config.h"
 #include "object_manager.h"
-#include "stream.hpp"
+#include "stream.h"
+#include "robuf.h"
 
 #include <http_parser.h>
 
