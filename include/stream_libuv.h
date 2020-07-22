@@ -75,6 +75,7 @@ class EBStreamUV: virtual public EBStreamAbstraction //{
 
         StreamType getType() override;
         static uv_tcp_t* getStreamFromWrapper(UNST wstream);
+        static UNST      getWrapperFromStream(uv_tcp_t* stream);
 
         bool timeout(TimeoutCallback cb, void* data, int time) override;
 }; //}

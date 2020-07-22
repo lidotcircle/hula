@@ -465,8 +465,9 @@ bool EBStreamByProvider::timeout(TimeoutCallback cb, void* data, int time) //{
 
 
 StreamType EBStreamObjectKProxyMultiplexerProvider::getType() {return StreamType::KPROXY_MULTIPLEXER;}
-EBStreamObject* EBStreamObjectKProxyMultiplexerProvider::NewStreamObject() //{
+EBStreamObject* EBStreamObjectKProxyMultiplexerProvider::NewStreamObject(UNST stream) //{
 {
+    this->releaseUnderlyStream(stream);
     return new EBStreamObjectKProxyMultiplexerProvider(this->getProvider(), NEW_STREAM_OBJECT_BUFFER_SIZE); // TODO
 } //}
 bool EBStreamObjectKProxyMultiplexerProvider::accept(EBStreamObject*) {NotImplement(); return false;}

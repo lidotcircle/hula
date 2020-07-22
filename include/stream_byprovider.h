@@ -95,7 +95,7 @@ class EBStreamObjectKProxyMultiplexerProvider: public EBStreamByProvider, public
             EBStreamByProvider(connection), EBStreamObject(max) {}
 
         StreamType getType() override;
-        EBStreamObject* NewStreamObject() override;
+        EBStreamObject* NewStreamObject(UNST stream) override;
         bool accept(EBStreamObject*) override;
 }; //}
 

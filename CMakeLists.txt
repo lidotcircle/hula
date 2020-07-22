@@ -24,6 +24,8 @@ set(kproxy_lib_src
     lib/StreamProvider.cpp
     lib/stream_byprovider.cpp
     lib/StreamProvider_KProxyMultiplexer.cpp
+    lib/stream_libuvTLS.cpp
+    lib/stream_object_libuvTLS.cpp
 
     lib/file_libuv.cpp
     lib/config_file.cpp

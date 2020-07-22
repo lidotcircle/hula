@@ -253,7 +253,6 @@ void EBStreamUV::uv_stream_read_callback(uv_stream_t* stream, ssize_t nread, con
     if(nread <= 0) {
         free(buf->base);
         if(nread < 0) {
-            // _this->release(); TODO
             _this->read_callback(ROBuf(), -1);
         } else {
             _this->end_signal();
@@ -262,7 +261,7 @@ void EBStreamUV::uv_stream_read_callback(uv_stream_t* stream, ssize_t nread, con
     }
 
     ROBuf rbuf(buf->base, nread, 0, free);
-    _this->m_stat_traffic_in += rbuf.size();
+    _this->m_stat_traffic_in += rbuf.size(); // FIXME invalid read ?????? rediculous, ahah
     _this->read_callback(rbuf, 0);
 } //}
 
@@ -581,6 +580,10 @@ uv_tcp_t* EBStreamUV::getStreamFromWrapper(UNST wstream) //{
     __UnderlyingStreamUV* stream = dynamic_cast<decltype(stream)>(wstream.get());
     assert(stream);
     return stream->getStream();
+} //}
+EBStreamAbstraction::UNST EBStreamUV::getWrapperFromStream(uv_tcp_t* stream) //{
+{
+    return UNST(new __UnderlyingStreamUV(StreamType::LIBUV, stream));
 } //}
 
 struct __uv_timeout_state__ {

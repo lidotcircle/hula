@@ -9,7 +9,7 @@
 #include <uv.h>
 
 
-class EBStreamObjectUV: public EBStreamUV, public EBStreamObject //{
+class EBStreamObjectUV: protected EBStreamUV, public EBStreamObject //{
 {
     public:
         inline EBStreamObjectUV(uv_tcp_t* connection, size_t max): 
@@ -17,7 +17,7 @@ class EBStreamObjectUV: public EBStreamUV, public EBStreamObject //{
         inline EBStreamObjectUV(UNST connection, size_t max): 
             EBStreamUV(connection), EBStreamObject(max) {}
 
-        EBStreamObject* NewStreamObject() override;
+        EBStreamObject* NewStreamObject(UNST stream) override;
         bool accept(EBStreamObject*) override;
 }; //}
 

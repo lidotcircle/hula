@@ -3,10 +3,9 @@
 
 
 
-EBStreamObject* EBStreamObjectUV::NewStreamObject() //{
+EBStreamObject* EBStreamObjectUV::NewStreamObject(UNST stream) //{
 {
-    auto new_underlying = this->newUnderlyStream();
-    return new EBStreamObjectUV(new_underlying, NEW_STREAM_OBJECT_BUFFER_SIZE);
+    return new EBStreamObjectUV(stream, NEW_STREAM_OBJECT_BUFFER_SIZE);
 } //}
 
 bool EBStreamObjectUV::accept(EBStreamObject* streamo) //{
