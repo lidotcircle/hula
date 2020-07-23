@@ -17,11 +17,15 @@ class ServerConfig;
 using UNST = EBStreamAbstraction::UNST;
 
 namespace Factory {
-    KProxyServer::Server*                     createServer(std::shared_ptr<ServerConfig> config, UNST connection);
-    KProxyServer::ConnectionProxyAbstraction* createConnectionProxy(KProxyServer::Server* server, UNST connection);
-    KProxyServer::ToNetAbstraction*           createToNet(KProxyServer::ClientConnectionProxy* proxy, EBStreamObject* stream, 
-                                                          UNST connection, StreamProvider::StreamId id, 
-                                                          const std::string& addr, uint16_t port);
+    namespace KProxyServer {
+        using namespace ::KProxyServer;
+        Server*                     createServer(std::shared_ptr<ServerConfig> config, UNST connection);
+        Server*                     createUVTLSServer(std::shared_ptr<ServerConfig> config, uv_tcp_t* connection);
+        ConnectionProxyAbstraction* createConnectionProxy(Server* server, UNST connection);
+        ToNetAbstraction*           createToNet(ClientConnectionProxy* proxy, EBStreamObject* stream, 
+                                                UNST connection, StreamProvider::StreamId id, 
+                                                const std::string& addr, uint16_t port);
+    }
 
     EBStreamObject* createUVStreamObject(size_t max_write_buffer_size, UNST connection);
     EBStreamObject* createKProxyMultiplexerStreamObject(size_t max_write_buffer_size, KProxyMultiplexerStreamProvider* provider);
@@ -35,6 +39,7 @@ namespace Factory {
         ClientProxyAbstraction*      createProxy(Server* server, ProxyMultiplexerAbstraction* mgr, 
                                                  const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5);
         ProxyMultiplexerAbstraction* createMultiplexer(Server* server, SingleServerInfo* config, UNST connection);
+        ProxyMultiplexerAbstraction* createUVTLSMultiplexer(Server* server, SingleServerInfo* config, UNST connection);
     };
 };
 

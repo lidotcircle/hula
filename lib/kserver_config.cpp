@@ -49,6 +49,16 @@ bool ServerConfig::from_json(const json& jsonx) //{
     }
     this->m_rsa_private_key = jsonx["rsa_private_key"].get<std::string>();
 
+    if(jsonx.find("rsa_private_key") == jsonx.end()) {
+        this->setError("rsa private key not found");
+        return false;
+    }
+    if(!jsonx["rsa_private_key"].is_string()) {
+        this->setError("rsa private key bad format");
+        return false;
+    }
+    this->m_cert = jsonx["certificate"].get<std::string>();
+
     if(jsonx.find("cipher") == jsonx.end()) {
         this->setError("cipher not found");
         return false;
@@ -119,6 +129,7 @@ bool ServerConfig::from_json(const json& jsonx) //{
 json ServerConfig::to_json() //{
 {
     json res;
+    res["certificate"] = this->m_cert;
     res["rsa_private_key"] = this->m_rsa_private_key;
     res["cipher"] = this->m_cipher;
     res["bind_address"] = ip4_to_str(k_htonl(this->m_bind_addr));
@@ -155,6 +166,7 @@ bool  ServerConfig::fromROBuf(ROBuf buf) //{
     return this->from_json(jsonx);
 } //}
 
-std::string ServerConfig::RSA() {return this->m_rsa_private_key;}
+std::string ServerConfig::PrivateKey() {return this->m_rsa_private_key;}
+std::string ServerConfig::Cert() {return this->m_cert;}
 std::string ServerConfig::Cipher() {return this->m_cipher;}
 

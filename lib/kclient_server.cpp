@@ -80,7 +80,7 @@ void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5Server
             return;
         }
         UNST newcon = this->newUnderlyStream();
-        pp = Factory::KProxyClient::createMultiplexer(this, c, newcon);
+        pp = Factory::KProxyClient::createUVTLSMultiplexer(this, c, newcon); // TODO
         this->m_proxy.insert(pp);
     }
 

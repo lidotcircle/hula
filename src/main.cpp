@@ -12,6 +12,7 @@
 
 #include "../include/libuv_utils.h"
 #include "../include/kserver_libuv.h"
+#include "../include/ObjectFactory.h"
 
 static bool uv_continue = true;
 static bool uv_timer_set = false;
@@ -43,10 +44,11 @@ int main() //{
     uv_tcp_init(&loop, tcp);
     auto config = std::shared_ptr<ServerConfig>(new UVServerConfig(&loop, "../tests/server_config.json"));
     config->loadFromFile(nullptr, nullptr);
-    KProxyServer::UVServer server(tcp, config);
+    KProxyServer::Server* server = Factory::KProxyServer::createUVTLSServer(config, tcp);
+//    KProxyServer::UVServer server(tcp, config);
     config.reset();
 
-    server.trylisten();
+    server->trylisten();
 
     while(uv_continue) {
         if(uv_timer_set == false) {
@@ -59,12 +61,14 @@ int main() //{
     }
 
     __logger->warn("Exiting ...");
-    server.close();
+    server->close();
 
     while(uv_loop_alive(&loop))
         uv_run(&loop, UV_RUN_ONCE);
 
     uv_loop_close(&loop);
+
+    delete server;
     return 0;
 } //}
 

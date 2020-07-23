@@ -536,7 +536,7 @@ void KProxyMultiplexerStreamProvider::CreateConnectionSuccess(StreamId id) //{
 void KProxyMultiplexerStreamProvider::CreateConnectionFail(StreamId id, uint8_t reason) //{
 {
     GETKID();
-    assert(this->m_server_wait_connection.find(kid->m_id) != this->m_server_wait_connection.end());
+    assert(this->m_server_wait_connection.find(kid->m_id) != this->m_server_wait_connection.end()); // FIXME assert false
     this->m_server_wait_connection.erase(this->m_server_wait_connection.find(kid->m_id));
     this->reject_connection(id, reason);
 } //}

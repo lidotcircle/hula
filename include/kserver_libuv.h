@@ -7,6 +7,7 @@
 
 #include "stream.h"
 #include "stream_libuv.h"
+#include "stream_libuvTLS.h"
 
 NS_PROXY_SERVER_START
 
@@ -23,6 +24,7 @@ class UVMultiplexer: virtual public EBStreamUV, public ClientConnectionProxy {
             EBStreamUV(connection), ClientConnectionProxy(server) {}
 };
 
+
 class UVToNet: public ServerToNetConnection {
     public:
         inline UVToNet(ClientConnectionProxy* proxy, EBStreamObject* obj, EBStreamAbstraction::UNST connection, 
@@ -30,6 +32,19 @@ class UVToNet: public ServerToNetConnection {
             ServerToNetConnection(proxy, obj, connection, id, addr, port) {
                 assert(connection->getType() == StreamType::LIBUV);
             }
+};
+
+
+class UVTLSServer: virtual public EBStreamUVTLS, public Server {
+    public:
+        inline UVTLSServer(uv_tcp_t* connection, std::shared_ptr<ServerConfig> config):
+            EBStreamUVTLS(connection, TLSMode::ServerMode, config->Cert(), config->PrivateKey()), Server(config) {}
+};
+
+class UVTLSMultiplexer: virtual EBStreamUVTLS, public ClientConnectionProxy {
+    public:
+        inline UVTLSMultiplexer(UNST connection, Server* server):
+            EBStreamUVTLS(connection), ClientConnectionProxy(server) {}
 };
 
 

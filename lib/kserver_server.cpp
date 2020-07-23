@@ -26,7 +26,7 @@ void Server::on_connection(UNST connection) //{
         return;
     }
 
-    ConnectionProxyAbstraction* newproxy = Factory::createConnectionProxy(this, connection);
+    ConnectionProxyAbstraction* newproxy = Factory::KProxyServer::createConnectionProxy(this, connection);
     this->m_connection_list.insert(newproxy);
     newproxy->start();
     return;

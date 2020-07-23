@@ -142,7 +142,7 @@ void ClientConnectionProxy::CreateNewConnection(EBStreamObject* obj, StreamId id
 {
     DEBUG("call %s", FUNCNAME);
     auto connection = this->newUnderlyStream();
-    ToNetAbstraction* relay = Factory::createToNet(this, obj, connection, id, addr, port);
+    ToNetAbstraction* relay = Factory::KProxyServer::createToNet(this, obj, connection, id, addr, port);
     this->m_relays.insert(relay);
     relay->connectToAddr();
 } //}

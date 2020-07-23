@@ -8,16 +8,43 @@
 namespace Factory {
     using UNST = EBStreamAbstraction::UNST;
 
-    KProxyServer::Server* createServer(std::shared_ptr<ServerConfig> config, void* connection) {
-        return new KProxyServer::UVServer((uv_tcp_t*)connection, config);
-    }
-    KProxyServer::ConnectionProxyAbstraction* createConnectionProxy(KProxyServer::Server* server, UNST connection) {
-        return new KProxyServer::UVMultiplexer(EBStreamUV::getStreamFromWrapper(connection), server);
-    }
-    KProxyServer::ToNetAbstraction* createToNet(KProxyServer::ClientConnectionProxy* proxy, EBStreamObject* stream, 
-                                                UNST connection, StreamProvider::StreamId id, 
-                                                const std::string& addr, uint16_t port) {
-        return new KProxyServer::UVToNet(proxy, stream, connection, id, addr, port);
+    namespace KProxyServer {
+        Server* createServer(std::shared_ptr<ServerConfig> config, void* connection) {
+            return new KProxyServer::UVServer((uv_tcp_t*)connection, config);
+        }
+        Server* createUVTLSServer(std::shared_ptr<ServerConfig> config, uv_tcp_t* connection) {
+            return new UVTLSServer(connection, config);
+        }
+        ConnectionProxyAbstraction* createConnectionProxy(Server* server, UNST connection) {
+            switch(connection->getType()) {
+                case LIBUV:
+                    return new UVMultiplexer(EBStreamUV::getStreamFromWrapper(connection), server);
+                case TLS_LIBUV:
+                    return new UVTLSMultiplexer(connection, server);
+                default:
+                    return nullptr;
+            }
+        }
+        ToNetAbstraction* createToNet(ClientConnectionProxy* proxy, EBStreamObject* stream, 
+                                      UNST connection, StreamProvider::StreamId id, 
+                                      const std::string& addr, uint16_t port) {
+            switch(connection->getType()) {
+                case LIBUV:
+                    return new KProxyServer::UVToNet(proxy, stream, connection, id, addr, port);
+                case TLS_LIBUV:
+                    {
+                        auto ctx = EBStreamTLS::getCTXFromWrapper(connection);
+                        auto fffstream = ctx->mp_stream;
+                        ctx->mp_stream = nullptr;
+                        EBStreamTLS::releaseCTX(ctx);
+                        auto thestream = fffstream->transfer();
+                        delete fffstream;
+                        return new KProxyServer::UVToNet(proxy, stream, thestream, id, addr, port);
+                    }
+                default:
+                    return nullptr;
+            }
+        }
     }
 
     EBStreamObject* createUVStreamObject(size_t max_write_buffer_size, UNST connection) {
@@ -49,6 +76,9 @@ namespace Factory {
         }
         ProxyMultiplexerAbstraction* createMultiplexer(Server* server, SingleServerInfo* config, UNST connection) {
             return new KProxyClient::UVMultiplexer(server, config, EBStreamUV::getStreamFromWrapper(connection));
+        }
+        ProxyMultiplexerAbstraction* createUVTLSMultiplexer(Server* server, SingleServerInfo* config, UNST connection) {
+            return new KProxyClient::UVTLSMultiplexer(server, config, EBStreamUV::getStreamFromWrapper(connection));
         }
     };
 };

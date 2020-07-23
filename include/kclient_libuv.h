@@ -1,4 +1,7 @@
+#pragma once
+
 #include "stream_libuv.h"
+#include "stream_libuvTLS.h"
 
 #include "kclient_server.h"
 #include "kclient_socks5.h"
@@ -38,6 +41,15 @@ class UVClientConnection: public ClientConnection {
                               const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5):
         ClientConnection(server, mgr, addr, port, socks5){}
 };
+
+
+class UVTLSMultiplexer: protected EBStreamUVTLS, public ConnectionProxy {
+    public:
+        inline
+            UVTLSMultiplexer(Server* server, SingleServerInfo* config, uv_tcp_t* connection):
+                ConnectionProxy(server, config), EBStreamUVTLS(connection, TLSMode::ClientMode, "", "") {}
+};
+
 
 NS_PROXY_CLIENT_END
 

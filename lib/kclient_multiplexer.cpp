@@ -241,7 +241,7 @@ KProxyMultiplexerStreamProvider* ConnectionProxy::getProvider() {return this;}
 void ConnectionProxy::close() //{
 {
     DEBUG("call %s", FUNCNAME);
-    assert(this->m_state != __State::STATE_CLOSED);
+    assert(this->m_state != __State::STATE_CLOSED); // FIXME assert false
     this->m_state = __State::STATE_CLOSED;
 
     auto proxyrelay_copy = this->m_proxyrelays;
