@@ -40,7 +40,7 @@ void Server::on_connection(UNST connection) //{
 void Server::dispatch_base_on_addr(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
 {
     DEBUG("call %s", FUNCNAME);
-    this->dispatch_proxy(addr, port, socks5); // TODO
+    this->dispatch_proxy(addr, port, socks5); // TODO debug
     return;
     if(this->m_config->AdMatch(addr, port)) {
         socks5->netAccept();
@@ -57,7 +57,7 @@ void Server::dispatch_bypass(const std::string& addr, uint16_t port, Socks5Serve
     DEBUG("call %s", FUNCNAME);
     RelayAbstraction* relay = Factory::KProxyClient::createRelay(this, socks5, addr, port, this->newUnderlyStream());
     this->m_socks5_handler.insert(relay);
-    this->m_auths[socks5] = relay; // FIXME
+    this->m_auths[socks5] = relay;
     relay->connectToAddr();
 } //}
 void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5) //{
@@ -80,7 +80,7 @@ void Server::dispatch_proxy(const std::string& addr, uint16_t port, Socks5Server
             return;
         }
         UNST newcon = this->newUnderlyStream();
-        pp = Factory::KProxyClient::createUVTLSMultiplexer(this, c, newcon); // TODO
+        pp = Factory::KProxyClient::createUVTLSMultiplexer(this, c, newcon); // TODO certificate and cipher
         this->m_proxy.insert(pp);
     }
 
@@ -162,7 +162,7 @@ void Server::remove_socks5_handler(Socks5RequestProxy* handler) //{
     assert(this->m_socks5_handler.find(handler) != this->m_socks5_handler.end());
     this->m_socks5_handler.erase(this->m_socks5_handler.find(handler));
     if(this->m_auths.find(handler) != this->m_auths.end())
-        this->m_auths.erase(this->m_auths.find(handler)); // FIXME
+        this->m_auths.erase(this->m_auths.find(handler));
     delete handler;
 } //}
 void Server::remove_proxy(ProxyMultiplexerAbstraction* proxy) //{

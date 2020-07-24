@@ -3,6 +3,7 @@ project(kproxy)
 
 # export compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(__CXX_VERSION 17)
 
 set(CMAKE_CXX_FLAGS "-g ${CMAKE_CXX_FLAGS}")
 set(CMAKE_C_FLAGS   "-g ${CMAKE_C_FLAGS}")
@@ -43,6 +44,7 @@ set(kproxy_lib_src
     lib/socks5.cpp
 
     lib/ObjectFactory.cpp
+    lib/base64.cpp
 
     lib/utils.cpp
     lib/utils_hideuv.cpp
@@ -50,7 +52,11 @@ set(kproxy_lib_src
 
     lib/websocket.cpp
     lib/websocket_libuv.cpp
+
     lib/http.cpp
+    lib/http_file_server.cpp
+    lib/http_file_server_libuv.cpp
+    lib/http_file_server_config.cpp
     )
 
 include_directories("${CMAKE_CURRENT_LIST_DIR}/include")
@@ -80,6 +86,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/third_party/http-parser.cmake)
 
 # library #{
 add_library(${kproxy_lib} STATIC ${kproxy_lib_src})
+set_property(TARGET ${kproxy_lib} PROPERTY CXX_STANDARD ${__CXX_VERSION})
 
 add_dependencies(${kproxy_lib} uv_a)
 add_dependencies(${kproxy_lib} nlohmann_json)
@@ -95,6 +102,7 @@ target_link_libraries(${kproxy_lib} ${HTTP_PARSER_LIB})
 
 # server #{
 add_executable(${kproxy_server} ./src/main.cpp)
+set_property(TARGET ${kproxy_server} PROPERTY CXX_STANDARD ${__CXX_VERSION})
 
 add_dependencies(${kproxy_server} uv_a)
 target_link_libraries(${kproxy_server} uv_a)
@@ -106,6 +114,7 @@ target_link_libraries(${kproxy_server} ${OPENSSL_SSL_LIBRARY})
 
 # client #{
 add_executable(${kproxy_client} ./app/main.cpp)
+set_property(TARGET ${kproxy_server} PROPERTY CXX_STANDARD ${__CXX_VERSION})
 
 add_dependencies(${kproxy_client} uv_a)
 target_link_libraries(${kproxy_client} uv_a)
@@ -127,6 +136,7 @@ foreach (test_file IN LISTS TEST_FILES)
     string(SUBSTRING ${fname} 5 ${name_len} execname)
     message(STATUS "test=${execname}")
     add_executable(${execname} ${test_file})
+    set_property(TARGET ${execname} PROPERTY CXX_STANDARD ${__CXX_VERSION})
     add_dependencies(${execname} ${kproxy_lib})
     target_link_libraries(${execname} ${kproxy_lib})
     set_target_properties(${execname} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")

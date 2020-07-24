@@ -139,3 +139,35 @@ bool k_inet_pton(int af, const char* src, void* dst)              {return __k_in
 
 std::pair<std::string, uint16_t> k_sockaddr_to_str(struct sockaddr* addr) {return __k_sockaddr_to_str(addr);}
 
+
+std::string time_t_to_UTCString(time_t time) //{
+{
+    std::stringstream timestr;
+    auto tmtime = std::gmtime(&time);
+    timestr << std::put_time(tmtime, "%a, %d %b %Y %H:%M:%S %Z");
+    return timestr.str();
+} //}
+
+
+const char* Sha1Bin(const char* str, size_t len) //{
+{
+    static char obuf[20];
+    SHA1((const unsigned char*)str, len, (unsigned char*)obuf);
+    std::string ret(40, '=');
+
+    return obuf;
+} //}
+static const char lowercasehex[] = "0123456789abcdef";
+std::string Sha1Hex(const char* str, size_t len) //{
+{
+    auto obuf = Sha1Bin(str, len);
+    std::string ret(40, '=');
+
+    for(size_t i=0;i<20;i++) {
+        ret[2*i]     = lowercasehex[obuf[i] & 0xf0];
+        ret[2*i + 1] = lowercasehex[obuf[i] & 0x0f];
+    }
+
+    return ret;
+} //}
+

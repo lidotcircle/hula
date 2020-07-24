@@ -27,7 +27,7 @@ json SingleServerInfo::to_json() //{
     json result = json::object();
     result["server_name"] = this->m_server_name;
     result["address"] = this->m_addr;
-    result["port"]    = this->m_port; // FIXME ??
+    result["port"]    = this->m_port;
     result["certificate"] = this->m_cert;
     result["cipher"] = this->m_cipher;
     result["username"] = this->m_user;

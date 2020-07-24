@@ -53,7 +53,7 @@ struct WebsocketError: public std::exception {
 };
 
 PACK(
-struct WSHeaderPartial { // FIXME ??? bit order is reversed
+struct WSHeaderPartial {
     union {
         struct {
             uint8_t OPCODE:4;

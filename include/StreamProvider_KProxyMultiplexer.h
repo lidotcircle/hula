@@ -52,7 +52,7 @@ class KProxyMultiplexerStreamProvider: public virtual StreamProvider, virtual pr
         static void buffer_write_callback(ROBuf buf, int status, void* data);
         void write_header(ROBuf buf);
         void write_buffer(ROBuf buf, WriteCallback cb, void* data);
-        void send_zero_packet(StreamId id, uint8_t opcode); // TODO
+        void send_zero_packet(StreamId id, uint8_t opcode);
         using StreamProvider::finish;
 
         static void new_connection_write_callback  (ROBuf buf, int status, void* data);

@@ -47,3 +47,10 @@ bool k_inet_ntop(int af, const void* src, char* dst, size_t size);
 bool k_inet_pton(int af, const char* src, void* dst);
 std::pair<std::string, uint16_t> k_sockaddr_to_str(struct sockaddr*);
 
+
+std::string time_t_to_UTCString(time_t time);
+
+
+const char* Sha1Bin(const char* str, size_t len);
+std::string Sha1Hex(const char* str, size_t len);
+

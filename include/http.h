@@ -8,25 +8,36 @@
 
 #include <http_parser.h>
 
+#include <evtls/help_class.h>
+using namespace evtls;
+
 #include <unordered_map>
 
 #define HTTP_VERSION "1.1"
 
+
+#define XXX(a, b, c) b = a, 
+enum HttpStatus {
+    HTTP_STATUS_MAP(XXX)
+};
+#undef  XXX
+
+
 class Http;
-/** << Event >>
+/** << Event >> //{
  * @event drain 
  *     @param () */
 namespace HttpRequestArg {
 struct DrainArgs: public EventArgs::Base {};
-}
+} //}
 class HttpRequest: virtual public CallbackManager, public EventEmitter //{
 {
     public:
-        /** if(req == nullptr) 
-         *      write fail 
-         *  else
-         *      continue do something */
-        using WriteCallback = void (*)(HttpRequest* req, int status);
+        using WriteCallback = void (*)(HttpRequest* req);
+        struct Info {
+            inline virtual ~Info() {}
+        };
+
 
     private:
         std::string m_method;
@@ -38,7 +49,7 @@ class HttpRequest: virtual public CallbackManager, public EventEmitter //{
         std::unordered_map<std::string, std::string> m_header;
 
         Http* m_http;
-        size_t m_write_size;
+        Info* m_info;
 
         uint16_t m_status;
         std::string m_statusText;
@@ -49,6 +60,7 @@ class HttpRequest: virtual public CallbackManager, public EventEmitter //{
         bool m_writeHeader;
 
         static void response_write_callback(ROBuf buf, int status, void* data);
+
 
     public:
         HttpRequest(Http* http, const std::unordered_map<std::string, std::string>& default_header, 
@@ -64,12 +76,25 @@ class HttpRequest: virtual public CallbackManager, public EventEmitter //{
                 return "";
         }
         inline const std::unordered_map<std::string, std::string>& GetRequestHeaders() {return this->m_request_header;}
+        inline const std::string& GetURL() {return this->m_url;}
+        inline const std::string& GetMethod() {return this->m_method;}
+        inline const ROBuf        GetData() {return this->m_request_data;}
         void setChunk();
-        void setStatus(uint16_t status, const char* statusText);
+        void setStatus(HttpStatus status, const char* statusText = nullptr);
         void setHeader(const std::string& field, const std::string& value);
         void writeHeader();
-        int  write(ROBuf buf, WriteCallback cb);
-        void end();
+        int  write(ROBuf buf,       WriteCallback cb = nullptr);
+        int  write(const char* buf, WriteCallback cb = nullptr);
+        void end(ROBuf buf);
+        void end(const char* buf);
+
+        EBStreamAbstraction::UNST AcceptUpgrade(ROBuf buf);
+        EBStreamAbstraction::UNST AcceptUpgrade(const char* buf);
+        void                      RejectUpgrade(ROBuf buf);
+        void                      RejectUpgrade(const char* buf);
+
+        Info* GetInfo();
+        void  SetInfo(Info*);
         ~HttpRequest();
 }; //}
 
@@ -93,7 +118,9 @@ enum HttpState {
  *     @param (HttpRequest* request)
  * @event error
  *     @param (std::string)
- *///}
+ * @event upgraded
+ *     @param ()
+ */
 namespace HttpArg {
 struct RequestArgs: public EventArgs::Base {
     HttpRequest* m_request;
@@ -107,8 +134,9 @@ struct ErrorArgs: public EventArgs::Base {
     std::string m_error;
     inline ErrorArgs(const std::string& error): m_error(error) {}
 };
-}
-class Http: virtual public EBStreamAbstraction //{
+struct UpgradedArgs: public EventArgs::Base {};
+} //}
+class Http: virtual public EBStreamAbstraction, virtual public StoreFetchPointer //{
 {
     private:
         std::unordered_map<std::string, std::string> m_default_response_header;
@@ -127,6 +155,8 @@ class Http: virtual public EBStreamAbstraction //{
 
         bool m_chunk;
         bool m_upgrade;
+
+        size_t m_writed_buffer_size;
 
         void read_callback(ROBuf buf, int status) override;
         void end_signal() override;
@@ -147,15 +177,19 @@ class Http: virtual public EBStreamAbstraction //{
 
         void start_request();
 
-        static void write_callback(EventEmitter*, ROBuf buf, int status, void* data);
+        static void response_write_callback(ROBuf buf, int status, void* data);
 
     protected:
-        void response_write(ROBuf buf, WriteCallback cb, void* data);
+        int  response_write(ROBuf buf, WriteCallback cb, void* data);
         void FinishRequest(HttpRequest*);
+        UNST FinishUpgradeAccept(HttpRequest*);
+        void FinishUpgradeReject(HttpRequest*);
         friend class HttpRequest;
 
     public:
         Http(const std::unordered_map<std::string, std::string>& default_response_header);
+
+        void PushFirst(ROBuf buf);
 }; //}
 
 struct __URL__ {
@@ -168,4 +202,12 @@ struct __URL__ {
     std::string m_fragment;
 };
 __URL__ parse_url(const std::string& str);
+
+
+#include "stream_libuv.h"
+class UVHttp: public Http, public EBStreamUV {
+    public:
+       inline UVHttp(const std::unordered_map<std::string, std::string>& dh, uv_tcp_t* tcp):
+           Http(dh), EBStreamUV(tcp) {this->start_read();}
+};
 

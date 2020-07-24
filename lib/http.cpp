@@ -14,11 +14,13 @@
 //       << class Http >>      //{
 Http::Http(const std::unordered_map<std::string, std::string>& default_response_header) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->m_default_response_header = default_response_header;
     this->m_state = HttpState::FINISH_PREV;
     this->m_current_request = nullptr;
     this->m_upgrade = false;
     this->m_chunk = false;
+    this->m_writed_buffer_size = 0;
     http_parser_init(&this->m_parser, http_parser_type::HTTP_REQUEST);
     http_parser_settings_init(&this->m_parser_setting);
     this->m_parser_setting.on_message_begin    = http_on_message_begin;
@@ -38,7 +40,11 @@ Http::Http(const std::unordered_map<std::string, std::string>& default_response_
 /** implement virtual methods */
 void Http::read_callback(ROBuf buf, int status) //{
 {
-    if(status < 0) return;
+    DEBUG("call %s", FUNCNAME);
+    if(status < 0) {
+        this->emit("error", new HttpArg::ErrorArgs("read failure"));
+        return;
+    }
     ROBuf merge;
     if(this->m_remain.size() == 0) {
         merge = buf;
@@ -50,17 +56,22 @@ void Http::read_callback(ROBuf buf, int status) //{
 } //}
 void Http::end_signal() //{
 {
+    DEBUG("call %s", FUNCNAME);
+    this->emit("error", new HttpArg::ErrorArgs("end"));
 } //}
 
 void Http::should_start_write() //{
 {
+    DEBUG("call %s", FUNCNAME);
 } //}
 void Http::should_stop_write() //{
 {
+    DEBUG("call %s", FUNCNAME);
 } //}
 
 void Http::start_request() //{
 {
+    DEBUG("call %s", FUNCNAME);
     if(this->in_read())
         this->stop_read();
     assert(this->m_current_request == nullptr);
@@ -83,9 +94,63 @@ void Http::start_request() //{
     }
 } //}
 
-void Http::response_write(ROBuf buf, WriteCallback cb, void* data) //{
+struct http_write_state: public CallbackPointer {
+    Http* _this;
+    Http::WriteCallback _cb;
+    void* _data;
+    size_t _n;
+    inline http_write_state(Http* _this, Http::WriteCallback cb, void* data, size_t n):
+        _this(_this), _cb(cb), _data(data), _n(n) {}
+};
+int  Http::response_write(ROBuf buf, WriteCallback cb, void* data) //{
 {
-    this->_write(buf, cb, data);
+    DEBUG("call %s", FUNCNAME);
+    this->m_writed_buffer_size += buf.size();
+    auto ptr = new http_write_state(this, cb, data, buf.size());
+    this->add_callback(ptr);
+    this->_write(buf, response_write_callback, ptr);
+
+    if(this->m_writed_buffer_size > HTTP_MAX_WRITE_BUFFER_SIZE) 
+        return -1;
+    else 
+        return 0;
+} //}
+/** [static] */
+void Http::response_write_callback(ROBuf buf, int status, void* data) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    http_write_state* msg = 
+        dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
+    assert(msg);
+
+    auto _this = msg->_this;
+    auto _cb   = msg->_cb;
+    auto _data = msg->_data;
+    auto _n    = msg->_n;
+    auto run   = msg->CanRun();
+    delete msg;
+
+    if(!run) {
+        _cb(buf, -1, _data);
+        return;
+    }
+    _this->remove_callback(msg);
+
+    if(status < 0) {
+        _cb(buf, -1, _data);
+        return;
+    }
+
+    _this->m_writed_buffer_size -= _n;
+
+    if(_this->m_writed_buffer_size <= HTTP_MAX_WRITE_BUFFER_SIZE &&
+       _this->m_writed_buffer_size + _n >  HTTP_MAX_WRITE_BUFFER_SIZE) {
+        status = 3;
+    } else {
+        status = 1;
+    }
+
+    _cb(buf, status, _data);
 } //}
 
 /** [static] */
@@ -201,6 +266,7 @@ int Http::http_on_chunk_complete(http_parser* parser) //{
 
 void Http::FinishRequest(HttpRequest* req) //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_current_request == req);
     assert(this->m_upgrade == false);
     this->m_current_request = nullptr;
@@ -209,19 +275,47 @@ void Http::FinishRequest(HttpRequest* req) //{
     this->start_read();
     http_parser_init(&this->m_parser, http_parser_type::HTTP_REQUEST);
 } //}
+Http::UNST Http::FinishUpgradeAccept(HttpRequest* req) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    assert(this->m_current_request == req);
+    assert(this->m_upgrade == true);
+    this->m_current_request = nullptr;
+    delete req;
+    assert(!this->in_read());
+
+    auto ret = this->transfer();
+    this->emit("upgraded", new HttpArg::UpgradedArgs());
+    return ret;
+} //}
+void Http::FinishUpgradeReject(HttpRequest* req) //{ FIXME close connection ???
+{
+    DEBUG("call %s", FUNCNAME);
+    assert(this->m_current_request == req);
+    assert(this->m_upgrade == true);
+    this->m_upgrade = false;
+    this->FinishRequest(req);
+} //}
+
+void Http::PushFirst(ROBuf buf) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    this->read_callback(buf, 0);
+} //}
 //}
 
 
 //      << class HttpRequest >>            //{
-HttpRequest::HttpRequest(Http* http, const std::unordered_map<std::string, std::string>& default_header,
+HttpRequest::HttpRequest(Http* http, const std::unordered_map<std::string, std::string>& default_header, //{
         std::unordered_map<std::string, std::string>&& req_header,
         std::string&& method,
         std::string&& url,
         ROBuf&& request_data):
-    m_header(), m_http(http), m_write_size(0), m_writeHeader(false),
+    m_header(), m_http(http), m_writeHeader(false),
     m_request_header(std::move(req_header)), m_method(std::move(method)),
-    m_url(std::move(url)), m_request_data(std::move(request_data)), m_version("1.1") //{
+    m_url(std::move(url)), m_request_data(std::move(request_data)), m_version("1.1"), m_info(nullptr)
 {
+    DEBUG("call %s", FUNCNAME);
     this->m_status = 0;
     this->m_chunk = false;
     this->m_end = false;
@@ -230,13 +324,15 @@ HttpRequest::HttpRequest(Http* http, const std::unordered_map<std::string, std::
 
 void HttpRequest::setChunk() //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_chunk == false);
     this->m_chunk = true;
     this->setHeader("Transfer-Encoding", "chunked");
 } //}
 
-void HttpRequest::setStatus(uint16_t status, const char* statusText) //{
+void HttpRequest::setStatus(HttpStatus status, const char* statusText) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->m_status = status;
     if(statusText == nullptr)
         this->m_statusText = http_status_str((enum http_status)this->m_status);
@@ -245,6 +341,7 @@ void HttpRequest::setStatus(uint16_t status, const char* statusText) //{
 } //}
 void HttpRequest::setHeader(const std::string& field, const std::string& value) //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(field.size() > 0);
     std::string res;
     bool upper = true;
@@ -259,10 +356,11 @@ void HttpRequest::setHeader(const std::string& field, const std::string& value) 
 } //}
 void HttpRequest::writeHeader() //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_writeHeader == false);
     this->m_writeHeader = true;
     std::ostringstream str;
-    if(this->m_status == 0) this->setStatus(200, nullptr);
+    if(this->m_status == 0) this->setStatus(HttpStatus::OK, nullptr);
     str << "HTTP/" << HTTP_VERSION << " " << this->m_status << " " << this->m_statusText << std::endl;
     for(auto& pair: this->m_header) 
         str << pair.first << ": " << pair.second << std::endl;
@@ -283,6 +381,7 @@ struct ResponseWriteData: public CallbackPointer {
 };
 int  HttpRequest::write(ROBuf buf, WriteCallback cb) //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_end == false);
     assert(buf.size() > 0);
     if(!this->m_writeHeader)
@@ -292,19 +391,24 @@ int  HttpRequest::write(ROBuf buf, WriteCallback cb) //{
         sprintf(size_str, "%lx\r\n", buf.size());
         buf = ROBuf(size_str, strlen(size_str)) + buf;
     }
-    this->m_write_size += buf.size();
-    int ret = 0;
-    if(this->m_write_size > HTTP_MAX_WRITE_BUFFER_SIZE) {
-        ret = this->m_write_size - HTTP_MAX_WRITE_BUFFER_SIZE;
-    }
+
     auto ptr = new ResponseWriteData(this, cb);
     this->add_callback(ptr);
-    this->m_http->response_write(buf, response_write_callback, ptr);
-    return ret;
+    return this->m_http->response_write(buf, response_write_callback, ptr);
+} //}
+int  HttpRequest::write(const char* data, WriteCallback cb) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    ROBuf buf(strlen(data) + 1);
+    memcpy(buf.__base(), data, buf.size());
+    buf.__base()[buf.size() - 1] = 0;
+
+    return this->write(buf, cb);
 } //}
 /** [static] */
 void HttpRequest::response_write_callback(ROBuf buf, int status, void* data) //{
 { 
+    DEBUG("call %s", FUNCNAME);
     ResponseWriteData* msg = 
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data));
     assert(msg);
@@ -317,24 +421,102 @@ void HttpRequest::response_write_callback(ROBuf buf, int status, void* data) //{
     if(!run) return;
     _this->remove_callback(msg);
 
-    _this->m_write_size -= buf.size();
-    if(status == 0 && _this->m_write_size < HTTP_MAX_WRITE_BUFFER_SIZE && 
-            (_this->m_write_size + buf.size()) > HTTP_MAX_WRITE_BUFFER_SIZE) {
-        _this->emit("drain", nullptr);
-    }
+    if(status < 0)
+        return;
 
-    if(cb != nullptr) return cb(_this, status);
+    if(status == 3)
+        _this->emit("drain", new HttpRequestArg::DrainArgs());
+
+    if(cb != nullptr) return cb(_this);
 } //}
-void HttpRequest::end() //{
+void HttpRequest::end(ROBuf buf) //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->m_end == false);
-    this->m_end = true;
-    if(this->m_writeHeader == false)
+    if(this->m_writeHeader == false) {
+        if(!this->m_chunk)
+            this->setHeader("Content-Length", std::to_string(buf.size()));
+        this->setHeader("Content-Type", "text/html");
         this->writeHeader();
+    }
+    if(buf.size() > 0)
+        this->write(buf, nullptr);
+    this->m_end = true;
     this->m_http->FinishRequest(this);
 } //}
-HttpRequest::~HttpRequest() {}
+void HttpRequest::end(const char* data) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    if(data == nullptr || strlen(data) == 0) {
+        this->end(ROBuf());
+        return;
+    }
+    ROBuf buf(strlen(data));
+    memcpy(buf.__base(), data, buf.size());
+
+    this->end(buf);
+} //}
+
+EBStreamAbstraction::UNST HttpRequest::AcceptUpgrade(ROBuf buf) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    assert(this->m_end == false);
+    if(this->m_writeHeader == false) {
+        if(!this->m_chunk)
+            this->setHeader("Content-Length", std::to_string(buf.size()));
+        this->setHeader("Content-Type", "text/html");
+        this->writeHeader();
+    }
+    if(buf.size() > 0)
+        this->write(buf, nullptr);
+    this->m_end = true;
+    return this->m_http->FinishUpgradeAccept(this);
+} //}
+EBStreamAbstraction::UNST HttpRequest::AcceptUpgrade(const char* data) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    if(data == nullptr || strlen(data) == 0) {
+        return this->AcceptUpgrade(ROBuf());
+    }
+    ROBuf buf(strlen(data));
+    memcpy(buf.__base(), data, buf.size());
+
+    return this->AcceptUpgrade(buf);
+} //}
+void                      HttpRequest::RejectUpgrade(ROBuf buf) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    assert(this->m_end == false);
+    if(this->m_writeHeader == false) {
+        if(!this->m_chunk)
+            this->setHeader("Content-Length", std::to_string(buf.size()));
+        this->setHeader("Content-Type", "text/html");
+        this->writeHeader();
+    }
+    if(buf.size() > 0)
+        this->write(buf, nullptr);
+    this->m_end = true;
+    this->m_http->FinishUpgradeReject(this);
+} //}
+void                      HttpRequest::RejectUpgrade(const char* data) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    if(data == nullptr || strlen(data) == 0) {
+        this->RejectUpgrade(ROBuf());
+        return;
+    }
+    ROBuf buf(strlen(data));
+    memcpy(buf.__base(), data, buf.size());
+
+    this->RejectUpgrade(buf);
+} //}
+
+HttpRequest::Info* HttpRequest::GetInfo() {return this->m_info;}
+void               HttpRequest::SetInfo(Info* info) {this->m_info = info;}
+
+HttpRequest::~HttpRequest() {if(this->m_info) delete this->m_info;}
 //}
+
 
 __URL__ parse_url(const std::string& str) //{
 {

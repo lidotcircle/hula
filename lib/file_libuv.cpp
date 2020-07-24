@@ -248,6 +248,7 @@ ROBuf UVFile::__read(size_t n, ReadCallback cb, void *data) //{
     this->add_callback(ptr);
 
     uv_fs_read(this->mp_loop, req, this->m_fd, buf, 1, this->m_pos, read_callback);
+    this->m_pos += n;
     return ROBuf();
 } //}
 /** [static] */
@@ -277,6 +278,42 @@ void UVFile::read_callback(uv_fs_t* p_req) //{
     }
 } //}
 
+
+ROBuf  UVFile::read(size_t start, size_t len, ReadCallback cb, void* data) //{
+{
+    assert(this->m_fd > 0);
+    assert(this->m_error == false);
+    assert(len > 0);
+
+    uv_fs_t* req = new uv_fs_t();
+
+    uv_buf_t* buf = new uv_buf_t();
+    buf->base = (char*)malloc(len);
+    buf->len  = len;
+
+    if(cb == nullptr) {
+        assert(data == nullptr);
+        auto rv = uv_fs_read(this->mp_loop, req, this->m_fd, buf, 1, start, nullptr);
+        if(rv < 0)
+            this->m_error = true;
+
+        ROBuf retbuf(buf->base, rv < 0 ? len : rv, 0, free);
+        freereq(req);
+        delete buf;
+
+        if(this->m_error)
+            return ROBuf();
+        else
+            return retbuf;
+    }
+
+    auto ptr = new uvfile_read_state(this, (void*)cb, data, buf);
+    uv_req_set_data((uv_req_t*)req, ptr);
+    this->add_callback(ptr);
+
+    uv_fs_read(this->mp_loop, req, this->m_fd, buf, 1, start, read_callback);
+    return ROBuf();
+} //}
 ROBuf UVFile::read(size_t n, ReadCallback cb, void *data) //{
 {
     return this->__read(n, cb, data);
@@ -592,7 +629,7 @@ void UVFile::truncate_callback(uv_fs_t* p_req) //{
 
 bool UVFile::reopen(const std::string& filename, int flag, int mode, OpenCallback cb, void* data) //{
 {
-    if(this->opened() && !this->m_close_error) // FIXME nonblock
+    if(this->opened() && !this->m_close_error) // TODO nonblock
         this->close(nullptr, nullptr);
     this->m_filename = filename;
     this->m_fd = -1;

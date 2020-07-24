@@ -5,6 +5,15 @@
 #include "StreamProvider_KProxyMultiplexer.h"
 #include "StreamObject.h"
 
+#include "http.h"                // web
+#include "websocket.h"
+#include "websocket_libuv.h"
+#include "http_file_server.h"
+#include "http_file_server_libuv.h"
+
+#include "file.h"
+#include "file_libuv.h"
+
 #include <memory>
 
 NS_PROXY_SERVER_START
@@ -27,8 +36,10 @@ namespace Factory {
                                                 const std::string& addr, uint16_t port);
     }
 
+
     EBStreamObject* createUVStreamObject(size_t max_write_buffer_size, UNST connection);
     EBStreamObject* createKProxyMultiplexerStreamObject(size_t max_write_buffer_size, KProxyMultiplexerStreamProvider* provider);
+
 
     namespace KProxyClient {
         using namespace ::KProxyClient;
@@ -40,6 +51,17 @@ namespace Factory {
                                                  const std::string& addr, uint16_t port, Socks5ServerAbstraction* socks5);
         ProxyMultiplexerAbstraction* createMultiplexer(Server* server, SingleServerInfo* config, UNST connection);
         ProxyMultiplexerAbstraction* createUVTLSMultiplexer(Server* server, SingleServerInfo* config, UNST connection);
+    };
+
+    namespace Filesystem {
+        FileAbstraction* createUVFile(const std::string& filename, uv_loop_t* loop);
+    };
+
+
+    namespace Web {
+        Http* createHttpSession(UNST con, const std::unordered_map<std::string, std::string>& default_header = {});
+
+        HttpFileServer* createHttpFileServer(UNST con, std::shared_ptr<HttpFileServerConfig> config);
     };
 };
 

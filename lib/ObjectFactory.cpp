@@ -81,5 +81,33 @@ namespace Factory {
             return new KProxyClient::UVTLSMultiplexer(server, config, EBStreamUV::getStreamFromWrapper(connection));
         }
     };
+
+    namespace Filesystem {
+        FileAbstraction* createUVFile(const std::string& filename, uv_loop_t* loop) {
+            return new UVFile(loop, filename);
+        }
+    }
+
+    namespace Web {
+        Http* createHttpSession(UNST con, const std::unordered_map<std::string, std::string>& default_header) //{
+        {
+            switch(con->getType()) {
+                case StreamType::LIBUV:
+                    return new UVHttp(default_header, EBStreamUV::getStreamFromWrapper(con));
+                default:
+                    return nullptr;
+            }
+        } //}
+
+        HttpFileServer* createHttpFileServer(UNST con, std::shared_ptr<HttpFileServerConfig> config) //{
+        {
+            switch(con->getType()) {
+                case StreamType::LIBUV:
+                    return new UVHttpFileServer(config, EBStreamUV::getStreamFromWrapper(con));
+                default:
+                    return nullptr;
+            }
+        } //}
+    }
 };
 

@@ -121,7 +121,7 @@ bool EBStreamByProvider::connect(const std::string& domname, uint16_t port, Conn
     CHECK_SOCKET();
     assert(this->m_info->m_send_end == false);
 
-    auto ptr = new __connect_cb_state(this, cb, data); // FIXME LOSS
+    auto ptr = new __connect_cb_state(this, cb, data);
     this->add_callback(ptr);
     this->m_info->mp_provider->connect(this->m_info->m_id, domname, port, connect_callback, ptr);
 

@@ -50,6 +50,7 @@ class FileAbstraction //{
         virtual bool open(int flags, int mode = 0666, OpenCallback cb = nullptr, void* data = nullptr) = 0;
         virtual bool close(CloseCallback cb = nullptr, void* data = nullptr) = 0;
         virtual ROBuf  read(size_t n, ReadCallback cb = nullptr, void* data = nullptr) = 0;
+        virtual ROBuf  read(size_t start, size_t len, ReadCallback cb = nullptr, void* data = nullptr) = 0;
         virtual ROBuf  readremain(ReadCallback cb = nullptr, void* data = nullptr) = 0;
         virtual size_t write(ROBuf buf, WriteCallback cb = nullptr, void* data = nullptr) = 0;
 

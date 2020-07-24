@@ -30,13 +30,8 @@ void test_http_parser() {
     int n = http_parser_execute(&parser, &setting, nnn, strlen(nnn));
 }
 
-void writecb(HttpRequest* req, int status) {
+void writecb(HttpRequest* req) {
     if(req == nullptr) return;
-    if(status != 0) {
-        std::cout << "write fail" << std::endl;
-        req->end();
-        return;
-    }
     return;
 }
 void on_request(EventEmitter* target, const std::string& event, EventArgs::Base* argv) {
@@ -46,9 +41,9 @@ void on_request(EventEmitter* target, const std::string& event, EventArgs::Base*
     assert(reqarg);
     auto req = reqarg->m_request;
     req->setChunk();
-    req->write(ROBuf((char*)"hello\n\n", 7), writecb);
-    req->write(ROBuf((char*)"hello\n\n", 7), writecb);
-    req->end();
+    req->write("hello\n\n", writecb);
+    req->write("hello\n\n", writecb);
+    req->end(nullptr);
 }
 
 void on_upgrade(EventEmitter* target, const std::string& event, EventArgs::Base* argv) {

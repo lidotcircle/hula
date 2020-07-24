@@ -139,7 +139,7 @@ void Socks5Auth::dispatch_data(ROBuf buf) //{
                 this->m_servername = msg.m_addr;
                 this->m_port = msg.m_port;
                 this->m_state = SOCKS5_FINISH;
-                this->try_to_build_connection(); // TODO
+                this->try_to_build_connection();
             }
             break;
         }
