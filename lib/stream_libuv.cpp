@@ -586,6 +586,12 @@ EBStreamAbstraction::UNST EBStreamUV::getWrapperFromStream(uv_tcp_t* stream) //{
     return UNST(new __UnderlyingStreamUV(StreamType::LIBUV, stream));
 } //}
 
+uv_loop_t* EBStreamUV::get_uv_loop() //{
+{
+    assert(this->mp_tcp); 
+    return uv_handle_get_loop((uv_handle_t*)this->mp_tcp);
+} //}
+
 struct __uv_timeout_state__ {
     EBStreamAbstraction::TimeoutCallback _cb;
     void* _data; 

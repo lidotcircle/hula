@@ -20,6 +20,8 @@ static KProxyClient::Server* g_server = nullptr;
 
 static int handle_count = 0;
 
+#define STDOUT_HANDLE(h) \
+    case h: std::cout << #h; break
 static void timer_handle(uv_timer_t* timer) //{
 {
     uv_timer_stop(timer);
@@ -29,7 +31,30 @@ static void timer_handle(uv_timer_t* timer) //{
 static void walk_callback(uv_handle_t* h, void* data) //{
 {
     ++handle_count;
-    std::cout << "handle: " << handle_count << std::endl;
+    auto type = uv_handle_get_type(h);
+    std::cout << "    handle: " << handle_count << ", type: ";
+    switch(type) {
+        STDOUT_HANDLE(UV_CHECK);
+        STDOUT_HANDLE(UV_FILE);
+        STDOUT_HANDLE(UV_HANDLE);
+        STDOUT_HANDLE(UV_ASYNC);
+        STDOUT_HANDLE(UV_POLL);
+        STDOUT_HANDLE(UV_IDLE);
+        STDOUT_HANDLE(UV_FS_EVENT);
+        STDOUT_HANDLE(UV_FS_POLL);
+        STDOUT_HANDLE(UV_PREPARE);
+        STDOUT_HANDLE(UV_PROCESS);
+        STDOUT_HANDLE(UV_NAMED_PIPE);
+        STDOUT_HANDLE(UV_STREAM);
+        STDOUT_HANDLE(UV_TCP);
+        STDOUT_HANDLE(UV_UDP);
+        STDOUT_HANDLE(UV_TIMER);
+        STDOUT_HANDLE(UV_TTY);
+        STDOUT_HANDLE(UV_SIGNAL);
+        STDOUT_HANDLE(UV_UNKNOWN_HANDLE);
+        STDOUT_HANDLE(UV_HANDLE_TYPE_MAX);
+    }
+    std::cout << std::endl;
 } //}
 static void walk_loop(uv_loop_t* loop) //{
 {
@@ -40,7 +65,7 @@ static void interrupt_handle(int sig) //{
 {
     if(uv_continue == false) {
         walk_loop(uv_loop_global);
-        abort();
+        exit(1);
     }
     __logger->warn("Exiting ...");
     uv_continue = false;

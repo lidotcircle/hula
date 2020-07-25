@@ -14,6 +14,7 @@ class EBMemStream: virtual public EBStreamAbstraction
         class __UnderlyingStreamMem: public __UnderlyingStream {
             public:
             inline __UnderlyingStreamMem(StreamType type): __UnderlyingStream(type) {}
+            inline bool is_null() override {return false;}
         };
 
 

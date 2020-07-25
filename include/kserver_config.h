@@ -15,6 +15,7 @@ using nlohmann::json;
  *     "certificate": <cert>,
  *     "rsa_private_key": <key>,
  *     "cipher": <cipher>,
+ *     "http_config": <file>,
  *     "users": [
  *         {
  *             "username": <username>,
@@ -31,6 +32,7 @@ class ServerConfig: public ConfigFile //{
         std::string m_rsa_private_key;
         std::string m_cert;
         std::string m_cipher;
+        std::string m_http_config;
 
         std::unordered_map<std::string, std::string> m_users;
 
@@ -57,6 +59,7 @@ class ServerConfig: public ConfigFile //{
         std::string Cert();
         std::string PrivateKey();
         std::string Cipher();
+        std::string HttpConfig();
 
         inline uint32_t BindAddr() {return this->m_bind_addr;}
         inline uint32_t BindPort() {return this->m_bind_port;}

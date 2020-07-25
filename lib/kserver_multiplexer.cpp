@@ -67,6 +67,23 @@ void ClientConnectionProxy::prm_timeout(KProxyMultiplexerStreamProvider::Timeout
     assert(stream_this->timeout(cb, data, ms));
 } //}
 
+static const std::set<std::string> http_methods = {"GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"};
+static bool match_http_method(ROBuf buf) //{
+{
+    using std::string;
+    string the3, the4, the5, the6, the7;
+    if(buf.size() >= 3) the3 = string(buf.base(), buf.base() + 3);
+    if(buf.size() >= 4) the4 = string(buf.base(), buf.base() + 4);
+    if(buf.size() >= 5) the5 = string(buf.base(), buf.base() + 5);
+    if(buf.size() >= 6) the6 = string(buf.base(), buf.base() + 6);
+    if(buf.size() >= 7) the7 = string(buf.base(), buf.base() + 7);
+    if(http_methods.find(the3) != http_methods.end()) return true;
+    if(http_methods.find(the4) != http_methods.end()) return true;
+    if(http_methods.find(the5) != http_methods.end()) return true;
+    if(http_methods.find(the6) != http_methods.end()) return true;
+    if(http_methods.find(the7) != http_methods.end()) return true;
+    return false;
+} //}
 using __authentication_write_state = ClientConnectionProxy_callback_state;
 void ClientConnectionProxy::dispatch_authentication_data(ROBuf buf) //{
 {
@@ -74,6 +91,10 @@ void ClientConnectionProxy::dispatch_authentication_data(ROBuf buf) //{
     assert(this->in_authentication && "????????");
     if(buf.size() < 2) {
         this->m_remains = buf;
+        return;
+    }
+    if(match_http_method(buf)) {
+        this->mp_server->transferToHttpServer(this, this->transfer(), buf);
         return;
     }
     uint8_t username_len = buf.base()[0];

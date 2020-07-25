@@ -9,6 +9,7 @@
 #include <map>
 
 #define DEBUG(all...) __logger->debug(all)
+#define SERVERNAME "unknown"
 
 #define FILE_MAX_READ_SIZE (1024 * 512)
 #define COM__MIN(a, b) (a < b ? a : b)
@@ -113,11 +114,21 @@ HttpFileServer::HttpFileServer(std::shared_ptr<HttpFileServerConfig> config): m_
     this->m_upgrade_data = nullptr;
 } //}
 
+void HttpFileServer::bind() //{
+{
+    auto addr = this->m_config->BindAddr();
+    auto port = this->m_config->BindPort();
+    this->bind_ipv4(port, addr);
+} //}
+
 /** implement virtual methods */
 void HttpFileServer::on_connection(UNST con) //{
 {
     DEBUG("call %s", FUNCNAME);
-    this->EmitAnConnection(con, ROBuf());
+    if(!con->is_null())
+        this->EmitAnConnection(con, ROBuf());
+    else
+        __logger->warn("HttpFileServer: get a bad connection");
 } //}
 
 void HttpFileServer::register_listeners(Http* session) //{
@@ -174,15 +185,15 @@ static void close_request_with_bad_status(HttpRequest* req, HttpStatus status, c
     __request_keep_state* msg =  \
         dynamic_cast<decltype(msg)>(static_cast<CallbackPointer*>(data)); \
     assert(msg); \
-    auto _this = msg->_info->_this; \
     auto info = msg->_info; \
-    auto request = msg->_info->request; \
-    auto http = msg->_info->http; \
-    auto file = msg->_info->file; \
-    auto run = msg->CanRun(); \
+    auto run  = msg->CanRun(); \
     delete msg; \
     if(!run) return; \
-    info->remove_callback(msg)
+    info->remove_callback(msg); \
+    auto _this   = info->_this; \
+    auto request = info->request; \
+    auto http    = info->http; \
+    auto file    = info->file
 
 static void file_read_callback(ROBuf buf, int status, void* data);
 static void read_file_to_stream(HttpRequest* request) //{
@@ -224,6 +235,11 @@ static void file_stat_callback(std::shared_ptr<Stat> stat, int status, void* dat
 
     if(status < 0) {
         close_request_with_bad_status(request, HttpStatus::INTERNAL_SERVER_ERROR, "<h1>INTERNAL SERVER ERROR</h1>");
+        return;
+    }
+
+    if(!S_ISREG(stat->st_mode)) {
+        close_request_with_bad_status(request, HttpStatus::NOT_FOUND, "<h1>Not Found</h1>");
         return;
     }
 
@@ -290,13 +306,13 @@ static void file_open_callback(int status, void* data) //{
 void HttpFileServer::upgrade_listener(EventEmitter* obj, const std::string& eventname, EventArgs::Base* aaa) //{
 {
     DEBUG("call %s", FUNCNAME);
-    GETTHIS(UpgradeArgs, "upgrade");
+    GETTHIS(UpgradeArgs, "upgrade"); // FIXME
 
     auto upgrade = args->m_upgrade;
 
     auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     upgrade->setHeader("Date", time_t_to_UTCString(now));
-    upgrade->setHeader("Server", "Unknown");
+    upgrade->setHeader("Server", SERVERNAME);
 
     if(upgrade->GetRequestHeader("Connection").size() == 0 ||
        tolower_(upgrade->GetRequestHeader("Connection")) != "upgrade") {
@@ -338,7 +354,8 @@ void HttpFileServer::request_listener(EventEmitter* obj, const std::string& even
 
     auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     request->setHeader("Date", time_t_to_UTCString(now));
-    request->setHeader("Server", "Unknown");
+    request->setHeader("Connection", "keep-alive");
+    request->setHeader("Server", SERVERNAME);
     std::string location = "http://" + request->GetRequestHeader("Host") + __url.m_path;
     request->setHeader("Location", location);
 
@@ -519,3 +536,4 @@ void HttpFileServer::UpgradeRequestIMPL::setHeader(const std::string& field, con
 {
     this->m_request->setHeader(field, value);
 } //}
+

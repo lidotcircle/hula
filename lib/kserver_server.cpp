@@ -26,6 +26,27 @@ void Server::on_connection(UNST connection) //{
         return;
     }
 
+    if(connection->is_null()) {
+        __logger->warn("Server: recieve a bad connection");
+        return;
+    }
+
+    if(this->mp_fileserver == nullptr) {
+        auto http_config_file = this->m_config->HttpConfig();
+        auto mm = this->m_config->GetFileMechanism();
+        auto http_config = Factory::Config::createHttpFileServerConfig(http_config_file, mm);
+        http_config->loadFromFile(nullptr, nullptr);
+
+        auto server = Factory::Web::createHttpFileServer(this->newUnderlyStream(), 
+                std::shared_ptr<HttpFileServerConfig>(http_config));
+        this->mp_fileserver = server;
+
+        if(this->mp_fileserver != nullptr) {
+            this->mp_fileserver->bind();
+            this->mp_fileserver->listen();
+        }
+    }
+
     ConnectionProxyAbstraction* newproxy = Factory::KProxyServer::createConnectionProxy(this, connection);
     this->m_connection_list.insert(newproxy);
     newproxy->start();
@@ -41,6 +62,17 @@ void Server::remove_proxy(ConnectionProxyAbstraction* p) //{
     delete p;
 } //}
 
+void Server::transferToHttpServer(ConnectionProxyAbstraction* p, UNST stream, ROBuf firstPacket) //{
+{
+    DEBUG("call %s", FUNCNAME);
+    this->remove_proxy(p);
+    if(this->mp_fileserver != nullptr) {
+        this->mp_fileserver->EmitAnConnection(stream, firstPacket);
+    } else {
+        this->releaseUnderlyStream(stream);
+    }
+} //}
+
 /** implement an abstract method */
 void Server::read_callback(ROBuf buf, int status) //{
 {
@@ -52,6 +84,7 @@ Server::Server(std::shared_ptr<ServerConfig> config): m_connection_list() //{
 {
     DEBUG("call %s", FUNCNAME);
     this->m_config = config;
+    this->mp_fileserver = nullptr;
     this->bind_addr = config->BindAddr();
     this->bind_port = config->BindPort();
 } //}

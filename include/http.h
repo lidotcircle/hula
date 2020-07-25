@@ -190,6 +190,8 @@ class Http: virtual public EBStreamAbstraction, virtual public StoreFetchPointer
         Http(const std::unordered_map<std::string, std::string>& default_response_header);
 
         void PushFirst(ROBuf buf);
+
+        virtual ~Http();
 }; //}
 
 struct __URL__ {
@@ -209,5 +211,13 @@ class UVHttp: public Http, public EBStreamUV {
     public:
        inline UVHttp(const std::unordered_map<std::string, std::string>& dh, uv_tcp_t* tcp):
            Http(dh), EBStreamUV(tcp) {this->start_read();}
+};
+
+
+#include "stream_libuvTLS.h"
+class UVTLSHttp: public Http, public EBStreamUVTLS {
+    public:
+        inline UVTLSHttp(const std::unordered_map<std::string, std::string>& dh, UNST tlscon):
+            Http(dh), EBStreamUVTLS(tlscon) {this->start_read();}
 };
 

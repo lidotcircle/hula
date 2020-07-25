@@ -16,5 +16,7 @@ class EBStreamUVTLS: public EBStreamTLS
         EBStreamUVTLS(uv_tcp_t* stream, TLSMode mode, const std::string& cert, const std::string& privateKey);
         EBStreamUVTLS(UNST stream);
         StreamType getType() override;
+
+        static UNST createUnderlyingStream(uv_tcp_t* tcp, TLSMode mode, const std::string& cert, const std::string& privateKey);
 };
 

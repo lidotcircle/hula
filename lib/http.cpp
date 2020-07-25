@@ -88,7 +88,7 @@ void Http::start_request() //{
             std::move(this->m_req_data));
     this->m_upgrade = (this->m_parser.upgrade == 1);
     if(this->m_upgrade) {
-        this->emit("upgrade", new HttpArg::RequestArgs(this->m_current_request));
+        this->emit("upgrade", new HttpArg::UpgradeArgs(this->m_current_request));
     } else {
         this->emit("request", new HttpArg::RequestArgs(this->m_current_request));
     }
@@ -301,6 +301,12 @@ void Http::PushFirst(ROBuf buf) //{
 {
     DEBUG("call %s", FUNCNAME);
     this->read_callback(buf, 0);
+} //}
+
+Http::~Http() //{
+{
+    if(this->m_current_request != nullptr)
+        delete this->m_current_request;
 } //}
 //}
 

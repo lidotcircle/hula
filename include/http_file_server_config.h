@@ -10,7 +10,9 @@ using nlohmann::json;
 //                              HttpFileServerConfig JSON format                  //{
 /**
  * {
- *     "document_root": <dir>
+ *     "document_root": <dir>, 
+ *     "bind_port": <port>, 
+ *     "bind_address": <address>
  * }
  */
 //}
@@ -19,6 +21,8 @@ using nlohmann::json;
 class HttpFileServerConfig: public ConfigFile {
     private:
         std::string m_docroot;
+        uint32_t    m_bind_addr;
+        uint16_t    m_bind_port;
 
     protected:
         bool  fromROBuf(ROBuf buf) override;
@@ -36,6 +40,8 @@ class HttpFileServerConfig: public ConfigFile {
         HttpFileServerConfig& operator=(HttpFileServerConfig&&) = delete;
 
         const std::string& DocRoot();
+        uint32_t BindAddr();
+        uint16_t BindPort();
 };
 
 

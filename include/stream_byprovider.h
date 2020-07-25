@@ -21,6 +21,7 @@ class EBStreamByProvider: public virtual EBStreamAbstraction //{
             public:
             inline __UnderlyingStreamProvider(StreamType type, __info_type* msg): __UnderlyingStream(type), msg(msg) {}
             inline __info_type* getStream() {return msg;}
+            inline bool is_null() override {return msg == nullptr;}
         };
 
         std::string m_stat_remote_address;

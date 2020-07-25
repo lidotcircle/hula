@@ -3,6 +3,8 @@
 #include "../include/ObjectFactory.h"
 #include "../include/http_file_server_config.h"
 
+#include "cert.h"
+
 static bool uv_continue = true;
 static bool uv_timer_set = false;
 static int handle_count = 0;
@@ -67,13 +69,17 @@ static void timer_handle(uv_timer_t* timer) //{
 void delete_object(EventEmitter* obj, const std::string& eventname, EventArgs::Base*) {delete obj;}
 
 void test1() {
-    auto config = new UVHttpFileServerConfig(g_loop, "../tests/httpfileserver_config.json");
-    config->loadFromFile(nullptr, nullptr);
+    auto config_ = new UVHttpFileServerConfig(g_loop, "../tests/httpfileserver_config.json");
+    config_->loadFromFile(nullptr, nullptr);
 
     uv_tcp_t* tcp = new uv_tcp_t();
     uv_tcp_init(g_loop, tcp);
+    auto config = std::shared_ptr<HttpFileServerConfig>(config_);
+    /*
     auto server = Factory::Web::createHttpFileServer(EBStreamUV::getWrapperFromStream(tcp), 
-            std::shared_ptr<HttpFileServerConfig>(config));
+            config);
+            */
+    auto server = Factory::Web::createUVTLSHttpFileServer(config, tcp, certificate, privateKey);
     file_server = server;
 
     server->bind_ipv4(8800, 0);

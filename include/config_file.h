@@ -39,6 +39,8 @@ class ConfigFile: virtual protected FileAbstraction, public CallbackManager //{
 
         bool setNewFile(const std::string& filename);
 
+        using FileAbstraction::GetFileMechanism;
+
         inline const auto& getError() {return this->m_error;}
 }; //}
 

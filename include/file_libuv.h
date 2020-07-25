@@ -6,6 +6,13 @@
 #include <uv.h>
 
 
+struct __UVFileMechanism: public __FileMechanism {
+    uv_loop_t* m_loop;
+    __UVFileMechanism(uv_loop_t* loop) {this->m_loop = loop;}
+    inline FileMechanismType getType() {return FileMechanismType::LIBUV;}
+};
+
+
 class UVFile: virtual public FileAbstraction, protected CallbackManager //{
 {
     private:
@@ -60,6 +67,8 @@ class UVFile: virtual public FileAbstraction, protected CallbackManager //{
         bool error()  override;
         int  flags()  override;
         int  mode()   override;
+
+        FileMechanism GetFileMechanism() override;
 
         inline auto get_uv_loop() {return this->mp_loop;}
         ~UVFile();

@@ -28,6 +28,13 @@ struct Stat {
 };
 
 
+enum FileMechanismType {LIBUV};
+struct __FileMechanism {
+    virtual FileMechanismType getType() = 0;
+    inline virtual ~__FileMechanism() {}
+};
+
+
 class FileAbstraction //{
 {
     public:
@@ -40,6 +47,7 @@ class FileAbstraction //{
         using TruncateCallback = void (*)(int status, void* data);
 
         using FileEventType = enum {RENAME, CHANGE};
+        using FileMechanism = std::shared_ptr<__FileMechanism>;
 
 
     protected:
@@ -68,6 +76,8 @@ class FileAbstraction //{
         virtual bool error() = 0;
         virtual int  flags() = 0;
         virtual int  mode() = 0;
+
+        virtual FileMechanism GetFileMechanism() = 0;
 
         virtual inline ~FileAbstraction() {};
 }; //}

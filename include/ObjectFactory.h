@@ -14,6 +14,8 @@
 #include "file.h"
 #include "file_libuv.h"
 
+#include "http_file_server_config.h"
+
 #include <memory>
 
 NS_PROXY_SERVER_START
@@ -57,11 +59,16 @@ namespace Factory {
         FileAbstraction* createUVFile(const std::string& filename, uv_loop_t* loop);
     };
 
+    namespace Config {
+        HttpFileServerConfig* createHttpFileServerConfig(const std::string& filename, FileAbstraction::FileMechanism mm);
+    };
 
     namespace Web {
         Http* createHttpSession(UNST con, const std::unordered_map<std::string, std::string>& default_header = {});
 
         HttpFileServer* createHttpFileServer(UNST con, std::shared_ptr<HttpFileServerConfig> config);
+        HttpFileServer* createUVTLSHttpFileServer(std::shared_ptr<HttpFileServerConfig> config, uv_tcp_t* tcp, 
+                                                  const std::string& cert, const std::string& privateKey);
     };
 };
 

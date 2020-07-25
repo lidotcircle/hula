@@ -18,6 +18,7 @@ class EBStreamUV: virtual public EBStreamAbstraction //{
             public:
             inline __UnderlyingStreamUV(StreamType type, uv_tcp_t* tcp): __UnderlyingStream(type), uv_tcp(tcp) {}
             inline uv_tcp_t* getStream() {return this->uv_tcp;}
+            inline bool is_null() override {return uv_tcp == nullptr;}
         };
 
 
@@ -76,6 +77,8 @@ class EBStreamUV: virtual public EBStreamAbstraction //{
         StreamType getType() override;
         static uv_tcp_t* getStreamFromWrapper(UNST wstream);
         static UNST      getWrapperFromStream(uv_tcp_t* stream);
+
+        uv_loop_t* get_uv_loop();
 
         bool timeout(TimeoutCallback cb, void* data, int time) override;
 }; //}

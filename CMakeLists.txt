@@ -56,6 +56,7 @@ set(kproxy_lib_src
     lib/http.cpp
     lib/http_file_server.cpp
     lib/http_file_server_libuv.cpp
+    lib/http_file_server_libuvTLS.cpp
     lib/http_file_server_config.cpp
     )
 

@@ -17,6 +17,8 @@ class EBStreamObjectUV: protected EBStreamUV, public EBStreamObject //{
         inline EBStreamObjectUV(UNST connection, size_t max): 
             EBStreamUV(connection), EBStreamObject(max) {}
 
+        using EBStreamUV::get_uv_loop;
+
         EBStreamObject* NewStreamObject(UNST stream) override;
         bool accept(EBStreamObject*) override;
 }; //}

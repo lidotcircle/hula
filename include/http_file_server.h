@@ -101,6 +101,7 @@ class HttpFileServer: virtual protected EBStreamAbstraction, public StoreFetchPo
 
         void EmitAnConnection(UNST con, ROBuf firstPacket);
 
+        void bind();
         using EBStreamAbstraction::bind;
         using EBStreamAbstraction::bind_ipv4;
         using EBStreamAbstraction::bind_ipv6;

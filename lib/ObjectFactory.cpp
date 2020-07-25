@@ -4,6 +4,8 @@
 #include "../include/stream_object_libuv.h"
 #include "../include/stream_byprovider.h"
 
+#include "../include/http_file_server_libuvTLS.h"
+
 
 namespace Factory {
     using UNST = EBStreamAbstraction::UNST;
@@ -17,9 +19,9 @@ namespace Factory {
         }
         ConnectionProxyAbstraction* createConnectionProxy(Server* server, UNST connection) {
             switch(connection->getType()) {
-                case LIBUV:
+                case StreamType::LIBUV:
                     return new UVMultiplexer(EBStreamUV::getStreamFromWrapper(connection), server);
-                case TLS_LIBUV:
+                case StreamType::TLS_LIBUV:
                     return new UVTLSMultiplexer(connection, server);
                 default:
                     return nullptr;
@@ -29,9 +31,9 @@ namespace Factory {
                                       UNST connection, StreamProvider::StreamId id, 
                                       const std::string& addr, uint16_t port) {
             switch(connection->getType()) {
-                case LIBUV:
+                case StreamType::LIBUV:
                     return new KProxyServer::UVToNet(proxy, stream, connection, id, addr, port);
-                case TLS_LIBUV:
+                case StreamType::TLS_LIBUV:
                     {
                         auto ctx = EBStreamTLS::getCTXFromWrapper(connection);
                         auto fffstream = ctx->mp_stream;
@@ -88,12 +90,30 @@ namespace Factory {
         }
     }
 
+    namespace Config {
+        HttpFileServerConfig* createHttpFileServerConfig(const std::string& filename, FileAbstraction::FileMechanism mm) //{
+        {
+            switch(mm->getType()) {
+                case FileMechanismType::LIBUV:
+                    {
+                        __UVFileMechanism* mmm = dynamic_cast<decltype(mmm)>(mm.get());
+                        assert(mmm);
+                        return new UVHttpFileServerConfig(mmm->m_loop, filename);
+                    }
+                default:
+                    return nullptr;
+            }
+        } //}
+    }
+
     namespace Web {
         Http* createHttpSession(UNST con, const std::unordered_map<std::string, std::string>& default_header) //{
         {
             switch(con->getType()) {
                 case StreamType::LIBUV:
                     return new UVHttp(default_header, EBStreamUV::getStreamFromWrapper(con));
+                case StreamType::TLS_LIBUV:
+                    return new UVTLSHttp(default_header, con);
                 default:
                     return nullptr;
             }
@@ -104,10 +124,18 @@ namespace Factory {
             switch(con->getType()) {
                 case StreamType::LIBUV:
                     return new UVHttpFileServer(config, EBStreamUV::getStreamFromWrapper(con));
+                case StreamType::TLS_LIBUV:
+                    return new UVTLSHttpFileServer(config, con);
                 default:
                     return nullptr;
             }
         } //}
+        HttpFileServer* createUVTLSHttpFileServer(std::shared_ptr<HttpFileServerConfig> config, uv_tcp_t* tcp, //{
+                                                  const std::string& cert, const std::string& privateKey)
+        {
+            return new UVTLSHttpFileServer(config, tcp, cert, privateKey);
+        } //}
+
     }
 };
 

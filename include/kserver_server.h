@@ -2,6 +2,7 @@
 
 #include "kserver.h"
 #include "stream.h"
+#include "http_file_server.h"
 
 #include <memory>
 #include <unordered_set>
@@ -25,12 +26,14 @@ class Server: virtual protected EBStreamAbstraction //{
         std::shared_ptr<ServerConfig> m_config;
 
         std::unordered_set<ConnectionProxyAbstraction*> m_connection_list;
+        HttpFileServer* mp_fileserver;
 
 
     protected:
         friend class ClientConnectionProxy;
 
         void remove_proxy(ConnectionProxyAbstraction* p);
+        void transferToHttpServer(ConnectionProxyAbstraction* p, UNST stream, ROBuf firstPacket);
 
         void read_callback(ROBuf buf, int status) override;
         void on_connection(UNST connection) override;

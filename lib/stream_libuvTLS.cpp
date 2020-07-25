@@ -34,3 +34,12 @@ EBStreamObject* EBStreamUVTLS::getStreamObject(UNST stream) //{
 } //}
 StreamType EBStreamUVTLS::getType() {return StreamType::TLS_LIBUV;}
 
+/** [static] */
+EBStreamUVTLS::UNST EBStreamUVTLS::createUnderlyingStream(uv_tcp_t* tcp, TLSMode mode, //{
+        const std::string& cert, const std::string& privateKey)
+{
+    auto stream = Factory::createUVStreamObject(STREAM_BUFFER_SIZE, EBStreamUV::getWrapperFromStream(tcp));
+    auto ctx = EBStreamTLS::getCTX(mode, stream, cert, privateKey);
+    return UNST(new TLSUS(StreamType::TLS_LIBUV, ctx));
+} //}
+

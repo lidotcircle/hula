@@ -72,7 +72,7 @@ UVFile::UVFile(uv_loop_t* loop, const std::string& filename): m_filename(filenam
 void UVFile::register_file_watcher() //{
 {
     assert(this->m_file_watcher == nullptr);
-    this->m_file_watcher = new uv_fs_event_t();
+    this->m_file_watcher = new uv_fs_event_t(); // FIXME LOSS
     uv_fs_event_init(this->mp_loop, this->m_file_watcher);
     uv_handle_set_data((uv_handle_t*)this->m_file_watcher, this);
     uv_fs_event_start(this->m_file_watcher, file_watcher_callback, this->m_filename.c_str(), 0);
@@ -652,6 +652,11 @@ bool UVFile::opened() {return this->m_fd > 0;}
 bool UVFile::error()  {return this->m_error;}
 int  UVFile::mode()   {return this->m_mode;}
 int  UVFile::flags()  {return this->m_flags;}
+
+FileAbstraction::FileMechanism UVFile::GetFileMechanism() //{
+{
+    return FileMechanism(new __UVFileMechanism(this->mp_loop));
+} //}
 
 static void clean_close_callback(uv_fs_t* req) {freereq(req);}
 UVFile::~UVFile() //{
