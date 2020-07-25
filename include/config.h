@@ -38,3 +38,6 @@
 #endif // defined(_WIN32) || defined(_WIN64)
 
 
+#define CLIENT_DEFAULT_CONFIG_DIR   "../tests"
+#define CLIENT_DEFAULT_CONFIG_NAME  "client.conf"
+

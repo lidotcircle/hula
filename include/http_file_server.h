@@ -107,6 +107,9 @@ class HttpFileServer: virtual protected EBStreamAbstraction, public StoreFetchPo
         using EBStreamAbstraction::bind_ipv6;
         using EBStreamAbstraction::listen;
 
+        using EBStreamAbstraction::newUnderlyStream;
+        using EBStreamAbstraction::releaseUnderlyStream;
+
         void SetUpgradeHandler(UpgradeHandler h);
         void SetWSHandler(UpgradeHandler h);
         void SetUpgradeData(UpgradeExtraData* data);

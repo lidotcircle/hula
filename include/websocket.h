@@ -14,6 +14,8 @@
 #include "utils.h"
 #include "stream.h"
 
+#include <evtls/help_class.h>
+
 #define __MIN2(x, y) (x < y ? x : y)
 #define __MAX2(x, y) (x > y ? x : y)
 
@@ -153,7 +155,7 @@ struct WSEventClose: public WSEventArgvBase {
  *     @param (clean: boolean) indicates whether websocket is closed cleanly
  *///}
 
-class WebSocketCommon: virtual public EBStreamAbstraction //{
+class WebSocketCommon: virtual public EBStreamAbstraction, virtual public evtls::StoreFetchPointer //{
 {
     private:
         WebsocketState m_state;
