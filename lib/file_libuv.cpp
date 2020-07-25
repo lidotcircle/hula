@@ -63,10 +63,8 @@ UVFile::UVFile(uv_loop_t* loop, const std::string& filename): m_filename(filenam
 
     this->m_pos = 0;
 
-    this->m_watching = false;
     this->m_file_watcher = nullptr;
     this->register_file_watcher();
-    this->m_watching = true;
 } //}
 
 void UVFile::register_file_watcher() //{
@@ -88,17 +86,11 @@ void UVFile::file_watcher_callback(uv_fs_event_t* handle, const char* filename, 
 {
     UVFile* _this = static_cast<decltype(_this)>(uv_handle_get_data((uv_handle_t*)handle));
 
-    if(status < 0) {
-        /*
-        _this->release_file_watcher(); // TODO
-        _this->m_watching = false;
-        */
+    if(status < 0)
         return;
-    }
 
     if(_this->m_error) {
         _this->release_file_watcher();
-        _this->m_watching = false;
         return;
     }
 
@@ -639,9 +631,8 @@ bool UVFile::reopen(const std::string& filename, int flag, int mode, OpenCallbac
     this->m_flags = 0;
     this->m_mode = 0;
 
-    if(this->m_watching)
+    if(this->m_file_watcher != nullptr)
         this->release_file_watcher();
-    this->m_watching = true;
     this->register_file_watcher();
 
     return this->open(flag | O_CREAT, mode, cb, data);
@@ -665,6 +656,6 @@ UVFile::~UVFile() //{
         uv_fs_t* req = new uv_fs_t();
         uv_fs_close(this->mp_loop, req, this->m_fd, clean_close_callback);
     }
-    if(this->m_watching) this->release_file_watcher();
+    if(this->m_file_watcher != nullptr) this->release_file_watcher();
 } //}
 

@@ -120,6 +120,8 @@ void Server::close() //{
 
     this->release();
     this->m_config.reset();
+
+    delete this->mp_fileserver;
     return;
 } //}
 

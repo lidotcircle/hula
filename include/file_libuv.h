@@ -28,7 +28,6 @@ class UVFile: virtual public FileAbstraction, protected CallbackManager //{
         uv_loop_t* mp_loop;
 
         uv_fs_event_t* m_file_watcher;
-        bool m_watching;
 
         static void open_callback(uv_fs_t* req);
         static void close_callback(uv_fs_t* req);
