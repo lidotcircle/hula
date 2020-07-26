@@ -153,6 +153,20 @@ void ResourceManager::Response(WebSocketServer* ws, int id, bool error, std::str
     std::string ans = theresult.dump(4);
     ws->sendText(ans);
 } //}
+bool ResourceManager::Inform(const std::string& eventname, const std::vector<std::string>& args) //{
+{
+    if(this->mp_wsserver.size() == 0)  return false;
+
+    WebSocketServer* ws = *this->mp_wsserver.begin();
+    json theresult = json::object();
+    theresult["EVENTNAME"] = eventname;
+    theresult["ARGS"]= json::array();
+    for(auto& arg: args) theresult["ARGS"].push_back(arg);
+
+    std::string ans = theresult.dump(4);
+    ws->sendText(ans);
+    return true;
+} //}
 
 EBStreamAbstraction::UNST    ResourceManager::NewUNST() //{
 {

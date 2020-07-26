@@ -5,7 +5,7 @@ project(kproxy)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(__CXX_VERSION 17)
 
-set(CMAKE_CXX_FLAGS "-g ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-std=gnu++17 -g ${CMAKE_CXX_FLAGS}")
 set(CMAKE_C_FLAGS   "-g ${CMAKE_C_FLAGS}")
 
 set(kproxy_server kproxys)
@@ -39,6 +39,7 @@ set(kproxy_lib_src
     lib/kclient_clientproxy.cpp
     lib/kclient_multiplexer.cpp
     lib/kclient_config.cpp
+    lib/kclient_manager.cpp
 
     lib/manager.cpp
     lib/manager_libuv.cpp

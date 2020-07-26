@@ -14,6 +14,9 @@
 
 
 /** A JSON base RPC provider, communicate with websocket.
+ *
+ *
+ * 1. REQUEST:
  *  The expected message has following format,
  *      {
  *          "ID":    <int>,
@@ -22,6 +25,7 @@
  *      }
  *  Messages differ with above example will be ignored.
  *
+ * 2. RESPONCE:
  *  And this manager should return message with following format,
  *      {
  *          "ID":     <int>,
@@ -33,6 +37,13 @@
  *
  *  ID should greater than 0, except
  *  (ID = -1) specify response of unknown message
+ *
+ * 3. INFORM:
+ *  Inform an event has happend,
+ *      {
+ *          "EVENTNAME": <string>
+ *          "EVENTARGS": [<string>]
+ *      }
  */
 
 
@@ -65,6 +76,7 @@ class ResourceManager
 
         virtual void Request(WebSocketServer* ws, int id, const std::string& fname, std::vector<std::string> args) = 0;
         void         Response(WebSocketServer* ws, int id, bool error, std::string msg);
+        bool         Inform(const std::string& eventname, const std::vector<std::string>& args);
 
         UNST    NewUNST();
 

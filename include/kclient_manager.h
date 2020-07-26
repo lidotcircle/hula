@@ -1,10 +1,8 @@
 #pragma once
 
-#include "manager.h"
+#include "k_manager.hpp"
 #include "kclient_server.h"
-
-#include <set>
-#include <map>
+#include "kclient.h"
 
 
 /** RPC LIST */
@@ -33,56 +31,20 @@
 NS_PROXY_CLIENT_START
 
 
-#define CLIENT_MG_DISPATCH_FUNC_ARGS \
-     ServerManager* mg, WebSocketServer* ws, int id, \
-     const std::string& fname, std::vector<std::string> args
-
-class ServerManager: virtual public ResourceManager
+class ServerManager: public KManager<Server> 
 {
+
     private:
-        using DispatchFunc = void (*)(CLIENT_MG_DISPATCH_FUNC_ARGS);
-        std::map<std::string, DispatchFunc> m_dispatch_funcs;
-
-        int m_servers_inc;
-        int m_configs_inc;
-        std::map<int, std::pair<int, Server*>> m_servers;
-        std::map<int, std::string>   m_configs;
-        std::map<int, std::set<int>> m_config_server;
-
-        void register_dispatch(const std::string& fname, DispatchFunc);
-
-#define DEFINE_FUNC(fname) static void fname(CLIENT_MG_DISPATCH_FUNC_ARGS);
-        CLIENT_RPC_LIST(DEFINE_FUNC);
-#undef DEFINE_FUNC
-
-        int  new_server(int config_id);
-        void shutdown_server(int server_id);
-
-        void rescan_configs();
-        bool add_config   (const std::string& filename, const std::string& config);
-        bool delete_config(int config_id);
-        bool rename_config(int config_id, const std::string& newname);
-
-
-    protected:
-        void Request(WebSocketServer* ws, int id, const std::string& fname, std::vector<std::string> args) override;
-
-        virtual Server* createServer(const std::string& filename, UNST con) = 0;
-
+#define FUNC_CALL(fname) static void fname(RequestArg arg);
+        CLIENT_RPC_LIST(FUNC_CALL)
+#undef  FUNC_CALL
 
     public:
         ServerManager();
-
-        ServerManager(ServerManager&&) = delete;
-        ServerManager(const ServerManager&) = delete;
-        ServerManager& operator=(ServerManager&&) = delete;
-        ServerManager& operator=(const ServerManager&) = delete;
-
-        void start();
-
-        ~ServerManager();
+        void start() override;
 };
 
 
 NS_PROXY_CLIENT_END
+
 
