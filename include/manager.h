@@ -78,6 +78,8 @@ class ResourceManager
         void         Response(WebSocketServer* ws, int id, bool error, std::string msg);
         bool         Inform(const std::string& eventname, const std::vector<std::string>& args);
 
+        void setup_FileServer(HttpFileServer* server);
+
         UNST    NewUNST();
 
 

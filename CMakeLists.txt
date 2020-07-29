@@ -40,6 +40,7 @@ set(kproxy_lib_src
     lib/kclient_multiplexer.cpp
     lib/kclient_config.cpp
     lib/kclient_manager.cpp
+    lib/kclient_manager_libuv.cpp
 
     lib/manager.cpp
     lib/manager_libuv.cpp
@@ -63,6 +64,8 @@ set(kproxy_lib_src
     lib/http_file_server_libuv.cpp
     lib/http_file_server_libuvTLS.cpp
     lib/http_file_server_config.cpp
+
+    lib/ifbs.cpp
     )
 
 include_directories("${CMAKE_CURRENT_LIST_DIR}/include")

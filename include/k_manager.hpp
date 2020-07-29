@@ -2,11 +2,13 @@
 
 #include "manager.h"
 #include "kclient_server.h"
+#include "ifbs.h"
 
 #include <set>
 #include <map>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 
 
 
@@ -22,16 +24,17 @@ class KManager: virtual public ResourceManager
                 virtual int  GetID() = 0;
                 virtual const std::string& GetFunc() = 0;
                 virtual size_t  GetArgc() = 0;
-                virtual const std::string& GetArg(size_t i) = 0;
+                virtual IFBS GetArg(size_t i) = 0;
                 inline virtual ~__RequestArg() {}
         };
     public:
         using RequestArg = std::shared_ptr<__RequestArg>;
+        using Server     = T;
 
+        static bool verify_args(RequestArg arg, const std::string& as);
 
     private:
         using DispatchFunc = void (*)(RequestArg);
-        using Server       = T;
         std::map<std::string, DispatchFunc> m_dispatch_funcs;
 
         int m_servers_inc;
@@ -65,18 +68,18 @@ class KManager: virtual public ResourceManager
                 inline void fail(const std::string& reason) override {
                     assert(this->m_returned == false);
                     this->m_returned = true;
-                    this->m_ma->Response(ws, this->m_id, true, reason);
+                    this->m_manager->Response(this->m_ws, this->m_id, true, reason);
                 }
                 void success(const std::string& result) override {
                     assert(this->m_returned == false);
                     this->m_returned = true;
-                    this->m_manager->Response(ws, this->m_id, false, result);
+                    this->m_manager->Response(this->m_ws, this->m_id, false, result);
                 }
                 inline KManager* GetThis() {return this->m_manager;}
                 inline int  GetID() override {return this->m_id;}
                 inline const std::string& GetFunc() override {return this->m_fname;}
                 inline size_t  GetArgc() override {return this->m_args.size();}
-                inline const std::string& GetArg(size_t i) override {assert(i < this->GetArgc()); return this->m_args[i];}
+                inline IFBS    GetArg(size_t i) override {assert(i < this->GetArgc()); return this->m_args[i];}
                 inline ~RequestArgImpl() {assert(this->m_returned == true);} // TODO ???
         }; //}
 
@@ -263,7 +266,36 @@ void KManager<T>::Request(WebSocketServer* ws, int id, const std::string& fname,
         return;
     }
 
-    RequestArgImpl* _arg = new RequestArgImpl(fname, id, ws, args, this);
-    this->m_dispatch_funcs[fname](std::shared_ptr<RequestArg>(_arg));
+    RequestArgImpl* _arg = new RequestArgImpl(fname, id, ws, std::move(args), this);
+    this->m_dispatch_funcs[fname](RequestArg(_arg));
+} //}
+
+template<typename T>
+KManager<T>::~KManager() {}
+
+template<typename T>
+bool KManager<T>::verify_args(RequestArg arg, const std::string& as) //{
+{
+    if(arg->GetArgc() != as.size()) return false;
+    for(size_t i=0;i<as.size();i++) {
+        char c = as[i];
+        auto a = arg->GetArg(i);
+        switch(c) {
+            case 'i':
+                if(!a.is_integer()) return false;
+                break;
+            case 'f':
+                if(!a.is_float()) return false;
+                break;
+            case 'b':
+                if(!a.is_boolean()) return false;
+                break;
+            case 's':
+                break;
+            default:
+                return false;
+        }
+    }
+    return true;
 } //}
 

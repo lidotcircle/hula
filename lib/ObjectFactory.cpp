@@ -6,6 +6,7 @@
 
 #include "../include/http_file_server_libuvTLS.h"
 
+#include "../include/websocket_libuv.h"
 
 namespace Factory {
     using UNST = EBStreamAbstraction::UNST;
@@ -104,6 +105,33 @@ namespace Factory {
                     return nullptr;
             }
         } //}
+
+        ServerConfig* createServerConfig(const std::string& filename, FileAbstraction::FileMechanism mm) //{
+        {
+            switch(mm->getType()) {
+                case FileMechanismType::LIBUV:
+                    {
+                        __UVFileMechanism* mmm = dynamic_cast<decltype(mmm)>(mm.get());
+                        assert(mmm);
+                        return new UVServerConfig(mmm->m_loop, filename);
+                    }
+                default:
+                    return nullptr;
+            }
+        } //}
+        ClientConfig* createClientConfig(const std::string& filename, FileAbstraction::FileMechanism mm) //{
+        {
+            switch(mm->getType()) {
+                case FileMechanismType::LIBUV:
+                    {
+                        __UVFileMechanism* mmm = dynamic_cast<decltype(mmm)>(mm.get());
+                        assert(mmm);
+                        return new UVClientConfig(mmm->m_loop, filename);
+                    }
+                default:
+                    return nullptr;
+            }
+        } //}
     }
 
     namespace Web {
@@ -114,6 +142,16 @@ namespace Factory {
                     return new UVHttp(default_header, EBStreamUV::getStreamFromWrapper(con));
                 case StreamType::TLS_LIBUV:
                     return new UVTLSHttp(default_header, con);
+                default:
+                    return nullptr;
+            }
+        } //}
+
+        WebSocketServer* createWSServer(UNST con) //{
+        {
+            switch(con->getType()) {
+                case StreamType::LIBUV:
+                    return new UVWebsocketServer(EBStreamUV::getStreamFromWrapper(con));
                 default:
                     return nullptr;
             }

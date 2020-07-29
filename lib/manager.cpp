@@ -63,6 +63,14 @@ void ResourceManager::clean_ws(WebSocketServer* ws) //{
     delete ws;
 } //}
 
+void ResourceManager::setup_FileServer(HttpFileServer* server) //{
+{
+    assert(this->mp_httpserver == nullptr);
+    assert(server != nullptr);
+    this->mp_httpserver = server;
+    this->mp_httpserver->bind();
+    assert(this->mp_httpserver->listen()); // TODO
+} //}
 
 #define GETTHIS(ET) \
     WebSocketServer* ws = dynamic_cast<decltype(ws)>(obj); assert(ws); \

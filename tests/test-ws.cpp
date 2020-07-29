@@ -2,7 +2,7 @@
 #include "../include/config.h"
 
 void echo_textMessage(EventEmitter* server, const std::string& event, EventArgs::Base* argv) {
-    UVWebsocketCommon* _this = dynamic_cast<decltype(_this)>(server);
+    WebSocketCommon* _this = dynamic_cast<decltype(_this)>(server);
     assert(_this);
     WSEventTextMessage* _msg = dynamic_cast<decltype(_msg)>(argv);
     assert(_msg);
@@ -17,7 +17,7 @@ void on_end(EventEmitter* obj, const std::string& event, EventArgs::Base* argv) 
 }
 
 void echo_message(EventEmitter* server, const std::string& event, EventArgs::Base* argv) {
-    UVWebsocketCommon* _this = dynamic_cast<decltype(_this)>(server);
+    WebSocketCommon* _this = dynamic_cast<decltype(_this)>(server);
     assert(_this);
     WSEventMessage* _msg = dynamic_cast<decltype(_msg)>(argv);
     assert(_msg);
@@ -26,7 +26,7 @@ void echo_message(EventEmitter* server, const std::string& event, EventArgs::Bas
 }
 
 void echo_fragment(EventEmitter* server, const std::string& event, EventArgs::Base* argv) {
-    UVWebsocketCommon* _this = dynamic_cast<decltype(_this)>(server);
+    WebSocketCommon* _this = dynamic_cast<decltype(_this)>(server);
     assert(_this);
     WSEventFragment* _msg = dynamic_cast<decltype(_msg)>(argv);
     assert(_msg);

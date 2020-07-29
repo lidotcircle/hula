@@ -4,7 +4,7 @@
     "cipher": "chacha20",
     "http_config": "../tests/httpfileserver_config.json",
     "bind_address": "0.0.0.0",
-    "bind_port": 8800,
+    "bind_port": 7788,
     "users": [
         {
             "username": "admin",

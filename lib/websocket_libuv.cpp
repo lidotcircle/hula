@@ -2,8 +2,8 @@
 
 
 UVWebsocketClient::UVWebsocketClient(uv_tcp_t* connection, bool save_fragment):
-    UVWebsocketCommon(connection, true, save_fragment) {}
+    WebSocketClient(save_fragment), EBStreamUV(connection) {}
 
 UVWebsocketServer::UVWebsocketServer(uv_tcp_t* connection, bool save_fragment):
-    UVWebsocketCommon(connection, false, save_fragment) {}
+    WebSocketServer(save_fragment), EBStreamUV(connection) {}
 

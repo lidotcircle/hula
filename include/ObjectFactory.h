@@ -61,10 +61,15 @@ namespace Factory {
 
     namespace Config {
         HttpFileServerConfig* createHttpFileServerConfig(const std::string& filename, FileAbstraction::FileMechanism mm);
+
+        ServerConfig* createServerConfig(const std::string& filename, FileAbstraction::FileMechanism mm);
+        ClientConfig* createClientConfig(const std::string& filename, FileAbstraction::FileMechanism mm);
     };
 
     namespace Web {
         Http* createHttpSession(UNST con, const std::unordered_map<std::string, std::string>& default_header = {});
+
+        WebSocketServer* createWSServer(UNST con);
 
         HttpFileServer* createHttpFileServer(UNST con, std::shared_ptr<HttpFileServerConfig> config);
         HttpFileServer* createUVTLSHttpFileServer(std::shared_ptr<HttpFileServerConfig> config, uv_tcp_t* tcp, 

@@ -39,6 +39,7 @@ class ServerManager: public KManager<Server>
         CLIENT_RPC_LIST(FUNC_CALL)
 #undef  FUNC_CALL
 
+
     public:
         ServerManager();
         void start() override;

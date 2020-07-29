@@ -24,10 +24,10 @@ void ServerManager::start() //{
 void ServerManager::NEW_INSTANCE(RequestArg arg) //{
 {
     GETTHIS();
-    if(arg->GetArgc() != 1)
-        return arg->fail(std::string(__func__) + ": bad arguments, required 1");
+    if(!verify_args(arg, "i")) 
+        return arg->fail(std::string(__func__) + ": bad arguments, required 1 integer");
 
-    int id = atoi(arg->GetArg(0).c_str());
+    int id = arg->GetArg(0);
     if(!_this->has_config(id))
         return arg->fail(std::string(__func__) + ": config " + std::to_string(id) + " doesn't exist");
 
@@ -40,10 +40,10 @@ void ServerManager::NEW_INSTANCE(RequestArg arg) //{
 void ServerManager::CLOSE_INSTANCE(RequestArg arg) //{
 {
     GETTHIS();
-    if(arg->GetArgc() != 1)
+    if(!verify_args(arg, "i"))
         return arg->fail(std::string(__func__) + ": bad arguments, required 1");
 
-    int id = atoi(arg->GetArg(0).c_str());
+    int id = arg->GetArg(0);
     if(!_this->has_server(id))
         return arg->fail(std::string(__func__) + ": server " + std::to_string(id) + " doesn't exist");
 

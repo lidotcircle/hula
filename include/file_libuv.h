@@ -68,6 +68,7 @@ class UVFile: virtual public FileAbstraction, protected CallbackManager //{
         int  mode()   override;
 
         FileMechanism GetFileMechanism() override;
+        static FileMechanism loop_to_FileMechanism(uv_loop_t* loop);
 
         inline auto get_uv_loop() {return this->mp_loop;}
         ~UVFile();

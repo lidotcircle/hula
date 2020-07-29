@@ -1,3 +1,5 @@
 {
-    "document_root": "../../docroot"
+    "bind_port": 7788,
+    "bind_address": "0.0.0.0",
+    "document_root": "../../kproxy-ui/docroot"
 }

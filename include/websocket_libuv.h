@@ -5,19 +5,12 @@
 
 #include <set>
 
-class UVWebsocketCommon: public EBStreamUV, public WebSocketCommon //{
-{
-    public:
-        inline UVWebsocketCommon(uv_tcp_t* tcp_connection, bool masked, bool save_fragment): 
-            EBStreamUV(tcp_connection), WebSocketCommon(masked, save_fragment) {};
-}; //}
-
-class UVWebsocketClient: public UVWebsocketCommon //{
+class UVWebsocketClient: public WebSocketClient, public EBStreamUV //{
 {
     public:
         UVWebsocketClient(uv_tcp_t* connection, bool save_fragment = false);
 }; //}
-class UVWebsocketServer: public UVWebsocketCommon //{
+class UVWebsocketServer: public WebSocketServer, public EBStreamUV //{
 {
     public:
         UVWebsocketServer(uv_tcp_t* connection, bool save_fragment = false);

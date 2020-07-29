@@ -646,7 +646,12 @@ int  UVFile::flags()  {return this->m_flags;}
 
 FileAbstraction::FileMechanism UVFile::GetFileMechanism() //{
 {
-    return FileMechanism(new __UVFileMechanism(this->mp_loop));
+    return loop_to_FileMechanism(this->mp_loop);
+} //}
+/** [static] */
+FileAbstraction::FileMechanism UVFile::loop_to_FileMechanism(uv_loop_t* loop) //{
+{
+    return FileMechanism(new __UVFileMechanism(loop));
 } //}
 
 static void clean_close_callback(uv_fs_t* req) {freereq(req);}
