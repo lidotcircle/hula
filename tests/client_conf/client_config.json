@@ -1,0 +1,28 @@
+{
+    "mode": "port",
+    "rule": "all",
+    "bind_address": "0.0.0.0",
+    "bind_port": 1080,
+    "socks5_authentication": "allowed",
+    "proxy_rule": "../tests/gfwlist.txt",
+    "ad_rule": "../tests/adblock.txt",
+
+    "local_users": [
+        {
+            "password": "test_password",
+            "username": "test"
+        }
+    ],
+
+    "servers": [
+        {
+            "server_name": "beybey",
+            "address": "www.example.com",
+            "port": 7700,
+            "certificate": "fake certificate",
+            "cipher": "chacha20",
+            "username": "admin",
+            "password": "password"
+        }
+    ]
+}

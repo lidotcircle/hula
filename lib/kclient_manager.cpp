@@ -2,14 +2,18 @@
 #include "../include/config.h"
 
 
+#define DEBUG(all...) __logger->debug(all)
+
 NS_PROXY_CLIENT_START
 
 
 ServerManager::ServerManager(): KManager(CLIENT_DEFAULT_CONFIG_DIR, CLIENT_DEFAULT_CONFIG_NAME) //{
 {
+    DEBUG("call %s", FUNCNAME);
 } //}
 void ServerManager::start() //{
 {
+    DEBUG("call %s", FUNCNAME);
 #define REGISTER_FCALL(fname) this->register_dispatch(#fname, fname);
     CLIENT_RPC_LIST(REGISTER_FCALL)
 #undef  REGISTER_FCALL
@@ -23,6 +27,7 @@ void ServerManager::start() //{
 /** [static] */
 void ServerManager::NEW_INSTANCE(RequestArg arg) //{
 {
+    DEBUG("call %s", FUNCNAME);
     GETTHIS();
     if(!verify_args(arg, "i")) 
         return arg->fail(std::string(__func__) + ": bad arguments, required 1 integer");
@@ -39,6 +44,7 @@ void ServerManager::NEW_INSTANCE(RequestArg arg) //{
 } //}
 void ServerManager::CLOSE_INSTANCE(RequestArg arg) //{
 {
+    DEBUG("call %s", FUNCNAME);
     GETTHIS();
     if(!verify_args(arg, "i"))
         return arg->fail(std::string(__func__) + ": bad arguments, required 1");
@@ -52,24 +58,29 @@ void ServerManager::CLOSE_INSTANCE(RequestArg arg) //{
 } //}
 void ServerManager::GET_INSTANCES_STATUS(RequestArg arg) //{
 {
+    DEBUG("call %s", FUNCNAME);
     arg->fail("unimplemented");
 } //}
 
 /** [static] */
 void ServerManager::GET_CONFIG_LIST(RequestArg arg) //{
 {
+    DEBUG("call %s", FUNCNAME);
     arg->fail("unimplemented");
 } //}
 void ServerManager::ADD_CONFIG(RequestArg arg) //{
 {
+    DEBUG("call %s", FUNCNAME);
     arg->fail("unimplemented");
 } //}
 void ServerManager::DELETE_CONFIG(RequestArg arg) //{
 {
+    DEBUG("call %s", FUNCNAME);
     arg->fail("unimplemented");
 } //}
 void ServerManager::RENAME_CONFIG(RequestArg arg) //{
 {
+    DEBUG("call %s", FUNCNAME);
     arg->fail("unimplemented");
 } //}
 #undef  GETTHIS

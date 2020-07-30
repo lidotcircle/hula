@@ -6,18 +6,23 @@ using nlohmann::json;
 #include <assert.h>
 
 
+#define DEBUG(all...) __logger->debug(all)
+
+
 struct UpgradeExtraData__: public HttpFileServer::UpgradeExtraData {
     ResourceManager* _this;
 };
 
 ResourceManager::ResourceManager() //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->mp_httpserver = nullptr;
 } //}
 
 static void dead_listener(EventEmitter* obj, const std::string& eventname, EventArgs::Base*) {delete obj;}
 void ResourceManager::post_init(const std::string& filename, UNST connection) //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->mp_httpserver == nullptr);
     assert(this->mp_wsserver.size() == 0);
 
@@ -35,6 +40,7 @@ void ResourceManager::post_init(const std::string& filename, UNST connection) //
 /** [static] */
 void ResourceManager::websocketUpgradeHandler(HttpFileServer::UpgradeRequest* upgrade, HttpFileServer::UpgradeExtraData* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     UpgradeExtraData__* msg = dynamic_cast<decltype(msg)>(data); assert(msg);
     auto _this = msg->_this;
 
@@ -46,6 +52,7 @@ void ResourceManager::websocketUpgradeHandler(HttpFileServer::UpgradeRequest* up
 
 void ResourceManager::setup_new_ws(WebSocketServer* ws) //{
 {
+    DEBUG("call %s", FUNCNAME);
     ws->StorePtr(this);
 
     ws->on("message", ws_message_listener);
@@ -58,18 +65,10 @@ void ResourceManager::setup_new_ws(WebSocketServer* ws) //{
 } //}
 void ResourceManager::clean_ws(WebSocketServer* ws) //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->mp_wsserver.find(ws) != this->mp_wsserver.end());
     this->mp_wsserver.erase(this->mp_wsserver.find(ws));
     delete ws;
-} //}
-
-void ResourceManager::setup_FileServer(HttpFileServer* server) //{
-{
-    assert(this->mp_httpserver == nullptr);
-    assert(server != nullptr);
-    this->mp_httpserver = server;
-    this->mp_httpserver->bind();
-    assert(this->mp_httpserver->listen()); // TODO
 } //}
 
 #define GETTHIS(ET) \
@@ -79,11 +78,13 @@ void ResourceManager::setup_FileServer(HttpFileServer* server) //{
 /** [static] */
 void ResourceManager::ws_message_listener    (EventEmitter* obj, const std::string& eventname, EventArgs::Base* args) //{
 {
+    DEBUG("call %s", FUNCNAME);
     GETTHIS(WSEventMessage);
     _this->Response(ws, -1, true, "bad message, expected a text message with json format");
 } //}
 void ResourceManager::ws_messageText_listener(EventEmitter* obj, const std::string& eventname, EventArgs::Base* args) //{
 {
+    DEBUG("call %s", FUNCNAME);
     GETTHIS(WSEventTextMessage);
     auto msg = argv->m_msg;
 
@@ -137,11 +138,13 @@ void ResourceManager::ws_messageText_listener(EventEmitter* obj, const std::stri
 } //}
 void ResourceManager::ws_error_listener      (EventEmitter* obj, const std::string& eventname, EventArgs::Base* args) //{
 {
+    DEBUG("call %s", FUNCNAME);
     GETTHIS(WSEventError);
     _this->clean_ws(ws);
 } //}
 void ResourceManager::ws_end_listener        (EventEmitter* obj, const std::string& eventname, EventArgs::Base* args) //{
 {
+    DEBUG("call %s", FUNCNAME);
     GETTHIS(WSEventEnd);
     ws->end(WebsocketStatusCode::CLOSE_NORMAL, "NORMAL CLOSE");
     _this->clean_ws(ws);
@@ -150,6 +153,7 @@ void ResourceManager::ws_end_listener        (EventEmitter* obj, const std::stri
 
 void ResourceManager::Response(WebSocketServer* ws, int id, bool error, std::string msg) //{
 {
+    DEBUG("call %s", FUNCNAME);
     if(this->mp_wsserver.find(ws) == this->mp_wsserver.end())
         return;
 
@@ -163,37 +167,42 @@ void ResourceManager::Response(WebSocketServer* ws, int id, bool error, std::str
 } //}
 bool ResourceManager::Inform(const std::string& eventname, const std::vector<std::string>& args) //{
 {
+    DEBUG("call %s", FUNCNAME);
     if(this->mp_wsserver.size() == 0)  return false;
 
-    WebSocketServer* ws = *this->mp_wsserver.begin();
     json theresult = json::object();
     theresult["EVENTNAME"] = eventname;
-    theresult["ARGS"]= json::array();
-    for(auto& arg: args) theresult["ARGS"].push_back(arg);
+    theresult["ARGS"]= args;
 
     std::string ans = theresult.dump(4);
-    ws->sendText(ans);
+    for(auto& ws: this->mp_wsserver)
+        ws->sendText(ans);
+
     return true;
 } //}
 
 EBStreamAbstraction::UNST    ResourceManager::NewUNST() //{
 {
+    DEBUG("call %s", FUNCNAME);
     return this->mp_httpserver->newUnderlyStream();
 } //}
 
 void ResourceManager::bind() //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->mp_httpserver != nullptr);
     this->mp_httpserver->bind();
 } //}
 void ResourceManager::listen() //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->mp_httpserver != nullptr);
     this->mp_httpserver->listen();
 } //}
 
 void ResourceManager::close() //{
 {
+    DEBUG("call %s", FUNCNAME);
     if(this->mp_httpserver != nullptr) {
         this->mp_httpserver->close();
         this->mp_httpserver = nullptr;
@@ -206,6 +215,7 @@ void ResourceManager::close() //{
 
 ResourceManager::~ResourceManager() //{
 {
+    DEBUG("call %s", FUNCNAME);
     assert(this->mp_httpserver == nullptr);
     assert(this->mp_wsserver.size() == 0);
 } //}

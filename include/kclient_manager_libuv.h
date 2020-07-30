@@ -11,7 +11,6 @@ NS_PROXY_CLIENT_START
 class ServerManagerUV: public ServerManager {
     private:
         uv_loop_t* m_loop;
-        std::string m_config_file;
 
 
     protected:
@@ -23,7 +22,6 @@ class ServerManagerUV: public ServerManager {
 
     public:
         ServerManagerUV(const std::string& http_conf_file, uv_loop_t* loop);
-        void start() override;
 };
 
 

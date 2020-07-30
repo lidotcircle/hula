@@ -81,6 +81,7 @@ int main() {
     sigaction(SIGPIPE, &mm, nullptr);
 
     auto __manager = new ServerManagerUV("../tests/httpfileserver_config.json", &loop);
+    manager = __manager;
     __manager->start();
 
     while(uv_continue) {
@@ -97,6 +98,7 @@ int main() {
 
     uv_loop_close(&loop);
     close_loop = true;
+    delete __manager;
     return 0;
 }
 

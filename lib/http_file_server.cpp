@@ -116,6 +116,7 @@ HttpFileServer::HttpFileServer(std::shared_ptr<HttpFileServerConfig> config): m_
 
 void HttpFileServer::bind() //{
 {
+    DEBUG("call %s", FUNCNAME);
     auto addr = this->m_config->BindAddr();
     auto port = this->m_config->BindPort();
     this->bind_ipv4(port, addr);

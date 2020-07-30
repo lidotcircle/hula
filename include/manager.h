@@ -59,7 +59,6 @@ class ResourceManager
         HttpFileServer* mp_httpserver;
         std::set<WebSocketServer*> mp_wsserver;
 
-        void post_init(const std::string& filename, UNST connection);
         static void websocketUpgradeHandler(HttpFileServer::UpgradeRequest* upgrade, HttpFileServer::UpgradeExtraData* data);
         void setup_new_ws(WebSocketServer* ws);
         void clean_ws(WebSocketServer* ws);
@@ -78,9 +77,9 @@ class ResourceManager
         void         Response(WebSocketServer* ws, int id, bool error, std::string msg);
         bool         Inform(const std::string& eventname, const std::vector<std::string>& args);
 
-        void setup_FileServer(HttpFileServer* server);
-
         UNST    NewUNST();
+
+        void post_init(const std::string& filename, UNST connection);
 
 
     public:
@@ -93,7 +92,7 @@ class ResourceManager
 
         void bind();
         void listen();
-        void close();
+        virtual void close();
 
         ~ResourceManager();
 };

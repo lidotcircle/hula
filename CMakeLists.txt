@@ -43,8 +43,6 @@ set(kproxy_lib_src
     lib/kclient_manager_libuv.cpp
 
     lib/manager.cpp
-    lib/manager_libuv.cpp
-    lib/manager_libuvTLS.cpp
 
     lib/kpacket.cpp
     lib/socks5.cpp
