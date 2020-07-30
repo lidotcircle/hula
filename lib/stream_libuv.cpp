@@ -249,6 +249,9 @@ void EBStreamUV::uv_stream_read_callback(uv_stream_t* stream, ssize_t nread, con
 {
     DEBUG("call %s", FUNCNAME);
     EBStreamUV* _this = static_cast<decltype(_this)>(uv_handle_get_data((uv_handle_t*)stream));
+    EBStreamAbstraction* _check = _this; // FIXME
+    EBStreamUV* _check2 = dynamic_cast<decltype(_check2)>(_check);
+    assert(_check2);
 
     if(nread <= 0) {
         free(buf->base);
@@ -436,16 +439,10 @@ EBStreamUV::EBStreamUV(uv_tcp_t* tcp) //{
 
     this->recalculatespeed();
 } //}
-EBStreamUV::EBStreamUV(UNST tcp) //{
+EBStreamUV::EBStreamUV(UNST tcp): EBStreamUV(EBStreamUV::getStreamFromWrapper(tcp)) //{
 {
     DEBUG("call %s", FUNCNAME);
     assert(tcp->getType() == StreamType::LIBUV);
-    this->mp_tcp = EBStreamUV::getStreamFromWrapper(tcp);
-    if(this->mp_tcp != nullptr)
-        uv_handle_set_data((uv_handle_t*)this->mp_tcp, this);
-    this->m_stream_read = false;
-
-    this->recalculatespeed();
 } //}
 EBStreamUV::~EBStreamUV() //{
 {
@@ -497,6 +494,8 @@ void EBStreamUV::release() //{
 EBStreamAbstraction::UNST EBStreamUV::transfer() //{
 {
     DEBUG("call %s", FUNCNAME);
+    assert(uv_handle_get_data((uv_handle_t*)this->mp_tcp) == this);
+    uv_handle_set_data((uv_handle_t*)this->mp_tcp, nullptr);
     if(this->in_read()) this->stop_read();
     auto stream = this->mp_tcp;
     this->mp_tcp = nullptr;
@@ -510,6 +509,7 @@ void  EBStreamUV::regain(UNST stream) //{
     assert(stream->getType() == this->getType());
     __UnderlyingStreamUV* ss = dynamic_cast<decltype(ss)>(stream.get()); assert(ss);
     this->mp_tcp = static_cast<decltype(this->mp_tcp)>(ss->getStream());
+    assert(uv_handle_get_data((uv_handle_t*)this->mp_tcp) == nullptr);
     uv_handle_set_data((uv_handle_t*)this->mp_tcp, this);
 } //}
 

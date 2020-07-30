@@ -143,7 +143,9 @@ class Http: virtual public EBStreamAbstraction, virtual public StoreFetchPointer
         std::unordered_map<std::string, std::string> m_request_header;
         http_parser m_parser;
         http_parser_settings m_parser_setting;
-        ROBuf m_remain;
+        ROBuf m_ref;
+        ROBuf m_pushed;
+        const char* m_max_ptr;
 
         HttpRequest* m_current_request;
 
@@ -175,6 +177,7 @@ class Http: virtual public EBStreamAbstraction, virtual public StoreFetchPointer
         static int http_on_chunk_header(http_parser* parser);
         static int http_on_chunk_complete(http_parser* parser);
 
+        void run_parser();
         void start_request();
 
         static void response_write_callback(ROBuf buf, int status, void* data);

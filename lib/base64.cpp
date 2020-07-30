@@ -26,7 +26,7 @@ int Base64Encode(const char* src, size_t src_len, char* dst, size_t dst_len) //{
       bits_collected += 8;
       while (bits_collected >= 6) {
          bits_collected -= 6;
-         if((outpos + 1) >= dst_len) return -1;
+         if((outpos + 1) > dst_len) return -1;
          dst[outpos++] = b64_table[(accumulator >> bits_collected) & 0x3fu];
       }
    }
@@ -34,17 +34,17 @@ int Base64Encode(const char* src, size_t src_len, char* dst, size_t dst_len) //{
    if (bits_collected > 0) { // Any trailing bits that are missing.
       assert(bits_collected < 6);
       accumulator <<= 6 - bits_collected;
-      if((outpos + 1) >= dst_len) return -1;
+      if((outpos + 1) > dst_len) return -1;
       dst[outpos++] = b64_table[accumulator & 0x3fu];
    }
    
    assert(outpos % 4 != 1);
    if(outpos % 4 == 2) {
-       if((outpos + 2) >= dst_len) return -1;
+       if((outpos + 2) > dst_len) return -1;
        dst[outpos++] = '=';
        dst[outpos++] = '=';
    } else if (outpos % 4 ==3 ) {
-       if((outpos + 1) >= dst_len) return -1;
+       if((outpos + 1) > dst_len) return -1;
        dst[outpos++] = '=';
    }
    assert(outpos % 4 == 0);
@@ -67,7 +67,7 @@ int Base64Decode(const char* src, size_t src_len, char* dst, size_t dst_len) //{
       bits_collected += 6;
       if (bits_collected >= 8) {
           bits_collected -= 8;
-          if((curpos + 1) >= dst_len) return -1;
+          if((curpos + 1) > dst_len) return -1;
           dst[curpos++] = static_cast<unsigned char>((accumulator >> bits_collected) & 0xffu);
       }
    }

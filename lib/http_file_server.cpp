@@ -307,11 +307,11 @@ static void file_open_callback(int status, void* data) //{
 void HttpFileServer::upgrade_listener(EventEmitter* obj, const std::string& eventname, EventArgs::Base* aaa) //{
 {
     DEBUG("call %s", FUNCNAME);
-    GETTHIS(UpgradeArgs, "upgrade"); // FIXME
+    GETTHIS(UpgradeArgs, "upgrade");
 
     auto upgrade = args->m_upgrade;
 
-    auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+   auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     upgrade->setHeader("Date", time_t_to_UTCString(now));
     upgrade->setHeader("Server", SERVERNAME);
 
@@ -330,6 +330,7 @@ void HttpFileServer::upgrade_listener(EventEmitter* obj, const std::string& even
     } else {
         upgrade->setStatus(HttpStatus::BAD_REQUEST);
         upgrade->RejectUpgrade("<h1>bad ws request</h1>");
+        rr->m_returned = true;
         return;
     }
     delete rr;
@@ -338,7 +339,10 @@ void HttpFileServer::upgraded_listener(EventEmitter* obj, const std::string& eve
 {
     DEBUG("call %s", FUNCNAME);
     GETTHIS(UpgradedArgs, "upgraded");
-    delete obj;
+    assert(_this->m_sessions.find(http) != _this->m_sessions.end());;
+    _this->m_sessions.erase(_this->m_sessions.find(http));
+    assert(!http->hasStreamObject());
+    delete http;
 } //}
 void HttpFileServer::request_listener(EventEmitter* obj, const std::string& eventname, EventArgs::Base* aaa) //{
 {
@@ -416,6 +420,7 @@ void HttpFileServer::error_listener(EventEmitter* obj, const std::string& eventn
 
 void HttpFileServer::ws_upgrade_preprocess(HttpRequest* request, UpgradeRequest* rr) //{
 {
+    DEBUG("call %s", FUNCNAME);
     if(request->GetRequestHeader("Upgrade").size() == 0 ||
        tolower_(request->GetRequestHeader("Upgrade")) != "websocket") {
         request->setStatus(HttpStatus::BAD_REQUEST);
@@ -441,9 +446,12 @@ void HttpFileServer::ws_upgrade_preprocess(HttpRequest* request, UpgradeRequest*
     auto sha1 = Sha1Bin(key.c_str(), key.size());
     std::string keysha1(28, '=');
     auto n    = Base64Encode(sha1, 20, (char*)keysha1.c_str(), 28);
-    assert(n == 28);
+    char buf[20];
+    assert(Base64Decode(keysha1.c_str(), keysha1.size(), buf, sizeof(buf)) == 20);
     request->setHeader("Sec-WebSocket-Accept", keysha1);
     request->setHeader("Sec-WebSocket-Version", "13");
+    request->setHeader("Connection", "Upgrade");
+    request->setHeader("Upgrade", "websocket");
 
     if(this->m_ws_handler == nullptr) {
         request->setStatus(HttpStatus::BAD_REQUEST);
@@ -480,21 +488,29 @@ void HttpFileServer::drain_listener(EventEmitter* obj, const std::string& eventn
 
 void HttpFileServer::SetUpgradeHandler(UpgradeHandler h) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->m_upgrade_handler = h;
 } //}
 void HttpFileServer::SetWSHandler(UpgradeHandler h) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->m_ws_handler = h;
 } //}
 void HttpFileServer::SetUpgradeData(UpgradeExtraData* data) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->m_upgrade_data = data;
 } //}
 
-void HttpFileServer::close() {this->emit("dead", new EventArgs::Base());}
+void HttpFileServer::close() //{
+{
+    DEBUG("call %s", FUNCNAME);
+    this->emit("dead", new EventArgs::Base());
+} //}
 
 HttpFileServer::~HttpFileServer() //{
 {
+    DEBUG("call %s", FUNCNAME);
     for(auto& session: this->m_sessions)
         delete session;
     if(this->m_upgrade_data) {
@@ -507,34 +523,51 @@ HttpFileServer::~HttpFileServer() //{
 
 HttpFileServer::UpgradeRequestIMPL::UpgradeRequestIMPL(HttpRequest* request) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->m_request = request;
+    this->m_returned = false;
 } //}
 void HttpFileServer::UpgradeRequestIMPL::reject() //{
 {
+    DEBUG("call %s", FUNCNAME);
+    assert(this->m_returned == false);
+    this->m_returned = true;
     this->m_request->setStatus(HttpStatus::BAD_REQUEST);
     this->m_request->RejectUpgrade(nullptr);
 } //}
 EBStreamAbstraction::UNST HttpFileServer::UpgradeRequestIMPL::accept() //{
 {
+    DEBUG("call %s", FUNCNAME);
+    assert(this->m_returned == false);
+    this->m_returned = true;
     this->m_request->setStatus(HttpStatus::SWITCHING_PROTOCOLS);
     return this->m_request->AcceptUpgrade(nullptr);
 } //}
 
 std::string HttpFileServer::UpgradeRequestIMPL::value(const std::string& field) //{
 {
+    DEBUG("call %s", FUNCNAME);
     return this->m_request->GetRequestHeader(field);
 } //}
 std::string HttpFileServer::UpgradeRequestIMPL::url() //{
 {
+    DEBUG("call %s", FUNCNAME);
     return this->m_request->GetURL();
 } //}
 ROBuf       HttpFileServer::UpgradeRequestIMPL::data() //{
 {
+    DEBUG("call %s", FUNCNAME);
     return this->m_request->GetData();
 } //}
 
 void HttpFileServer::UpgradeRequestIMPL::setHeader(const std::string& field, const std::string& value) //{
 {
+    DEBUG("call %s", FUNCNAME);
     this->m_request->setHeader(field, value);
+} //}
+
+HttpFileServer::UpgradeRequestIMPL::~UpgradeRequestIMPL() //{
+{
+    assert(this->m_returned && "unhandled http upgrade");
 } //}
 

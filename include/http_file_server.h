@@ -41,6 +41,8 @@ class HttpFileServer: virtual protected EBStreamAbstraction, public StoreFetchPo
             virtual ROBuf       data() = 0;
 
             virtual void setHeader(const std::string& field, const std::string& value) = 0;
+
+            inline virtual ~UpgradeRequest() {};
         };
 
         using UpgradeHandler   = void (*)(UpgradeRequest* upgrade, UpgradeExtraData* data);
@@ -52,6 +54,9 @@ class HttpFileServer: virtual protected EBStreamAbstraction, public StoreFetchPo
             private:
                 HttpRequest* m_request;
 
+            protected:
+                bool m_returned;
+                friend class HttpFileServer;
 
             public:
                 UpgradeRequestIMPL(HttpRequest* request);
@@ -63,6 +68,8 @@ class HttpFileServer: virtual protected EBStreamAbstraction, public StoreFetchPo
                 ROBuf       data() override;
 
                 void setHeader(const std::string& field, const std::string& value) override;
+
+                ~UpgradeRequestIMPL() override;
         };
 
         std::shared_ptr<HttpFileServerConfig> m_config;

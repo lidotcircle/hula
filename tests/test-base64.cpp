@@ -2,25 +2,42 @@
 #include <iostream>
 #include <assert.h>
 #include <string.h>
+#include <math.h>
+
+#include <random>
+static std::default_random_engine engine;
+static std::uniform_int_distribution<uint8_t> dist;
+
+
+void test(char* buf, size_t len) //{
+{
+    size_t n = std::ceil(len / 3.0) * 4;
+    char* buf1 = (char*)malloc(n);
+    char* buf2 = (char*)malloc(len);
+
+    auto a = Base64Encode(buf, len, buf1, n);
+    assert(a == n);
+    auto b = Base64Decode(buf1, n, buf2, len);
+    assert(b == len);
+
+    assert(memcmp(buf, buf2, len) == 0);
+
+    free(buf1); free(buf2);
+} //}
 
 
 int main() {
     char hello[] = "hello world! good morning";
-    char obuf[1000];
-    char obuf2[1000];
+    test(hello, sizeof(hello));
 
-    int a = Base64Encode(hello, strlen(hello), obuf, sizeof(obuf));
-    obuf[a] = 0;
-    assert(a > 0);
+    for(int i=0;i<100;i++) {
+        int j = dist(engine) + 8;
+        char* buf = (char*)malloc(j);
+        for(int k=0;k<j;k++)
+            buf[k] = dist(engine);
 
-    std::cout << a << std::endl;
-    std::cout << obuf << std::endl;
-
-    int b = Base64Decode(obuf, a, obuf2, sizeof(obuf2));
-    obuf2[b] = 0;
-    assert(b > 0);
-
-    std::cout << b << std::endl;
-    std::cout << obuf2 << std::endl;
+        test(buf, j);
+        free(buf);
+    }
 }
 

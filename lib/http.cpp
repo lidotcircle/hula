@@ -21,7 +21,9 @@ Http::Http(const std::unordered_map<std::string, std::string>& default_response_
     this->m_upgrade = false;
     this->m_chunk = false;
     this->m_writed_buffer_size = 0;
+    this->m_max_ptr = nullptr;
     http_parser_init(&this->m_parser, http_parser_type::HTTP_REQUEST);
+    this->m_parser.data = this;
     http_parser_settings_init(&this->m_parser_setting);
     this->m_parser_setting.on_message_begin    = http_on_message_begin;
     this->m_parser_setting.on_url              = http_on_url;
@@ -33,8 +35,6 @@ Http::Http(const std::unordered_map<std::string, std::string>& default_response_
     this->m_parser_setting.on_message_complete = http_on_message_complete;
     this->m_parser_setting.on_chunk_header     = http_on_chunk_header;
     this->m_parser_setting.on_chunk_complete   = http_on_chunk_complete;
-
-    this->m_parser.data = this;
 } //}
 
 /** implement virtual methods */
@@ -45,14 +45,17 @@ void Http::read_callback(ROBuf buf, int status) //{
         this->emit("error", new HttpArg::ErrorArgs("read failure"));
         return;
     }
-    ROBuf merge;
-    if(this->m_remain.size() == 0) {
-        merge = buf;
-    } else {
-        merge = this->m_remain + buf;
-        merge = ROBuf();
+
+    if(this->m_current_request != nullptr) { // IN PROCESSING REQUEST
+        this->m_pushed = this->m_pushed + buf;
+        return;
     }
-    http_parser_execute(&this->m_parser, &this->m_parser_setting, merge.base(), merge.size());
+
+    this->m_ref = this->m_pushed + buf; // keep MEMORY reference
+    this->m_pushed = ROBuf();
+    this->m_max_ptr = m_ref.base();
+
+    this->run_parser();
 } //}
 void Http::end_signal() //{
 {
@@ -69,6 +72,28 @@ void Http::should_stop_write() //{
     DEBUG("call %s", FUNCNAME);
 } //}
 
+void Http::run_parser() //{
+{
+    DEBUG("call %s", FUNCNAME);
+    auto checker = new ObjectChecker();
+    this->SetChecker(checker);
+
+    if(this->m_ref.size() == 0) return;
+    http_parser_execute(&this->m_parser, &this->m_parser_setting, this->m_ref.base(), this->m_ref.size());
+
+    if(checker->exist()) {
+        this->cleanChecker(checker);
+        if(this->m_parser.http_errno != http_errno::HPE_OK && this->m_parser.http_errno != http_errno::HPE_PAUSED) {
+            std::cout << this->m_ref.to_string() << std::endl;
+            std::string err(http_errno_name((http_errno)this->m_parser.http_errno));
+            this->emit("error", new HttpArg::ErrorArgs(err));
+        } else {
+            if(this->m_state == HttpState::MESSAGE_COMPLETE)
+                this->start_request();
+        }
+    }
+    delete checker;
+} //}
 void Http::start_request() //{
 {
     DEBUG("call %s", FUNCNAME);
@@ -203,6 +228,7 @@ int Http::http_on_value(http_parser* parser, const char* data, size_t len) //{
 {
     DEBUG("call %s, value=%s", FUNCNAME, std::string(data, data + len).c_str());
     Http* _this = static_cast<decltype(_this)>(parser->data);
+    _this->m_max_ptr = data + len;
     if(_this->m_state == HttpState::VALUE) {
         _this->m_request_header[_this->m_prev_field] += std::string(data, data + len);
         return 0;
@@ -225,6 +251,7 @@ int Http::http_on_body(http_parser* parser, const char* data, size_t len) //{
 { 
     DEBUG("call %s, body=%s", FUNCNAME, std::string(data, data + len).c_str());
     Http* _this = static_cast<decltype(_this)>(parser->data);
+    _this->m_max_ptr = data + len;
     if(_this->m_state == HttpState::BODY) {
         char* ddd = (char*)malloc(len);
         memcpy(ddd, data, len);
@@ -233,9 +260,9 @@ int Http::http_on_body(http_parser* parser, const char* data, size_t len) //{
     }
     assert(_this->m_state == HttpState::HEADER_COMPLETE);
     _this->m_state = HttpState::BODY;
-    char* ddd = (char*)malloc(len);
-    memcpy(ddd, data, len);
-    _this->m_req_data = ROBuf(ddd, len, 0, free);
+    ROBuf buf(len);
+    memcpy(buf.__base(), data, len);
+    _this->m_req_data = buf;
     return 0;
 } //}
 int Http::http_on_message_complete(http_parser* parser) //{
@@ -245,7 +272,7 @@ int Http::http_on_message_complete(http_parser* parser) //{
     assert(_this->m_state == HttpState::BODY || 
             _this->m_state == HttpState::HEADER_COMPLETE);
     _this->m_state = HttpState::MESSAGE_COMPLETE;
-    _this->start_request();
+    http_parser_pause(parser, 1);
     return 0;
 } //}
 int Http::http_on_chunk_header(http_parser* parser) //{
@@ -253,14 +280,14 @@ int Http::http_on_chunk_header(http_parser* parser) //{
     DEBUG("call %s", FUNCNAME);
     Http* _this = static_cast<decltype(_this)>(parser->data);
     _this->m_chunk = true;
-    __logger->error("TODO"); // TODO
+    // TODO
     return -1;
 } //}
 int Http::http_on_chunk_complete(http_parser* parser) //{
 {
     DEBUG("call %s", FUNCNAME);
     Http* _this = static_cast<decltype(_this)>(parser->data);
-    __logger->error("TODO"); // TODO
+    // TODO
     return -1;
 } //}
 
@@ -273,7 +300,18 @@ void Http::FinishRequest(HttpRequest* req) //{
     delete req;
     assert(!this->in_read());
     this->start_read();
+    this->m_state = HttpState::FINISH_PREV;
+    assert(this->m_max_ptr != nullptr);
+    assert(this->m_max_ptr >= this->m_ref.base());
+
+    size_t consume_len = this->m_max_ptr - this->m_ref.base();
+    assert(consume_len <= this->m_ref.size());
+
+    if(consume_len > 0)
+        this->m_ref = this->m_ref.increaseOffset(consume_len);
     http_parser_init(&this->m_parser, http_parser_type::HTTP_REQUEST);
+    this->m_parser.data = this;
+    this->run_parser();
 } //}
 Http::UNST Http::FinishUpgradeAccept(HttpRequest* req) //{
 {
