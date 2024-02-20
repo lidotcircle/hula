@@ -5,7 +5,6 @@
 
 #include <chrono>
 #include <time.h>
-#include <filesystem>
 #include <map>
 
 #define DEBUG(all...) __logger->debug(all)
@@ -375,23 +374,11 @@ void HttpFileServer::request_listener(EventEmitter* obj, const std::string& even
         return;
     }
 
-    std::filesystem::path filepath = std::filesystem::absolute(_this->m_config->DocRoot()).lexically_normal();
-    filepath.append(__url.m_path.substr(1));
-    if(!filepath.has_extension()) {
-        auto unknown = content_type_map.find("unknown");
-        assert(unknown != content_type_map.end());
-        request->setHeader("Content-Type", unknown->second);
-    } else {
-        std::string extension = filepath.extension();
-        if(content_type_map.find(extension) == content_type_map.end()) {
-            auto unknown = content_type_map.find("unknown");
-            assert(unknown != content_type_map.end());
-            request->setHeader("Content-Type", unknown->second);
-        } else {
-            auto type = content_type_map.find(extension);
-            request->setHeader("Content-Type", type->second);
-        }
-    }
+    auto filepath = _this->m_config->DocRoot();
+    filepath += __url.m_path.substr(1);
+    auto unknown = content_type_map.find("unknown");
+    assert(unknown != content_type_map.end());
+    request->setHeader("Content-Type", unknown->second);
 
     FileServerRequestInfo* info = new FileServerRequestInfo();
     request->SetInfo(info);
