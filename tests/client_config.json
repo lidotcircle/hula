@@ -17,8 +17,8 @@
     "servers": [
         {
             "server_name": "beybey",
-            "address": "www.example.com",
-            "port": 7700,
+            "address": "localhost",
+            "port": 7788,
             "certificate": "fake certificate",
             "cipher": "chacha20",
             "username": "admin",

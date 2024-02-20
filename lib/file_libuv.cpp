@@ -53,6 +53,7 @@ static void free_uv_fs_t(uv_fs_t* req) {uv_fs_req_cleanup(req); delete req;}
 
 UVFile::UVFile(uv_loop_t* loop, const std::string& filename): m_filename(filename) //{
 {
+    if (loop == nullptr) return;
     this->mp_loop = loop;
 
     this->m_flags = 0;

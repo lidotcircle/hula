@@ -139,7 +139,7 @@ SingleServerInfo* Server::select_remote_serever() //{
         avails.insert(std::make_pair(point, &x));
     }
     if(avails.size() == 0) {
-        __logger->warn("no server avaliable");
+        __logger->warn("no server avaliable, total = %d", this->m_config->Servers().size());
         return nullptr;
     }
 

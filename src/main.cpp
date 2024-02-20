@@ -71,9 +71,13 @@ static void interrupt_handle(int sig) //{
     uv_continue = false;
 } //}
 
-int main() //{
+int main(int argc, char* argv[]) //{
 {
-    __logger->Level = Logger::LoggerLevel::LOGGER_INFO;
+    if (argc != 2) {
+        std::cerr << "kproxys <config-file>" << std::endl;
+        return 1;
+    }
+    __logger->Level = Logger::LoggerLevel::LOGGER_DEBUG;
     uv_loop_t loop;
     uv_loop_init(&loop);
     uv_loop_global = &loop;
@@ -84,7 +88,7 @@ int main() //{
 
     uv_tcp_t* tcp = new uv_tcp_t();
     uv_tcp_init(&loop, tcp);
-    auto config = std::shared_ptr<ServerConfig>(new UVServerConfig(&loop, "../tests/server_config.json"));
+    auto config = std::shared_ptr<ServerConfig>(new UVServerConfig(&loop, argv[1]));
     config->loadFromFile(nullptr, nullptr);
     KProxyServer::Server* server = Factory::KProxyServer::createUVTLSServer(config, tcp);
 //    KProxyServer::UVServer server(tcp, config);

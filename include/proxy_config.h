@@ -19,7 +19,7 @@ class ProxyConfig: public ConfigFile //{
 
 
     public:
-        ProxyConfig();
+        ProxyConfig(const std::string& filename);
         void addRules(const std::vector<std::string>& rule);
         bool match(const std::string& addr, int port);
 }; //}
@@ -27,6 +27,6 @@ class ProxyConfig: public ConfigFile //{
 
 class UVProxyConfig: public ProxyConfig, protected UVFile {
     public:
-    inline UVProxyConfig(uv_loop_t* loop, const std::string& filename): ProxyConfig(), UVFile(loop, filename) {}
+    inline UVProxyConfig(uv_loop_t* loop, const std::string& filename): ProxyConfig(filename), UVFile(loop, filename) {}
 };
 

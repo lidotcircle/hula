@@ -1,6 +1,7 @@
 #include "../include/kclient_config.h"
 #include "../include/config.h"
 #include "../include/utils.h"
+#include <iostream>
 
 
 #define DEBUG(all...) __logger->debug(all)
@@ -38,7 +39,10 @@ json SingleServerInfo::to_json() //{
 //}
 
 
-ClientConfig::ClientConfig(): m_policy(), m_servers(), m_accounts(), mp_proxyrule(nullptr), mp_adblock_rule(nullptr) {}
+ClientConfig::ClientConfig(const std::string& filename): m_policy(), m_servers(), m_accounts(), mp_proxyrule(nullptr), mp_adblock_rule(nullptr)
+{
+    fromROBuf(loadFile(filename));
+}
 
 bool ClientConfig::validateUser(const std::string& username, const std::string& password) //{
 {
@@ -178,13 +182,16 @@ bool ClientConfig::set_policy(const json& jsonx) //{
 } //}
 bool ClientConfig::set_servers(const json& jsonx) //{
 {
+    __logger->info("set servers");
     this->m_servers.clear();
     if(jsonx.find("servers") == jsonx.end()) {
+        __logger->warn("  no server found");
         this->setError("JSON: servers field doesn't exists");
         return false;
     }
 
     if(!jsonx["servers"].is_array()) {
+        __logger->warn("  found %d servers", jsonx["servers"].size());
         this->setError("JSON: bad config format at 'servers'");
         return false;
     }
@@ -268,25 +275,31 @@ struct __clientconfig_state: public CallbackPointer {
 bool ClientConfig::from_json(const json& jsonx) //{
 {
     DEBUG("call ClientConfig::from_json()");
-    if(!this->set_policy(jsonx))
+    if(!this->set_policy(jsonx)) {
+        __logger->error("fail to load policy");
         return false;
-    if(!this->set_servers(jsonx))
+    }
+    if(!this->set_servers(jsonx)) {
+        __logger->error("fail to load servers");
         return false;
-    if(!this->set_users(jsonx))
+    }
+    if(!this->set_users(jsonx)) {
+        __logger->error("fail to load users");
         return false;
+    }
 
     if(this->mp_proxyrule != nullptr) delete this->mp_proxyrule;
     this->mp_proxyrule = this->createProxyConfig(this->m_policy.m_proxyrule_filename);
     auto ptr = new __clientconfig_state(this);
     this->add_callback(ptr);
-    this->mp_proxyrule->loadFromFile(load_proxyrule_callback, ptr);
+    // this->mp_proxyrule->loadFromFile(load_proxyrule_callback, ptr);
 
     if(this->m_policy.m_adrule_filename.size() > 0) {
         if(this->mp_adblock_rule != nullptr) delete this->mp_adblock_rule;
         this->mp_adblock_rule = this->createProxyConfig(this->m_policy.m_adrule_filename);
         auto ptr = new __clientconfig_state(this);
         this->add_callback(ptr);
-        this->mp_adblock_rule->loadFromFile(load_adrule_callback, ptr);
+        // this->mp_adblock_rule->loadFromFile(load_adrule_callback, ptr);
     }
 
     return true;

@@ -158,15 +158,14 @@ class ClientConfig: public ConfigFile //{
         json servers_to_json();
         json users_to_json();
 
-
     protected:
-        virtual ProxyConfig* createProxyConfig(const std::string& filename) = 0;
+        virtual ProxyConfig* createProxyConfig(const std::string& filename) { return new UVProxyConfig(nullptr, filename); };
         static void load_proxyrule_callback(int status, void* data);
         static void load_adrule_callback(int status, void* data);
 
 
     public:
-        ClientConfig();
+        ClientConfig(const std::string& filename);
 
         ClientConfig(const ClientConfig&) = delete;
         ClientConfig(ClientConfig&&) = delete;
@@ -191,7 +190,9 @@ class ClientConfig: public ConfigFile //{
 
 class UVClientConfig: public ClientConfig, public UVFile {
     public:
-    inline UVClientConfig(uv_loop_t* loop, const std::string& filename): ClientConfig(), UVFile(loop, filename) {}
+    inline UVClientConfig(uv_loop_t* loop, const std::string& filename): ClientConfig(filename), UVFile(loop, filename)
+    {
+    }
     inline ProxyConfig* createProxyConfig(const std::string& filename) override {return new UVProxyConfig(this->get_uv_loop(), filename);}
 };
 

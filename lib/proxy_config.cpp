@@ -6,7 +6,7 @@
 #include <iostream>
 
 
-ProxyConfig::ProxyConfig() {}
+ProxyConfig::ProxyConfig(const std::string& filename) { fromROBuf(loadFile(filename)); }
 void ProxyConfig::addRules(const std::vector<std::string>& rules) //{
 {
     for(auto& rule: rules) this->m_matcher.add(rule);
