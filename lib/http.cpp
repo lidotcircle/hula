@@ -84,7 +84,6 @@ void Http::run_parser() //{
     if(checker->exist()) {
         this->cleanChecker(checker);
         if(this->m_parser.http_errno != http_errno::HPE_OK && this->m_parser.http_errno != http_errno::HPE_PAUSED) {
-            std::cout << this->m_ref.to_string() << std::endl;
             std::string err(http_errno_name((http_errno)this->m_parser.http_errno));
             this->emit("error", new HttpArg::ErrorArgs(err));
         } else {

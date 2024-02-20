@@ -65,6 +65,7 @@ namespace Factory {
             } else {
                 assert(false && "nope");
             }
+            return nullptr;
         }
         Socks5ServerAbstraction*     createSocks5Server(Server* server, std::shared_ptr<ClientConfig> config, UNST connection) {
             return new KProxyClient::UVSocks5Auth(server, config, EBStreamUV::getStreamFromWrapper(connection));
