@@ -111,7 +111,7 @@ void Logger::initializeOutputFile() //{
 void Logger::initializeOutputStream() //{
 {
     this->outputStream = new std::fstream(this->fileName, std::ios_base::out | std::ios_base::app);
-    if(errno != 0) {
+    if(this->outputStream->bad()) {
         std::cout << "FATAL Open file '" << this->fileName.c_str() << "' fail!" << std::endl;
         abort();
     } else {
